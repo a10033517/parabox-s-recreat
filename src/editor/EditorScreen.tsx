@@ -5,6 +5,13 @@ import { saveCustomLevel } from '../storage/progress'
 import { serializeLevel } from '../game/engine/levelSchema'
 
 const CELL_SIZE = 32
+// A double-click always dispatches `click`, `click`, `dblclick` in that order. To
+// tell a genuine single click apart from the first click of a double-click, every
+// click's placement is delayed behind a short timer; the double-click handler
+// cancels that pending timer before it ever fires, so placeAt runs at most once
+// per gesture and never runs at all for a double-click. This doesn't depend on the
+// timing of any earlier, unrelated click — unlike a same-cell-within-N-ms debounce.
+const DOUBLE_CLICK_WINDOW_MS = 250
 type Tool = 'wall' | 'target' | 'empty' | 'normal-box' | 'container-box' | 'player'
 
 const TOOLS: { tool: Tool; label: string }[] = [
@@ -48,7 +55,7 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
   const [levelName, setLevelName] = useState('')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const boxIdCounter = useRef(0)
-  const lastClickRef = useRef<{ x: number; y: number; time: number } | null>(null)
+  const pendingPlaceRef = useRef<number | null>(null)
 
   const activeGrid = getGridAtPath(root, path)
 
@@ -101,23 +108,26 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = cellFromEvent(e)
     if (x < 0 || y < 0 || x >= activeGrid.width || y >= activeGrid.height) return
-    // A real double-click (and userEvent's simulation of one) delivers two `click`
-    // events to this handler before the `dblclick` event fires. Without this guard,
-    // the second click of a double-click on an existing box would replace it with
-    // whatever tool is currently selected — regardless of which tool that is —
-    // deleting the box (and its edited interior) right before handleCanvasDoubleClick
-    // gets a chance to look for it and navigate in. Treat a same-cell click within
-    // 400ms of the previous click as "the second click of a double-click" and skip
-    // placement, leaving whatever was at that cell untouched.
-    const now = Date.now()
-    const last = lastClickRef.current
-    const isLikelySecondClickOfDoubleClick = last !== null && last.x === x && last.y === y && now - last.time < 400
-    lastClickRef.current = { x, y, time: now }
-    if (isLikelySecondClickOfDoubleClick) return
-    placeAt(x, y)
+    // Delay placement behind a short timer instead of placing immediately. A genuine
+    // single click's timer simply fires after DOUBLE_CLICK_WINDOW_MS. Both clicks of
+    // a double-click reschedule this same timer, and handleCanvasDoubleClick cancels
+    // it outright once `dblclick` fires — so placeAt never runs for either click of a
+    // double-click, regardless of which tool is selected or how long it has been
+    // since any earlier, unrelated click.
+    if (pendingPlaceRef.current !== null) {
+      window.clearTimeout(pendingPlaceRef.current)
+    }
+    pendingPlaceRef.current = window.setTimeout(() => {
+      pendingPlaceRef.current = null
+      placeAt(x, y)
+    }, DOUBLE_CLICK_WINDOW_MS)
   }
 
   const handleCanvasDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (pendingPlaceRef.current !== null) {
+      window.clearTimeout(pendingPlaceRef.current)
+      pendingPlaceRef.current = null
+    }
     const { x, y } = cellFromEvent(e)
     const box = activeGrid.boxes.find((b) => b.x === x && b.y === y && b.boxType === 'container')
     if (box) setPath((p) => [...p, { boxId: box.id }])
