@@ -1,4 +1,4 @@
-import { createEmptyGrid, cloneGrid, cellAt, boxAt, Grid } from './types'
+import { createEmptyGrid, cloneGrid, cellAt, boxAt } from './types'
 
 test('createEmptyGrid produces all-empty cells of given size', () => {
   const grid = createEmptyGrid(3, 2)
