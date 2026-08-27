@@ -2,3 +2,5 @@ node_modules
 dist
 dist-ssr
 *.local
+.claude/
+tsconfig.tsbuildinfo
