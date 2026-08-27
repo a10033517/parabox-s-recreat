@@ -48,6 +48,7 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
   const [levelName, setLevelName] = useState('')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const boxIdCounter = useRef(0)
+  const lastClickRef = useRef<{ x: number; y: number; time: number } | null>(null)
 
   const activeGrid = getGridAtPath(root, path)
 
@@ -100,6 +101,19 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = cellFromEvent(e)
     if (x < 0 || y < 0 || x >= activeGrid.width || y >= activeGrid.height) return
+    // A real double-click (and userEvent's simulation of one) delivers two `click`
+    // events to this handler before the `dblclick` event fires. Without this guard,
+    // the second click of a double-click on an existing box would replace it with
+    // whatever tool is currently selected — regardless of which tool that is —
+    // deleting the box (and its edited interior) right before handleCanvasDoubleClick
+    // gets a chance to look for it and navigate in. Treat a same-cell click within
+    // 400ms of the previous click as "the second click of a double-click" and skip
+    // placement, leaving whatever was at that cell untouched.
+    const now = Date.now()
+    const last = lastClickRef.current
+    const isLikelySecondClickOfDoubleClick = last !== null && last.x === x && last.y === y && now - last.time < 400
+    lastClickRef.current = { x, y, time: now }
+    if (isLikelySecondClickOfDoubleClick) return
     placeAt(x, y)
   }
 

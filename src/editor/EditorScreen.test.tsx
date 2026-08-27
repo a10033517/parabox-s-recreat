@@ -38,6 +38,20 @@ test('double-clicking a container box enters its interior, breadcrumb shows the 
   expect(screen.getByText('外层 > box-0')).toBeInTheDocument()
 })
 
+test('double-clicking with a different tool selected still enters the box instead of destroying it', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('容器箱'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 }) // places container box at (0,0), gets id box-0
+  await user.click(screen.getByLabelText('墙')) // switch to a DIFFERENT, non-box tool
+  // Simulate the actual event sequence a real double-click dispatches: click, click, dblclick.
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  fireEvent.dblClick(canvas, { clientX: 5, clientY: 5 })
+  expect(screen.getByText('外层 > box-0')).toBeInTheDocument()
+})
+
 test('clicking the breadcrumb root returns to the outer grid', async () => {
   render(<EditorScreen onBack={() => {}} />)
   const user = userEvent.setup()
