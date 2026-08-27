@@ -55,7 +55,7 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
   const [levelName, setLevelName] = useState('')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const boxIdCounter = useRef(0)
-  const pendingPlaceRef = useRef<number | null>(null)
+  const pendingPlaceRef = useRef<{ x: number; y: number; timer: number } | null>(null)
 
   const activeGrid = getGridAtPath(root, path)
 
@@ -63,6 +63,12 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
     const ctx = canvasRef.current?.getContext('2d')
     if (ctx) renderGrid(ctx, activeGrid, 0, 0, CELL_SIZE)
   }, [activeGrid])
+
+  useEffect(() => {
+    return () => {
+      if (pendingPlaceRef.current) window.clearTimeout(pendingPlaceRef.current.timer)
+    }
+  }, [])
 
   const placeAt = (x: number, y: number) => {
     setRoot((r) =>
@@ -110,22 +116,34 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
     if (x < 0 || y < 0 || x >= activeGrid.width || y >= activeGrid.height) return
     // Delay placement behind a short timer instead of placing immediately. A genuine
     // single click's timer simply fires after DOUBLE_CLICK_WINDOW_MS. Both clicks of
-    // a double-click reschedule this same timer, and handleCanvasDoubleClick cancels
-    // it outright once `dblclick` fires — so placeAt never runs for either click of a
-    // double-click, regardless of which tool is selected or how long it has been
-    // since any earlier, unrelated click.
-    if (pendingPlaceRef.current !== null) {
-      window.clearTimeout(pendingPlaceRef.current)
+    // a double-click land on the SAME cell and reschedule that cell's timer, and
+    // handleCanvasDoubleClick cancels it outright once `dblclick` fires — so placeAt
+    // never runs for either click of a double-click, regardless of which tool is
+    // selected or how long it has been since any earlier, unrelated click. A click on
+    // a DIFFERENT cell than the one currently pending is not part of that gesture, so
+    // its predecessor's placement is flushed immediately rather than dropped — this
+    // matters for rapid same-tool painting across multiple cells (e.g. quickly
+    // clicking several cells in a row to place walls).
+    const pending = pendingPlaceRef.current
+    if (pending) {
+      window.clearTimeout(pending.timer)
+      if (pending.x !== x || pending.y !== y) {
+        placeAt(pending.x, pending.y)
+      }
     }
-    pendingPlaceRef.current = window.setTimeout(() => {
-      pendingPlaceRef.current = null
-      placeAt(x, y)
-    }, DOUBLE_CLICK_WINDOW_MS)
+    pendingPlaceRef.current = {
+      x,
+      y,
+      timer: window.setTimeout(() => {
+        pendingPlaceRef.current = null
+        placeAt(x, y)
+      }, DOUBLE_CLICK_WINDOW_MS),
+    }
   }
 
   const handleCanvasDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (pendingPlaceRef.current !== null) {
-      window.clearTimeout(pendingPlaceRef.current)
+    if (pendingPlaceRef.current) {
+      window.clearTimeout(pendingPlaceRef.current.timer)
       pendingPlaceRef.current = null
     }
     const { x, y } = cellFromEvent(e)
