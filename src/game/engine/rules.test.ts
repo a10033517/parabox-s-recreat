@@ -1,5 +1,5 @@
 import { createEmptyGrid, Box, Grid } from './types'
-import { applyMove } from './rules'
+import { applyMove, checkWin } from './rules'
 
 function withPlayer(grid: Grid, x: number, y: number): Grid {
   grid.player = { x, y }
@@ -127,4 +127,26 @@ test('chain of only normal boxes (3+) against a wall is fully jammed', () => {
   grid.cells[1][4] = 'wall'
   const next = applyMove(grid, 'right')
   expect(next).toBeNull()
+})
+
+test('checkWin is true when goal box sits on target cell', () => {
+  const grid = createEmptyGrid(3, 3)
+  grid.cells[1][1] = 'target'
+  addBox(grid, 'g1', 1, 1, 'normal').isGoalBox = true
+  expect(checkWin(grid)).toBe(true)
+})
+
+test('checkWin is false when goal box is off target', () => {
+  const grid = createEmptyGrid(3, 3)
+  grid.cells[1][1] = 'target'
+  addBox(grid, 'g1', 0, 0, 'normal').isGoalBox = true
+  expect(checkWin(grid)).toBe(false)
+})
+
+test('checkWin recurses into nested interiors for goal boxes placed inside containers', () => {
+  const grid = createEmptyGrid(3, 3)
+  const container = addBox(grid, 'c1', 1, 1, 'container')
+  container.interior.cells[1][1] = 'target'
+  container.interior.boxes.push({ id: 'g1', x: 1, y: 1, boxType: 'normal', interior: createEmptyGrid(2, 2), isGoalBox: true })
+  expect(checkWin(grid)).toBe(true)
 })

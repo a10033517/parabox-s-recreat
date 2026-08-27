@@ -75,3 +75,11 @@ function resolveNesting(grid: Grid, chain: Box[], direction: Direction): Grid | 
   }
   return next
 }
+
+export function checkWin(grid: Grid): boolean {
+  for (const box of grid.boxes) {
+    if (box.isGoalBox && grid.cells[box.y][box.x] !== 'target') return false
+    if (!checkWin(box.interior)) return false
+  }
+  return true
+}
