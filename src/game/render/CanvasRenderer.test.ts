@@ -39,6 +39,28 @@ test('renderGrid draws one rect per cell plus one per box, and recurses into con
   expect(fillRectCalls).toBe(9)
 })
 
+test('renderGrid outlines a goal box and leaves ordinary boxes unoutlined', () => {
+  const grid = createEmptyGrid(2, 2)
+  grid.boxes.push({ id: 'b1', x: 0, y: 0, boxType: 'normal', interior: createEmptyGrid(2, 2) })
+
+  const plain = mockContext()
+  let strokeRectCalls = 0
+  plain.strokeRect = () => {
+    strokeRectCalls++
+  }
+  renderGrid(plain, grid, 0, 0, 32)
+  expect(strokeRectCalls).toBe(0)
+
+  grid.boxes[0].isGoalBox = true
+  const goal = mockContext()
+  strokeRectCalls = 0
+  goal.strokeRect = () => {
+    strokeRectCalls++
+  }
+  renderGrid(goal, grid, 0, 0, 32)
+  expect(strokeRectCalls).toBe(1)
+})
+
 test('renderGrid does not throw on deeply nested grids', () => {
   const ctx = mockContext()
   let grid = createEmptyGrid(2, 2)

@@ -3,6 +3,7 @@ import { Grid } from '../engine/types'
 const CELL_COLORS = { empty: '#1e293b', wall: '#0f172a', target: '#334155' } as const
 const BOX_COLORS = { normal: '#f59e0b', container: '#38bdf8' } as const
 const PLAYER_COLOR = '#f472b6'
+const GOAL_BOX_OUTLINE = '#facc15'
 const NEST_INSET = 4
 
 export function renderGrid(
@@ -24,6 +25,12 @@ export function renderGrid(
     const by = originY + box.y * cellSize
     ctx.fillStyle = BOX_COLORS[box.boxType]
     ctx.fillRect(bx, by, cellSize, cellSize)
+
+    if (box.isGoalBox) {
+      ctx.strokeStyle = GOAL_BOX_OUTLINE
+      ctx.lineWidth = 2
+      ctx.strokeRect(bx + 1, by + 1, cellSize - 2, cellSize - 2)
+    }
 
     if (box.boxType === 'container') {
       renderGrid(ctx, box.interior, bx + NEST_INSET, by + NEST_INSET, Math.max(4, cellSize - NEST_INSET * 2) / Math.max(box.interior.width, box.interior.height))

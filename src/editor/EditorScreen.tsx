@@ -12,7 +12,7 @@ const CELL_SIZE = 32
 // per gesture and never runs at all for a double-click. This doesn't depend on the
 // timing of any earlier, unrelated click — unlike a same-cell-within-N-ms debounce.
 const DOUBLE_CLICK_WINDOW_MS = 250
-type Tool = 'wall' | 'target' | 'empty' | 'normal-box' | 'container-box' | 'player'
+type Tool = 'wall' | 'target' | 'empty' | 'normal-box' | 'container-box' | 'player' | 'toggle-goal'
 
 const TOOLS: { tool: Tool; label: string }[] = [
   { tool: 'empty', label: '空地' },
@@ -20,6 +20,7 @@ const TOOLS: { tool: Tool; label: string }[] = [
   { tool: 'target', label: '目标点' },
   { tool: 'normal-box', label: '普通箱' },
   { tool: 'container-box', label: '容器箱' },
+  { tool: 'toggle-goal', label: '目标箱' },
   { tool: 'player', label: '玩家起点' },
 ]
 
@@ -71,8 +72,21 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
   }, [])
 
   const placeAt = (x: number, y: number) => {
+    // The id is allocated here rather than inside the updater below: React 18
+    // StrictMode double-invokes updaters to surface impurity, so incrementing the
+    // counter in there made the first box placed in dev become "box-1".
+    const newBoxId = tool === 'normal-box' || tool === 'container-box' ? `box-${boxIdCounter.current++}` : ''
     setRoot((r) =>
       setGridAtPath(r, path, (g) => {
+        if (tool === 'toggle-goal') {
+          // Unlike every other tool this one edits the box already at the cell
+          // instead of replacing it, so its interior, id and type all survive.
+          if (!g.boxes.some((b) => b.x === x && b.y === y)) return g
+          const nextGrid = cloneGrid(g)
+          const target = nextGrid.boxes.find((b) => b.x === x && b.y === y)!
+          target.isGoalBox = !target.isGoalBox
+          return nextGrid
+        }
         if (tool === 'normal-box' || tool === 'container-box') {
           // A double-click delivers its two constituent `click` events (plus the
           // final `dblclick`) to this same handler. Without this guard, the second
@@ -91,7 +105,7 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
           next.player = { x, y }
         } else {
           const box: Box = {
-            id: `box-${boxIdCounter.current++}`,
+            id: newBoxId,
             x,
             y,
             boxType: tool === 'container-box' ? 'container' : 'normal',
@@ -218,6 +232,16 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
         {activeGrid.boxes.map((box) => (
           <span key={box.id} data-testid={`box-at-${box.x}-${box.y}`}>
             {box.boxType}
+          </span>
+        ))}
+        {activeGrid.boxes.map((box) => (
+          <span key={`goal-${box.id}`} data-testid={`box-goal-at-${box.x}-${box.y}`}>
+            {box.isGoalBox ? 'goal' : 'not-goal'}
+          </span>
+        ))}
+        {activeGrid.boxes.map((box) => (
+          <span key={`id-${box.id}`} data-testid={`box-id-at-${box.x}-${box.y}`}>
+            {box.id}
           </span>
         ))}
       </div>

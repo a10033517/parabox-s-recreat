@@ -101,6 +101,70 @@ test('clicking two different cells in quick succession places on both, not just 
   expect(screen.getByTestId('cell-type-1-0')).toHaveTextContent('wall')
 })
 
+test('the first box placed on a fresh mount gets id box-0', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('普通箱'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.getByTestId('box-id-at-0-0')).toHaveTextContent('box-0')
+})
+
+test('the goal-box tool flips isGoalBox on an existing box without replacing it', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('容器箱'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.getByTestId('box-goal-at-0-0')).toHaveTextContent('not-goal')
+
+  await user.click(screen.getByLabelText('目标箱'))
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.getByTestId('box-goal-at-0-0')).toHaveTextContent('goal')
+  // Same id and same type: the box was edited in place, not deleted and recreated.
+  expect(screen.getByTestId('box-id-at-0-0')).toHaveTextContent('box-0')
+  expect(screen.getByTestId('box-at-0-0')).toHaveTextContent('container')
+
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.getByTestId('box-goal-at-0-0')).toHaveTextContent('not-goal')
+})
+
+test('the goal-box tool on an empty cell does not create a box', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('目标箱'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.queryByTestId('box-at-0-0')).not.toBeInTheDocument()
+})
+
+test('a saved level marked with the goal-box tool does not start already won', async () => {
+  localStorage.clear()
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('普通箱'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  await user.click(screen.getByLabelText('目标箱'))
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  await user.type(screen.getByLabelText('关卡名称'), 'goal-level')
+  await user.click(screen.getByText('储存'))
+
+  const { listCustomLevels } = await import('../storage/progress')
+  const { parseLevel } = await import('../game/engine/levelSchema')
+  const { checkWin } = await import('../game/engine/rules')
+  const grid = parseLevel(listCustomLevels().find((l) => l.id === 'goal-level')!.json)
+  expect(grid.boxes[0].isGoalBox).toBe(true)
+  expect(checkWin(grid)).toBe(false)
+})
+
 test('clicking save stores the level in localStorage', async () => {
   localStorage.clear()
   render(<EditorScreen onBack={() => {}} />)
