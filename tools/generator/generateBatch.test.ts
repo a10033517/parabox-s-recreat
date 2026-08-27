@@ -1,4 +1,5 @@
 import { solve } from './solver'
+import { checkWin } from '../../src/game/engine/rules'
 import { parseLevel } from '../../src/game/engine/levelSchema'
 import { generateLevelBatch } from './generateBatch'
 
@@ -15,7 +16,17 @@ test('generateLevelBatch produces at least one solvable level per tier within a 
   expect(result.length).toBeGreaterThan(0)
   for (const entry of result) {
     const grid = parseLevel(entry.json)
-    expect(solve(grid, 100)).not.toBeNull()
+    const solution = solve(grid, 100)
+    expect(solution).not.toBeNull()
+    expect(solution!.length).toBeGreaterThan(0)
+  }
+})
+
+test('generateLevelBatch never emits a level that is already won on load', () => {
+  const result = generateLevelBatch(2, seededRng(99))
+  expect(result.length).toBeGreaterThan(0)
+  for (const entry of result) {
+    expect(checkWin(parseLevel(entry.json))).toBe(false)
   }
 })
 

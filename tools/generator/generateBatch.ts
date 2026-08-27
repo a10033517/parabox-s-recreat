@@ -29,7 +29,9 @@ export function generateLevelBatch(targetPerTier: number, rng: () => number): Ge
     const steps = 3 + Math.floor(rng() * 8)
     const grid = generateLevel(seed, steps, rng)
     const solution = solve(grid, 150)
-    if (!solution) continue
+    // solve() returns [] (truthy) for a grid that is already won, so an empty
+    // solution means the reverse walk produced a level that is solved on load.
+    if (!solution || solution.length === 0) continue
 
     const nestingCount = countNestingEvents(grid, solution)
     const score = scoreDifficulty(solution.length, nestingCount)
