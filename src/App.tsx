@@ -3,7 +3,7 @@ import { MenuScreen } from './ui/MenuScreen'
 import { LevelSelect } from './ui/LevelSelect'
 import { GameScreen } from './game/GameScreen'
 import { EditorScreen } from './editor/EditorScreen'
-import { BUILTIN_LEVELS, loadGeneratedLevels, LevelMeta } from './levels'
+import { BUILTIN_LEVELS, loadCustomLevels, loadGeneratedLevels, LevelMeta } from './levels'
 import { isLevelComplete, listCompletedLevels, markLevelComplete } from './storage/progress'
 import { cloneGrid } from './game/engine/types'
 
@@ -12,7 +12,9 @@ type Screen = 'menu' | 'levelSelect' | 'game' | 'editor'
 export default function App() {
   const [screen, setScreen] = useState<Screen>('menu')
   const [activeLevel, setActiveLevel] = useState<LevelMeta | null>(null)
-  const allLevels = [...BUILTIN_LEVELS, ...loadGeneratedLevels()]
+  // Recomputed each render rather than memoised so a level just saved in the
+  // editor shows up as soon as the player navigates back to level select.
+  const allLevels = [...BUILTIN_LEVELS, ...loadGeneratedLevels(), ...loadCustomLevels()]
 
   if (screen === 'menu') {
     return <MenuScreen onStart={() => setScreen('levelSelect')} onEditor={() => setScreen('editor')} />
