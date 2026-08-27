@@ -43,9 +43,9 @@ test('renderGrid does not throw on deeply nested grids', () => {
   const ctx = mockContext()
   let grid = createEmptyGrid(2, 2)
   for (let i = 0; i < 5; i++) {
-    const inner = createEmptyGrid(2, 2)
-    grid = createEmptyGrid(2, 2)
-    grid.boxes.push({ id: `c${i}`, x: 0, y: 0, boxType: 'container', interior: inner })
+    const outer = createEmptyGrid(2, 2)
+    outer.boxes.push({ id: `c${i}`, x: 0, y: 0, boxType: 'container', interior: grid })
+    grid = outer
   }
   expect(() => renderGrid(ctx, grid, 0, 0, 32)).not.toThrow()
 })
