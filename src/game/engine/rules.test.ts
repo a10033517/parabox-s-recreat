@@ -119,11 +119,12 @@ test('container1 -> container2 -> normal -> wall: container1 nests into containe
   expect(next.player).toEqual({ x: 1, y: 1 })
 })
 
-test('chain of only normal boxes against a wall is fully jammed', () => {
-  const grid = withPlayer(createEmptyGrid(5, 3), 0, 1)
+test('chain of only normal boxes (3+) against a wall is fully jammed', () => {
+  const grid = withPlayer(createEmptyGrid(6, 3), 0, 1)
   addBox(grid, 'n1', 1, 1, 'normal')
   addBox(grid, 'n2', 2, 1, 'normal')
-  grid.cells[1][3] = 'wall'
+  addBox(grid, 'n3', 3, 1, 'normal')
+  grid.cells[1][4] = 'wall'
   const next = applyMove(grid, 'right')
   expect(next).toBeNull()
 })
