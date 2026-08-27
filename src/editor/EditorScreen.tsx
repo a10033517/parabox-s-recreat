@@ -14,12 +14,11 @@ const TOOLS: { tool: Tool; label: string }[] = [
   { tool: 'player', label: '玩家起点' },
 ]
 
-let boxIdCounter = 0
-
 export function EditorScreen({ onBack }: { onBack: () => void }) {
   const [grid, setGrid] = useState<Grid>(() => createEmptyGrid(6, 6))
   const [tool, setTool] = useState<Tool>('wall')
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const boxIdCounter = useRef(0)
 
   useEffect(() => {
     const ctx = canvasRef.current?.getContext('2d')
@@ -36,7 +35,7 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
         next.player = { x, y }
       } else {
         const box: Box = {
-          id: `box-${boxIdCounter++}`,
+          id: `box-${boxIdCounter.current++}`,
           x,
           y,
           boxType: tool === 'container-box' ? 'container' : 'normal',
