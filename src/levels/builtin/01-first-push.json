@@ -1,0 +1,13 @@
+{
+  "width": 5,
+  "height": 3,
+  "cells": [
+    ["wall", "wall", "wall", "wall", "wall"],
+    ["wall", "empty", "empty", "target", "wall"],
+    ["wall", "wall", "wall", "wall", "wall"]
+  ],
+  "boxes": [
+    { "id": "g1", "x": 2, "y": 1, "boxType": "normal", "isGoalBox": true, "interior": { "width": 1, "height": 1, "cells": [["empty"]], "boxes": [] } }
+  ],
+  "player": { "x": 1, "y": 1 }
+}
