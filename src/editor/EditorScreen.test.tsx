@@ -1,0 +1,29 @@
+import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { EditorScreen } from './EditorScreen'
+
+beforeEach(() => {
+  HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
+    fillRect: vi.fn(),
+    strokeRect: vi.fn(),
+  }) as unknown as typeof HTMLCanvasElement.prototype.getContext
+  HTMLCanvasElement.prototype.getBoundingClientRect = vi.fn().mockReturnValue({ left: 0, top: 0 }) as unknown as typeof HTMLCanvasElement.prototype.getBoundingClientRect
+})
+
+test('selecting the wall tool then clicking the canvas places a wall cell', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('墙'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 32 + 5, clientY: 5 })
+  expect(screen.getByTestId('cell-type-1-0')).toHaveTextContent('wall')
+})
+
+test('selecting the container box tool then clicking places a container box', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('容器箱'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  expect(screen.getByTestId('box-at-0-0')).toHaveTextContent('container')
+})
