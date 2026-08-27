@@ -1,4 +1,4 @@
-import { Box, cellAt, boxAt, cloneGrid, Direction, DIRECTION_VECTORS, Grid } from './types'
+import { Box, boxAt, canNestAt, cellAt, cloneGrid, Direction, DIRECTION_VECTORS, Grid, nestEntryPosition } from './types'
 
 export function applyMove(grid: Grid, direction: Direction): Grid | null {
   if (!grid.player) return null
@@ -41,6 +41,37 @@ export function applyMove(grid: Grid, direction: Direction): Grid | null {
   return resolveNesting(grid, chain, direction)
 }
 
-function resolveNesting(_grid: Grid, _chain: Box[], _direction: Direction): Grid | null {
-  return null
+function resolveNesting(grid: Grid, chain: Box[], direction: Direction): Grid | null {
+  const { dx, dy } = DIRECTION_VECTORS[direction]
+  let canReceiveNext = false
+  let nestIndex = -1
+  for (let i = chain.length - 1; i >= 0; i--) {
+    if (canReceiveNext) {
+      nestIndex = i
+      break
+    }
+    canReceiveNext = chain[i].boxType === 'container'
+  }
+  if (nestIndex === -1) return null
+
+  const receiver = chain[nestIndex + 1]
+  const nested = chain[nestIndex]
+  const entryPos = nestEntryPosition(receiver.interior, direction)
+  if (!canNestAt(receiver.interior, entryPos)) return null
+
+  const next = cloneGrid(grid)
+  next.boxes = next.boxes.filter((b) => b.id !== nested.id)
+  const nextReceiver = next.boxes.find((b) => b.id === receiver.id)!
+  const nestedCopy = structuredClone(nested)
+  nestedCopy.x = entryPos.x
+  nestedCopy.y = entryPos.y
+  nextReceiver.interior.boxes.push(nestedCopy)
+
+  next.player = { x: grid.player!.x + dx, y: grid.player!.y + dy }
+  for (let i = 0; i < nestIndex; i++) {
+    const b = next.boxes.find((bb) => bb.id === chain[i].id)!
+    b.x += dx
+    b.y += dy
+  }
+  return next
 }

@@ -45,3 +45,22 @@ export function cellAt(grid: Grid, x: number, y: number): CellType | 'oob' {
 export function boxAt(grid: Grid, x: number, y: number): Box | undefined {
   return grid.boxes.find((b) => b.x === x && b.y === y)
 }
+
+export function nestEntryPosition(interior: Grid, direction: Direction): { x: number; y: number } {
+  switch (direction) {
+    case 'right':
+      return { x: 0, y: Math.floor(interior.height / 2) }
+    case 'left':
+      return { x: interior.width - 1, y: Math.floor(interior.height / 2) }
+    case 'down':
+      return { x: Math.floor(interior.width / 2), y: 0 }
+    case 'up':
+      return { x: Math.floor(interior.width / 2), y: interior.height - 1 }
+  }
+}
+
+export function canNestAt(interior: Grid, pos: { x: number; y: number }): boolean {
+  if (pos.x < 0 || pos.y < 0 || pos.x >= interior.width || pos.y >= interior.height) return false
+  if (interior.cells[pos.y][pos.x] === 'wall') return false
+  return !boxAt(interior, pos.x, pos.y)
+}
