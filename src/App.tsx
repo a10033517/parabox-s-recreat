@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { MenuScreen } from './ui/MenuScreen'
 import { LevelSelect } from './ui/LevelSelect'
 import { GameScreen } from './game/GameScreen'
+import { EditorScreen } from './editor/EditorScreen'
 import { BUILTIN_LEVELS, loadGeneratedLevels, LevelMeta } from './levels'
 import { isLevelComplete, listCompletedLevels, markLevelComplete } from './storage/progress'
 import { cloneGrid } from './game/engine/types'
 
-type Screen = 'menu' | 'levelSelect' | 'game'
+type Screen = 'menu' | 'levelSelect' | 'game' | 'editor'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('menu')
@@ -14,7 +15,7 @@ export default function App() {
   const allLevels = [...BUILTIN_LEVELS, ...loadGeneratedLevels()]
 
   if (screen === 'menu') {
-    return <MenuScreen onStart={() => setScreen('levelSelect')} onEditor={() => {}} />
+    return <MenuScreen onStart={() => setScreen('levelSelect')} onEditor={() => setScreen('editor')} />
   }
 
   if (screen === 'levelSelect') {
@@ -42,6 +43,10 @@ export default function App() {
         }}
       />
     )
+  }
+
+  if (screen === 'editor') {
+    return <EditorScreen onBack={() => setScreen('menu')} />
   }
 
   return null

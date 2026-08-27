@@ -27,3 +27,34 @@ test('selecting the container box tool then clicking places a container box', as
   fireEvent.click(canvas, { clientX: 5, clientY: 5 })
   expect(screen.getByTestId('box-at-0-0')).toHaveTextContent('container')
 })
+
+test('double-clicking a container box enters its interior, breadcrumb shows the path', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('容器箱'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  fireEvent.dblClick(canvas, { clientX: 5, clientY: 5 })
+  expect(screen.getByText('外层 > box-0')).toBeInTheDocument()
+})
+
+test('clicking the breadcrumb root returns to the outer grid', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('容器箱'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  fireEvent.dblClick(canvas, { clientX: 5, clientY: 5 })
+  await user.click(screen.getByText('外层'))
+  expect(screen.queryByText(/外层 > /)).not.toBeInTheDocument()
+})
+
+test('clicking save stores the level in localStorage', async () => {
+  localStorage.clear()
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.type(screen.getByLabelText('关卡名称'), 'my-level')
+  await user.click(screen.getByText('储存'))
+  const { listCustomLevels } = await import('../storage/progress')
+  expect(listCustomLevels().map((l) => l.id)).toEqual(['my-level'])
+})
