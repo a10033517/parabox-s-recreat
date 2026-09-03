@@ -1,40 +1,47 @@
 import { useEffect, useRef, useState } from 'react'
-import { createGameState, currentGrid, GameState, isWon, move, undo } from './engine/GameState'
-import { renderGrid } from './render/CanvasRenderer'
+import { GameState } from './engine/GameState'
+import { Direction, PLAYER_ID, World } from './engine/types'
+import { renderBoard } from './render/CanvasRenderer'
 import { DPad } from '../ui/DPad'
 import { SwipeLayer } from '../ui/SwipeLayer'
-import { Direction, Grid } from './engine/types'
 
 const CELL_SIZE = 32
 
 export function GameScreen({
-  initialGrid,
+  initialWorld,
   onExit,
   onWin,
 }: {
-  initialGrid: Grid
+  initialWorld: World
   onExit: () => void
   onWin: () => void
 }) {
-  const [state, setState] = useState<GameState>(() => createGameState(initialGrid))
+  const stateRef = useRef<GameState>()
+  if (!stateRef.current) stateRef.current = new GameState(initialWorld)
+  const state = stateRef.current
+
+  const [, setTick] = useState(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wonRef = useRef(false)
 
   const handleMove = (direction: Direction) => {
-    setState((s) => move(s, direction))
+    if (state.move(direction)) setTick((t) => t + 1)
   }
+
+  const currentBoardId = state.current.locations[PLAYER_ID].board
+  const currentBoard = state.current.boards[currentBoardId]
 
   useEffect(() => {
     const ctx = canvasRef.current?.getContext('2d')
-    if (ctx) renderGrid(ctx, currentGrid(state), 0, 0, CELL_SIZE)
-  }, [state])
+    if (ctx) renderBoard(ctx, currentBoard, state.current, CELL_SIZE)
+  }, [state.current, currentBoard])
 
   useEffect(() => {
-    if (isWon(state) && !wonRef.current) {
+    if (state.isWon && !wonRef.current) {
       wonRef.current = true
       onWin()
     }
-  }, [state, onWin])
+  }, [state.current, onWin])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -49,12 +56,18 @@ export function GameScreen({
   return (
     <div className="game-screen">
       <div className="hud">
-        <span>步数: {state.history.length - 1}</span>
-        <button onClick={() => setState((s) => undo(s))}>复位上一步</button>
+        <span>步数: {state.moveCount}</span>
+        <button
+          onClick={() => {
+            if (state.undo()) setTick((t) => t + 1)
+          }}
+        >
+          复位上一步
+        </button>
         <button onClick={onExit}>离开</button>
       </div>
       <SwipeLayer onMove={handleMove}>
-        <canvas ref={canvasRef} width={CELL_SIZE * currentGrid(state).width} height={CELL_SIZE * currentGrid(state).height} />
+        <canvas ref={canvasRef} width={CELL_SIZE * currentBoard.size} height={CELL_SIZE * currentBoard.size} />
       </SwipeLayer>
       <DPad onMove={handleMove} />
     </div>
