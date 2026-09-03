@@ -70,3 +70,21 @@ test('reaching the win condition calls onWin exactly once', async () => {
   await user.click(screen.getByLabelText('右'))
   expect(onWin).toHaveBeenCalledTimes(1)
 })
+
+test('undoing out of a won state allows onWin to fire again on re-winning', async () => {
+  const root = makeFloorBoard('root', 2)
+  setRequirement(root, 1, 0, 'player')
+  const world = makeWorld(
+    [root],
+    [{ id: PLAYER_ID, kind: 'player' }],
+    { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } },
+  )
+  const onWin = vi.fn()
+  render(<GameScreen initialWorld={world} onExit={() => {}} onWin={onWin} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('右')) // win
+  expect(onWin).toHaveBeenCalledTimes(1)
+  await user.click(screen.getByText('复位上一步')) // undo out of the win
+  await user.click(screen.getByLabelText('右')) // re-win
+  expect(onWin).toHaveBeenCalledTimes(2)
+})

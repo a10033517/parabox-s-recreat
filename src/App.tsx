@@ -7,8 +7,13 @@ import { isLevelComplete, listCompletedLevels, markLevelComplete } from './stora
 
 // Lazy-loaded: EditorScreen still targets the pre-World engine API and won't
 // compile until sub-project 3 rebuilds it. A static import would fail at
-// module-link time and crash every screen, not just the editor — deferring
-// the import means only navigating into the editor hits that failure.
+// module-link time and crash every screen, not just the editor, under
+// `npm run dev` — deferring the import means only navigating into the editor
+// hits that failure there. This does NOT make the app buildable: `npm run
+// build` (Rollup) still statically resolves this dynamic import and hard-
+// errors on EditorScreen.tsx's missing exports either way. This sub-project's
+// tested acceptance bar is "playable under `npm run dev`," not "deployable
+// via `npm run build`" — that stays broken until sub-project 3 lands.
 const EditorScreen = lazy(() => import('./editor/EditorScreen').then((m) => ({ default: m.EditorScreen })))
 
 // Suspense alone only covers the loading state — a module-link failure
@@ -64,6 +69,7 @@ export default function App() {
   if (screen === 'game' && activeLevel) {
     return (
       <GameScreen
+        key={activeLevel.id}
         initialWorld={activeLevel.world}
         onExit={() => setScreen('levelSelect')}
         onWin={() => {

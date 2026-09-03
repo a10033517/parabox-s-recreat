@@ -59,7 +59,10 @@ export function GameScreen({
         <span>步数: {state.moveCount}</span>
         <button
           onClick={() => {
-            if (state.undo()) setTick((t) => t + 1)
+            if (state.undo()) {
+              wonRef.current = false
+              setTick((t) => t + 1)
+            }
           }}
         >
           复位上一步

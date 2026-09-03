@@ -32,7 +32,11 @@ export function loadGeneratedLevels(): LevelMeta[] {
 export const CUSTOM_LEVEL_ID_PREFIX = 'custom:'
 
 // Sub-project 3 rebuilds the editor against the new World format; any levels
-// saved by the old editor are in the old, incompatible format.
+// saved by the old editor are in the old, incompatible format. When this is
+// un-stubbed: parseLevel throws on invalid input, and this function runs
+// during App's render — restore a per-entry try/catch (the old
+// implementation had one) so one corrupt saved level can't white-screen the
+// whole app.
 export function loadCustomLevels(): LevelMeta[] {
   return []
 }
