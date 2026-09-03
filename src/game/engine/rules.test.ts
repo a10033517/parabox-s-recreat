@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { computeTarget } from './rules'
-import { HALF, makeFraction } from './fraction'
+import { computeTarget, getEntryCell } from './rules'
+import { HALF, makeFraction, ZERO, ONE } from './fraction'
 import { makeFloorBoard, makeWorld } from './testFixtures'
 
 describe('computeTarget', () => {
@@ -58,5 +58,46 @@ describe('computeTarget', () => {
     )
     const result = computeTarget(world, { board: 'boardC', x: 0, y: 1 }, 'left', HALF)
     expect(result).toEqual({ location: { board: 'root', x: 0, y: 1 }, relativeCoord: HALF })
+  })
+})
+
+describe('getEntryCell', () => {
+  it('lands on the center cell of a 3x3 board for all four directions when relativeCoord is HALF', () => {
+    const board = makeFloorBoard('inside', 3)
+    expect(getEntryCell(board, 'up', HALF)).toEqual({ cell: { x: 1, y: 2 }, newRelativeCoord: HALF })
+    expect(getEntryCell(board, 'down', HALF)).toEqual({ cell: { x: 1, y: 0 }, newRelativeCoord: HALF })
+    expect(getEntryCell(board, 'left', HALF)).toEqual({ cell: { x: 2, y: 1 }, newRelativeCoord: HALF })
+    expect(getEntryCell(board, 'right', HALF)).toEqual({ cell: { x: 0, y: 1 }, newRelativeCoord: HALF })
+  })
+
+  it('lands on a non-center cell for a non-center relativeCoord', () => {
+    const board = makeFloorBoard('inside', 4)
+    expect(getEntryCell(board, 'down', makeFraction(3, 8))).toEqual({
+      cell: { x: 1, y: 0 },
+      newRelativeCoord: HALF,
+    })
+  })
+
+  it('backs up one cell on an exact-boundary left/right entry, still in bounds', () => {
+    const board = makeFloorBoard('inside', 3)
+    expect(getEntryCell(board, 'left', makeFraction(2, 3))).toEqual({ cell: { x: 2, y: 1 }, newRelativeCoord: ONE })
+    expect(getEntryCell(board, 'right', makeFraction(2, 3))).toEqual({ cell: { x: 0, y: 1 }, newRelativeCoord: ONE })
+  })
+
+  it('does not apply the back-up rule to up/down entry on the same exact-boundary input', () => {
+    const board = makeFloorBoard('inside', 3)
+    expect(getEntryCell(board, 'up', makeFraction(2, 3))).toEqual({ cell: { x: 2, y: 2 }, newRelativeCoord: ZERO })
+    expect(getEntryCell(board, 'down', makeFraction(2, 3))).toEqual({ cell: { x: 2, y: 0 }, newRelativeCoord: ZERO })
+  })
+
+  it('returns a null cell instead of a negative index when the boundary case lands out of bounds', () => {
+    const board = makeFloorBoard('inside', 3)
+    expect(getEntryCell(board, 'left', ZERO)).toEqual({ cell: null, newRelativeCoord: ONE })
+    expect(getEntryCell(board, 'right', ZERO)).toEqual({ cell: null, newRelativeCoord: ONE })
+  })
+
+  it('never needs the null case for up/down, even at the same zero input', () => {
+    const board = makeFloorBoard('inside', 3)
+    expect(getEntryCell(board, 'down', ZERO)).toEqual({ cell: { x: 0, y: 0 }, newRelativeCoord: ZERO })
   })
 })
