@@ -1,66 +1,87 @@
-export type CellType = 'empty' | 'wall' | 'target'
+export type BoardId = string
+export type PieceId = string
 export type Direction = 'up' | 'down' | 'left' | 'right'
 
-export interface Box {
-  id: string
+export type CellType = 'floor' | 'wall'
+export type Requirement = 'box' | 'player'
+
+export interface Cell {
+  type: CellType
+  requirement?: Requirement
+}
+
+export interface Board {
+  id: BoardId
+  size: number     // every board is size x size
+  cells: Cell[][]  // cells[y][x], cells.length === size, cells[y].length === size
+}
+
+export type PieceKind = 'player' | 'normal' | 'container'
+
+export interface Piece {
+  id: PieceId
+  kind: PieceKind
+  boardRef?: BoardId // present only when kind === 'container'
+}
+
+export interface Location {
+  board: BoardId
   x: number
   y: number
-  boxType: 'normal' | 'container'
-  interior: Grid
-  isGoalBox?: boolean
 }
 
-export interface Grid {
-  width: number
-  height: number
-  cells: CellType[][]
-  boxes: Box[]
-  player?: { x: number; y: number }
+export interface World {
+  boards: Record<BoardId, Board>
+  pieces: Record<PieceId, Piece>
+  locations: Record<PieceId, Location>
 }
 
-export const DIRECTION_VECTORS: Record<Direction, { dx: number; dy: number }> = {
-  up: { dx: 0, dy: -1 },
-  down: { dx: 0, dy: 1 },
-  left: { dx: -1, dy: 0 },
-  right: { dx: 1, dy: 0 },
+export const PLAYER_ID: PieceId = 'player'
+
+export function inBounds(board: Board, x: number, y: number): boolean {
+  return x >= 0 && y >= 0 && x < board.size && y < board.size
 }
 
-export function createEmptyGrid(width: number, height: number): Grid {
-  const cells: CellType[][] = []
-  for (let y = 0; y < height; y++) {
-    cells.push(new Array<CellType>(width).fill('empty'))
-  }
-  return { width, height, cells, boxes: [] }
-}
-
-export function cloneGrid(grid: Grid): Grid {
-  return structuredClone(grid)
-}
-
-export function cellAt(grid: Grid, x: number, y: number): CellType | 'oob' {
-  if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) return 'oob'
-  return grid.cells[y][x]
-}
-
-export function boxAt(grid: Grid, x: number, y: number): Box | undefined {
-  return grid.boxes.find((b) => b.x === x && b.y === y)
-}
-
-export function nestEntryPosition(interior: Grid, direction: Direction): { x: number; y: number } {
-  switch (direction) {
-    case 'right':
-      return { x: 0, y: Math.floor(interior.height / 2) }
-    case 'left':
-      return { x: interior.width - 1, y: Math.floor(interior.height / 2) }
-    case 'down':
-      return { x: Math.floor(interior.width / 2), y: 0 }
-    case 'up':
-      return { x: Math.floor(interior.width / 2), y: interior.height - 1 }
+export function opposite(dir: Direction): Direction {
+  switch (dir) {
+    case 'up': return 'down'
+    case 'down': return 'up'
+    case 'left': return 'right'
+    case 'right': return 'left'
   }
 }
 
-export function canNestAt(interior: Grid, pos: { x: number; y: number }): boolean {
-  if (pos.x < 0 || pos.y < 0 || pos.x >= interior.width || pos.y >= interior.height) return false
-  if (interior.cells[pos.y][pos.x] === 'wall') return false
-  return !boxAt(interior, pos.x, pos.y)
+export function step(x: number, y: number, dir: Direction): { x: number; y: number } {
+  switch (dir) {
+    case 'up': return { x, y: y - 1 }
+    case 'down': return { x, y: y + 1 }
+    case 'left': return { x: x - 1, y }
+    case 'right': return { x: x + 1, y }
+  }
+}
+
+export function occupantAt(world: World, location: Location): PieceId | undefined {
+  for (const [pieceId, loc] of Object.entries(world.locations)) {
+    if (loc.board === location.board && loc.x === location.x && loc.y === location.y) {
+      return pieceId
+    }
+  }
+  return undefined
+}
+
+export function findContainerFor(world: World, boardId: BoardId): PieceId | undefined {
+  for (const piece of Object.values(world.pieces)) {
+    if (piece.kind === 'container' && piece.boardRef === boardId) return piece.id
+  }
+  return undefined
+}
+
+export function cloneWorld(world: World): World {
+  return structuredClone(world)
+}
+
+export function moveTo(world: World, pieceId: PieceId, location: Location): World {
+  const next = cloneWorld(world)
+  next.locations[pieceId] = location
+  return next
 }
