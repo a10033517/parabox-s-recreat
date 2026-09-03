@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeTarget, getEntryCell, applyMove, tryEnter } from './rules'
+import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece } from './rules'
 import { HALF, makeFraction, ZERO, ONE } from './fraction'
 import { makeFloorBoard, makeWorld, setWall } from './testFixtures'
 import { PLAYER_ID } from './types'
@@ -378,5 +378,29 @@ describe('applyMove — exiting a box', () => {
     expect(next?.locations.normalBox).toEqual({ board: 'boardB', x: 1, y: 1 })
     expect(next?.locations.boxA).toEqual({ board: 'root', x: 1, y: 1 })
     expect(next?.locations.boxB).toEqual({ board: 'root', x: 2, y: 1 })
+  })
+})
+
+describe('tryMovePiece — inMotion loop guard', () => {
+  it('treats a piece already moving the same direction as a consistent no-op success', () => {
+    const world = makeWorld(
+      [makeFloorBoard('root', 3)],
+      [{ id: 'box1', kind: 'normal' }],
+      { box1: { board: 'root', x: 1, y: 1 } },
+    )
+    const inMotion = new Map([['box1', 'right' as const]])
+    const result = tryMovePiece(world, 'box1', 'right', inMotion, new Set())
+    expect(result).toBe(world) // unchanged world, returned as-is
+  })
+
+  it('fails when a piece already moving is asked to move in a conflicting direction', () => {
+    const world = makeWorld(
+      [makeFloorBoard('root', 3)],
+      [{ id: 'box1', kind: 'normal' }],
+      { box1: { board: 'root', x: 1, y: 1 } },
+    )
+    const inMotion = new Map([['box1', 'right' as const]])
+    const result = tryMovePiece(world, 'box1', 'up', inMotion, new Set())
+    expect(result).toBeNull()
   })
 })
