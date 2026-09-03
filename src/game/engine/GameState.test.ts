@@ -1,45 +1,62 @@
-import { createEmptyGrid } from './types'
-import { createGameState, currentGrid, move, undo, isWon } from './GameState'
+import { describe, it, expect } from 'vitest'
+import { GameState } from './GameState'
+import { makeFloorBoard, makeWorld, setRequirement } from './testFixtures'
+import { PLAYER_ID } from './types'
 
-function simpleGrid() {
-  const grid = createEmptyGrid(3, 3)
-  grid.player = { x: 1, y: 1 }
-  return grid
+function simpleWorld() {
+  return makeWorld(
+    [makeFloorBoard('root', 3)],
+    [{ id: PLAYER_ID, kind: 'player' }],
+    { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } },
+  )
 }
 
-test('move updates current grid and appends history', () => {
-  let state = createGameState(simpleGrid())
-  state = move(state, 'right')
-  expect(currentGrid(state).player).toEqual({ x: 2, y: 1 })
-  expect(state.history).toHaveLength(2)
-})
+describe('GameState', () => {
+  it('starts at the initial world', () => {
+    const world = simpleWorld()
+    const state = new GameState(world)
+    expect(state.current).toEqual(world)
+  })
 
-test('invalid move leaves state unchanged', () => {
-  let state = createGameState(simpleGrid())
-  state = move(state, 'right')
-  state = move(state, 'right') // 撞边界
-  expect(currentGrid(state).player).toEqual({ x: 2, y: 1 })
-  expect(state.history).toHaveLength(2)
-})
+  it('applies a successful move and updates current', () => {
+    const state = new GameState(simpleWorld())
+    const ok = state.move('right')
+    expect(ok).toBe(true)
+    expect(state.current.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 0 })
+  })
 
-test('undo restores previous grid', () => {
-  let state = createGameState(simpleGrid())
-  state = move(state, 'right')
-  state = undo(state)
-  expect(currentGrid(state).player).toEqual({ x: 1, y: 1 })
-})
+  it('leaves current unchanged when the move is illegal', () => {
+    const world = simpleWorld()
+    const state = new GameState(world)
+    const ok = state.move('left') // x=0, moving left goes out of bounds with no container
+    expect(ok).toBe(false)
+    expect(state.current).toEqual(world)
+  })
 
-test('undo on initial state is a no-op', () => {
-  let state = createGameState(simpleGrid())
-  state = undo(state)
-  expect(state.history).toHaveLength(1)
-})
+  it('undoes the most recent move', () => {
+    const state = new GameState(simpleWorld())
+    state.move('right')
+    const ok = state.undo()
+    expect(ok).toBe(true)
+    expect(state.current.locations[PLAYER_ID]).toEqual({ board: 'root', x: 0, y: 0 })
+  })
 
-test('isWon reflects checkWin on current grid', () => {
-  const grid = createEmptyGrid(3, 3)
-  grid.player = { x: 0, y: 0 }
-  grid.cells[1][1] = 'target'
-  grid.boxes.push({ id: 'g1', x: 1, y: 1, boxType: 'normal', interior: createEmptyGrid(1, 1), isGoalBox: true })
-  const state = createGameState(grid)
-  expect(isWon(state)).toBe(true)
+  it('fails to undo past the initial state', () => {
+    const state = new GameState(simpleWorld())
+    expect(state.undo()).toBe(false)
+  })
+
+  it('reports isWon based on the current state', () => {
+    const root = makeFloorBoard('root', 2)
+    setRequirement(root, 1, 0, 'player')
+    const world = makeWorld(
+      [root],
+      [{ id: PLAYER_ID, kind: 'player' }],
+      { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } },
+    )
+    const state = new GameState(world)
+    expect(state.isWon).toBe(false)
+    state.move('right')
+    expect(state.isWon).toBe(true)
+  })
 })

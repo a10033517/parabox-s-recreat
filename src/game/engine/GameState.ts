@@ -1,29 +1,31 @@
+import { World, Direction } from './types'
 import { applyMove, checkWin } from './rules'
-import { Direction, Grid } from './types'
 
-export interface GameState {
-  history: Grid[]
-}
+export class GameState {
+  private history: World[]
 
-export function createGameState(grid: Grid): GameState {
-  return { history: [grid] }
-}
+  constructor(initial: World) {
+    this.history = [initial]
+  }
 
-export function currentGrid(state: GameState): Grid {
-  return state.history[state.history.length - 1]
-}
+  get current(): World {
+    return this.history[this.history.length - 1]
+  }
 
-export function move(state: GameState, direction: Direction): GameState {
-  const next = applyMove(currentGrid(state), direction)
-  if (!next) return state
-  return { history: [...state.history, next] }
-}
+  get isWon(): boolean {
+    return checkWin(this.current)
+  }
 
-export function undo(state: GameState): GameState {
-  if (state.history.length <= 1) return state
-  return { history: state.history.slice(0, -1) }
-}
+  move(dir: Direction): boolean {
+    const next = applyMove(this.current, dir)
+    if (next === null) return false
+    this.history.push(next)
+    return true
+  }
 
-export function isWon(state: GameState): boolean {
-  return checkWin(currentGrid(state))
+  undo(): boolean {
+    if (this.history.length <= 1) return false
+    this.history.pop()
+    return true
+  }
 }
