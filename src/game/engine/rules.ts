@@ -105,17 +105,7 @@ export function tryEnter(
   if (into.kind !== 'container') return null
 
   const board = world.boards[into.boardRef as string]
-  const pieceLoc = world.locations[pieceId]
-  const parentBoard = world.boards[pieceLoc.board]
-
-  let entryDir = dir
-  if (pieceLoc.y === 0) {
-    entryDir = 'down'
-  } else if (pieceLoc.y === parentBoard.size - 1) {
-    entryDir = 'up'
-  }
-
-  const { cell, newRelativeCoord } = getEntryCell(board, entryDir, relativeCoord)
+  const { cell, newRelativeCoord } = getEntryCell(board, dir, relativeCoord)
   if (cell === null) return null
   if (board.cells[cell.y][cell.x].type === 'wall') return null
 

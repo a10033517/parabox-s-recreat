@@ -102,7 +102,7 @@ describe('getEntryCell', () => {
   })
 })
 
-import { applyMove } from './rules'
+import { applyMove, tryEnter } from './rules'
 import { PLAYER_ID } from './types'
 import { setWall } from './testFixtures'
 
@@ -200,7 +200,7 @@ describe('applyMove — enter', () => {
       },
     )
     const next = applyMove(world, 'right')
-    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'inside', x: 1, y: 0 })
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'inside', x: 0, y: 1 })
     expect(next?.locations.containerBox).toEqual({ board: 'root', x: 1, y: 0 })
   })
 
@@ -246,28 +246,43 @@ describe('applyMove — enter', () => {
     expect(applyMove(world, 'right')).toBeNull()
   })
 
-  it('guards against a container that (pathologically) contains itself, without infinite recursion', () => {
-    // This deliberately violates World invariants 3/4 (a board must have
-    // exactly one owner, and the root board must have none) — parseLevel
-    // (Task 11) rejects data shaped like this. This test exists purely to
-    // prove the engine's beingEntered guard is defense-in-depth: even if a
-    // World were ever hand-constructed or corrupted into this shape, the
-    // resolver terminates instead of recursing forever.
+  it('tryEnter refuses to enter a container already marked as being entered, without recursing', () => {
+    // This is a direct unit test of the beingEntered guard's own
+    // short-circuit line, not a black-box test through applyMove. An
+    // earlier version of this test tried to trigger the guard indirectly
+    // by constructing a container whose boardRef equals the board it sits
+    // on (a "self-containing box"). That construction doesn't actually
+    // exercise this guard at all: findContainerFor(world, 'root') would
+    // return that very container as root's "owner", so computeTarget's
+    // board-exit recursion (a separate function with no cycle detection of
+    // its own) loops forever on identical arguments before beingEntered is
+    // ever consulted. That's a known, deliberately out-of-scope limitation
+    // of computeTarget (self-recursive boards are explicitly deferred past
+    // this sub-project), not a gap in this guard — and it can never arise
+    // from a real level: parseLevel (Task 11) rejects any board that isn't
+    // referenced by exactly one container (or, for the one true root,
+    // zero), which this shape violates. So instead: call tryEnter directly
+    // with a beingEntered set that already contains the target container's
+    // id, and assert the guard's own `if (beingEntered.has(intoId)) return
+    // null` line fires immediately — no push, no board traversal, no
+    // reliance on any other function's cycle behavior.
     const root = makeFloorBoard('root', 3)
+    const inside = makeFloorBoard('inside', 3)
     const world = makeWorld(
-      [root],
+      [root, inside],
       [
         { id: PLAYER_ID, kind: 'player' },
-        { id: 'normalBox', kind: 'normal' },
-        { id: 'selfBox', kind: 'container', boardRef: 'root' },
+        { id: 'containerBox', kind: 'container', boardRef: 'inside' },
       ],
       {
         [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
-        normalBox: { board: 'root', x: 1, y: 1 },
-        selfBox: { board: 'root', x: 2, y: 1 },
+        containerBox: { board: 'root', x: 1, y: 1 },
       },
     )
-    expect(() => applyMove(world, 'right')).not.toThrow()
-    expect(applyMove(world, 'right')).toBeNull()
+    const result = tryEnter(
+      world, PLAYER_ID, 'containerBox', 'right', HALF,
+      new Map(), new Set(['containerBox']),
+    )
+    expect(result).toBeNull()
   })
 })
