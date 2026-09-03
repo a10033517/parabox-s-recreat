@@ -328,3 +328,55 @@ describe('applyMove — eat', () => {
     expect(applyMove(world, 'right')).toBeNull()
   })
 })
+
+describe('applyMove — exiting a box', () => {
+  it('lets the player walk out of a container through an open edge into the parent board', () => {
+    const root = makeFloorBoard('root', 3)
+    const inside = makeFloorBoard('inside', 3)
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'containerBox', kind: 'container', boardRef: 'inside' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'inside', x: 1, y: 0 },
+        containerBox: { board: 'root', x: 1, y: 1 },
+      },
+    )
+    const next = applyMove(world, 'up')
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 0 })
+  })
+
+  it('exits into an occupied cell that requires entering another box, whose own entry cell is also occupied', () => {
+    // Player exits boardA into root, landing exactly on containerB (an
+    // occupied cell) — this forces an `enter` into boardB. boardB's own
+    // entry cell for that direction is occupied by normalBox, which can
+    // still be pushed one cell further inside boardB. This exercises
+    // exit -> occupied-entry -> enter -> occupied-entry -> recursive push,
+    // plus inMotion and beingEntered, together in one fixture.
+    const root = makeFloorBoard('root', 3)
+    const boardA = makeFloorBoard('boardA', 3)
+    const boardB = makeFloorBoard('boardB', 3)
+    const world = makeWorld(
+      [root, boardA, boardB],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'boxA', kind: 'container', boardRef: 'boardA' },
+        { id: 'boxB', kind: 'container', boardRef: 'boardB' },
+        { id: 'normalBox', kind: 'normal' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'boardA', x: 2, y: 1 }, // right edge, middle row
+        boxA: { board: 'root', x: 1, y: 1 },           // center of root
+        boxB: { board: 'root', x: 2, y: 1 },           // immediately right of boxA
+        normalBox: { board: 'boardB', x: 0, y: 1 },     // sits on boardB's 'right'-entry cell
+      },
+    )
+    const next = applyMove(world, 'right')
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'boardB', x: 0, y: 1 })
+    expect(next?.locations.normalBox).toEqual({ board: 'boardB', x: 1, y: 1 })
+    expect(next?.locations.boxA).toEqual({ board: 'root', x: 1, y: 1 })
+    expect(next?.locations.boxB).toEqual({ board: 'root', x: 2, y: 1 })
+  })
+})
