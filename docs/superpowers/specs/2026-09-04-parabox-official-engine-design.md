@@ -188,7 +188,10 @@ function tryMovePiece(
 
   const loc = world.locations[pieceId]
   const target = computeTarget(world, loc, dir, HALF) // HALF = 1/2 fraction
-  if (target === null) return null // hit a wall somewhere along the way
+  if (target === null) return null // exited the root board with nothing beyond
+
+  const targetBoard = world.boards[target.location.board]
+  if (targetBoard.cells[target.location.y][target.location.x].type === 'wall') return null
 
   const occupant = occupantAt(world, target.location)
   if (!occupant) return moveTo(world, pieceId, target.location)
@@ -249,7 +252,6 @@ function tryEnter(
 
   const board = world.boards[into.boardRef!]
   const { cell, newRelativeCoord } = getEntryCell(board, dir, relativeCoord)
-  if (cell === null) return null // out of bounds — shouldn't happen for a valid board
   if (board.cells[cell.y][cell.x].type === 'wall') return null
 
   const target: Location = { board: board.id, x: cell.x, y: cell.y }
@@ -283,10 +285,16 @@ function computeTarget(
 
   // exiting: find the piece that references this board as its interior
   const containerId = findContainerFor(world, loc.board)
-  if (containerId === null) return null // root board, or dangling board — can't exit
+  if (containerId === undefined) return null // root board, or dangling board — can't exit
 
+  // Up/down crossings preserve horizontal (x) position, so the relevant
+  // edge length is the board's width; left/right crossings preserve
+  // vertical (y) position, so it's the board's height. Boards are not
+  // guaranteed square, unlike the reference solver's, so this can't
+  // reuse a single `width` like the source does.
+  const axisSize = dir === 'up' || dir === 'down' ? board.width : board.height
   const offset = dir === 'up' || dir === 'down' ? loc.x : loc.y
-  const newRelativeCoord = divideByInt(addInt(relativeCoord, offset), board.width)
+  const newRelativeCoord = divideByInt(addInt(relativeCoord, offset), axisSize)
 
   const containerLoc = world.locations[containerId]
   return computeTarget(world, containerLoc, dir, newRelativeCoord)
@@ -301,9 +309,13 @@ function getEntryCell(
   dir: Direction,
   relativeCoord: Fraction,
 ): { cell: { x: number; y: number }; newRelativeCoord: Fraction } {
-  const unit = makeFraction(1, board.width)
+  // Same axis rule as computeTarget: up/down entry happens along the top
+  // or bottom edge (spans width); left/right entry happens along the
+  // left or right edge (spans height).
+  const axisSize = dir === 'up' || dir === 'down' ? board.width : board.height
+  const unit = makeFraction(1, axisSize)
   const { offset, remainder } = fractionDivMod(relativeCoord, unit)
-  const scaled = multiplyByInt(remainder, board.width)
+  const scaled = multiplyByInt(remainder, axisSize)
 
   switch (dir) {
     case 'up':    return { cell: { x: offset, y: board.height - 1 }, newRelativeCoord: scaled }
