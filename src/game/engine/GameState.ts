@@ -16,6 +16,10 @@ export class GameState {
     return checkWin(this.current)
   }
 
+  get moveCount(): number {
+    return this.history.length - 1
+  }
+
   move(dir: Direction): boolean {
     const next = applyMove(this.current, dir)
     if (next === null) return false
