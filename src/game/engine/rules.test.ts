@@ -161,3 +161,113 @@ describe('applyMove — push only', () => {
     expect(applyMove(world, 'right')).toBeNull()
   })
 })
+
+describe('applyMove — enter', () => {
+  it('pushes a normal box into an adjacent container box, entering at the center', () => {
+    const root = makeFloorBoard('root', 3)
+    const inside = makeFloorBoard('inside', 3)
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'normalBox', kind: 'normal' },
+        { id: 'containerBox', kind: 'container', boardRef: 'inside' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+        normalBox: { board: 'root', x: 1, y: 1 },
+        containerBox: { board: 'root', x: 2, y: 1 },
+      },
+    )
+    const next = applyMove(world, 'right')
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 1 })
+    expect(next?.locations.normalBox).toEqual({ board: 'inside', x: 0, y: 1 })
+    expect(next?.locations.containerBox).toEqual({ board: 'root', x: 2, y: 1 })
+  })
+
+  it('lets the player walk directly into a container box', () => {
+    const root = makeFloorBoard('root', 2)
+    const inside = makeFloorBoard('inside', 3)
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'containerBox', kind: 'container', boardRef: 'inside' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        containerBox: { board: 'root', x: 1, y: 0 },
+      },
+    )
+    const next = applyMove(world, 'right')
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'inside', x: 1, y: 0 })
+    expect(next?.locations.containerBox).toEqual({ board: 'root', x: 1, y: 0 })
+  })
+
+  it('fails to enter when the center entry cell is a wall', () => {
+    const root = makeFloorBoard('root', 3)
+    const inside = makeFloorBoard('inside', 3)
+    setWall(inside, 0, 1) // the 'right'-direction entry cell for a 3x3 board
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'normalBox', kind: 'normal' },
+        { id: 'containerBox', kind: 'container', boardRef: 'inside' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+        normalBox: { board: 'root', x: 1, y: 1 },
+        containerBox: { board: 'root', x: 2, y: 1 },
+      },
+    )
+    expect(applyMove(world, 'right')).toBeNull()
+  })
+
+  it('fails to enter when the entry cell is occupied by something that cannot itself move', () => {
+    const root = makeFloorBoard('root', 3)
+    const inside = makeFloorBoard('inside', 3)
+    setWall(inside, 1, 1) // wall directly behind the entry cell, blocking any further push
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'normalBox', kind: 'normal' },
+        { id: 'containerBox', kind: 'container', boardRef: 'inside' },
+        { id: 'blocker', kind: 'normal' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+        normalBox: { board: 'root', x: 1, y: 1 },
+        containerBox: { board: 'root', x: 2, y: 1 },
+        blocker: { board: 'inside', x: 0, y: 1 }, // sits on the entry cell itself
+      },
+    )
+    expect(applyMove(world, 'right')).toBeNull()
+  })
+
+  it('guards against a container that (pathologically) contains itself, without infinite recursion', () => {
+    // This deliberately violates World invariants 3/4 (a board must have
+    // exactly one owner, and the root board must have none) — parseLevel
+    // (Task 11) rejects data shaped like this. This test exists purely to
+    // prove the engine's beingEntered guard is defense-in-depth: even if a
+    // World were ever hand-constructed or corrupted into this shape, the
+    // resolver terminates instead of recursing forever.
+    const root = makeFloorBoard('root', 3)
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'normalBox', kind: 'normal' },
+        { id: 'selfBox', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+        normalBox: { board: 'root', x: 1, y: 1 },
+        selfBox: { board: 'root', x: 2, y: 1 },
+      },
+    )
+    expect(() => applyMove(world, 'right')).not.toThrow()
+    expect(applyMove(world, 'right')).toBeNull()
+  })
+})

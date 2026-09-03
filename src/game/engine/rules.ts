@@ -1,6 +1,6 @@
 import { Fraction, addInt, divideByInt, multiplyByInt, isZero, fractionDivMod, makeFraction, HALF } from './fraction'
 import {
-  World, Location, Direction, Board, PieceId,
+  World, Location, Direction, Board, Piece, PieceId,
   inBounds, step, findContainerFor, occupantAt, moveTo, PLAYER_ID,
 } from './types'
 
@@ -90,9 +90,48 @@ export function tryMovePiece(
   return resolveBlocked(world, pieceId, occupant, target, dir, inMotion, beingEntered)
 }
 
-// beingEntered is threaded through but not yet used by this push-only
-// version — Task 6 wires it into the enter branch. Referencing it here
-// keeps the signature stable across tasks and satisfies noUnusedParameters.
+export function tryEnter(
+  world: World,
+  pieceId: PieceId,
+  intoId: PieceId,
+  dir: Direction,
+  relativeCoord: Fraction,
+  inMotion: Map<PieceId, Direction>,
+  beingEntered: Set<PieceId>,
+): World | null {
+  if (beingEntered.has(intoId)) return null
+
+  const into: Piece = world.pieces[intoId]
+  if (into.kind !== 'container') return null
+
+  const board = world.boards[into.boardRef as string]
+  const pieceLoc = world.locations[pieceId]
+  const parentBoard = world.boards[pieceLoc.board]
+
+  let entryDir = dir
+  if (pieceLoc.y === 0) {
+    entryDir = 'down'
+  } else if (pieceLoc.y === parentBoard.size - 1) {
+    entryDir = 'up'
+  }
+
+  const { cell, newRelativeCoord } = getEntryCell(board, entryDir, relativeCoord)
+  if (cell === null) return null
+  if (board.cells[cell.y][cell.x].type === 'wall') return null
+
+  const target: Location = { board: board.id, x: cell.x, y: cell.y }
+  const nextBeingEntered = new Set(beingEntered).add(intoId)
+
+  const occupant = occupantAt(world, target)
+  if (!occupant) return moveTo(world, pieceId, target)
+
+  return resolveBlocked(
+    world, pieceId, occupant,
+    { location: target, relativeCoord: newRelativeCoord },
+    dir, inMotion, nextBeingEntered,
+  )
+}
+
 export function resolveBlocked(
   world: World,
   pieceId: PieceId,
@@ -102,11 +141,16 @@ export function resolveBlocked(
   inMotion: Map<PieceId, Direction>,
   beingEntered: Set<PieceId>,
 ): World | null {
-  void beingEntered
   const nextInMotion = new Map(inMotion).set(pieceId, dir)
 
   const pushed = tryMovePiece(world, occupantId, dir, nextInMotion, new Set())
   if (pushed) return moveTo(pushed, pieceId, target.location)
+
+  const entered = tryEnter(
+    world, pieceId, occupantId, dir, target.relativeCoord,
+    nextInMotion, beingEntered,
+  )
+  if (entered) return entered
 
   return null
 }
