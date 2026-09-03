@@ -17,6 +17,12 @@ describe('makeFraction', () => {
   it('reduces zero to 0/1 regardless of the input denominator', () => {
     expect(makeFraction(0, 5)).toEqual({ numerator: 0, denominator: 1 })
   })
+
+  it('throws on a non-finite numerator or denominator instead of hanging', () => {
+    expect(() => makeFraction(Infinity, 2)).toThrow(/finite/i)
+    expect(() => makeFraction(1, Infinity)).toThrow(/finite/i)
+    expect(() => makeFraction(NaN, 2)).toThrow(/finite/i)
+  })
 })
 
 describe('constants', () => {

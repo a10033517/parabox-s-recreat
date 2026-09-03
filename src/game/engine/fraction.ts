@@ -16,6 +16,9 @@ function gcd(a: number, b: number): number {
 
 export function makeFraction(n: number, d: number): Fraction {
   if (d === 0) throw new Error('Fraction denominator cannot be zero')
+  if (!Number.isFinite(n) || !Number.isFinite(d)) {
+    throw new Error(`Fraction numerator/denominator must be finite numbers, got (${n}, ${d})`)
+  }
   const sign = d < 0 ? -1 : 1
   const num = n * sign
   const den = d * sign

@@ -1,5 +1,9 @@
 import { World, Board, Piece, Location, PLAYER_ID, inBounds } from './types'
 
+const VALID_PIECE_KINDS = new Set(['player', 'normal', 'container'])
+const VALID_CELL_TYPES = new Set(['floor', 'wall'])
+const VALID_REQUIREMENTS = new Set(['box', 'player'])
+
 export function serializeLevel(world: World): unknown {
   return structuredClone(world)
 }
@@ -31,6 +35,21 @@ export function parseLevel(data: unknown): World {
     if (board.cells.length !== board.size || board.cells.some((row) => row.length !== board.size)) {
       throw new Error(`Board "${boardId}" must be square: cells do not match its declared size`)
     }
+    for (const row of board.cells) {
+      for (const cell of row) {
+        if (!VALID_CELL_TYPES.has(cell.type)) {
+          throw new Error(`Board "${boardId}" has a cell with an invalid type "${cell.type}"`)
+        }
+        if (cell.requirement !== undefined) {
+          if (!VALID_REQUIREMENTS.has(cell.requirement)) {
+            throw new Error(`Board "${boardId}" has a cell with an invalid requirement "${cell.requirement}"`)
+          }
+          if (cell.type === 'wall') {
+            throw new Error(`Board "${boardId}" has a requirement on a wall cell, which can never be satisfied`)
+          }
+        }
+      }
+    }
   }
 
   const playerIds = Object.values(pieces).filter((p) => p.kind === 'player')
@@ -45,10 +64,15 @@ export function parseLevel(data: unknown): World {
     if (piece.id !== pieceId) {
       throw new Error(`Piece "${pieceId}" has a mismatched id "${piece.id}"`)
     }
+    if (!VALID_PIECE_KINDS.has(piece.kind)) {
+      throw new Error(`Piece "${pieceId}" has an invalid kind "${piece.kind}"`)
+    }
     if (piece.kind === 'container') {
       if (piece.boardRef === undefined || boards[piece.boardRef] === undefined) {
         throw new Error(`Container piece "${pieceId}" has a boardRef that does not exist`)
       }
+    } else if (piece.boardRef !== undefined) {
+      throw new Error(`Piece "${pieceId}" has kind "${piece.kind}" but also has a boardRef, which only container pieces may have`)
     }
   }
 
@@ -68,6 +92,7 @@ export function parseLevel(data: unknown): World {
       `Level must have exactly one board with no owner (the root); found ${orphanBoards.length}`,
     )
   }
+  const rootBoardId = orphanBoards[0][0]
   const overOwnedBoards = Object.entries(ownerCount).filter(([, count]) => count > 1)
   if (overOwnedBoards.length > 0) {
     const [boardId] = overOwnedBoards[0]
@@ -96,6 +121,37 @@ export function parseLevel(data: unknown): World {
       throw new Error(`More than one piece would occupy (${loc.board}, ${loc.x}, ${loc.y})`)
     }
     seenCells.add(cellKey)
+  }
+
+  // Reachability: every board must be reachable from the root board by
+  // following container pieces down into their interiors, starting from
+  // whatever board each container is physically located on. The ownership
+  // counts checked above (every non-root board has exactly one owner) are
+  // necessary but not sufficient — a cycle (A's interior is B, and a piece
+  // inside B has interior A) satisfies those counts while never actually
+  // connecting back to the true root, and would otherwise hang applyMove's
+  // board-exit recursion forever instead of ever resolving to null.
+  const reached = new Set<string>([rootBoardId])
+  const queue: string[] = [rootBoardId]
+  while (queue.length > 0) {
+    const currentBoardId = queue.shift() as string
+    for (const piece of Object.values(pieces)) {
+      if (
+        piece.kind === 'container' &&
+        piece.boardRef !== undefined &&
+        locations[piece.id].board === currentBoardId &&
+        !reached.has(piece.boardRef)
+      ) {
+        reached.add(piece.boardRef)
+        queue.push(piece.boardRef)
+      }
+    }
+  }
+  const unreachable = Object.keys(boards).filter((boardId) => !reached.has(boardId))
+  if (unreachable.length > 0) {
+    throw new Error(
+      `Board(s) not reachable from the root board: ${unreachable.join(', ')} (cyclic or disconnected containment graph)`,
+    )
   }
 
   return { boards, pieces, locations }

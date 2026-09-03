@@ -85,6 +85,39 @@ describe('parseLevel structural validation', () => {
     data.locations.box2 = { ...data.locations.box1 }
     expect(() => parseLevel(data)).toThrow(/occupy/i)
   })
+
+  it('rejects a piece with an invalid kind', () => {
+    const data = serializeLevel(sampleWorld()) as { pieces: Record<string, { kind: string }> }
+    data.pieces.box1.kind = 'ghost'
+    expect(() => parseLevel(data)).toThrow(/kind/i)
+  })
+
+  it('rejects a non-container piece that has a boardRef', () => {
+    const data = serializeLevel(sampleWorld()) as { pieces: Record<string, unknown> }
+    data.pieces[PLAYER_ID] = { id: PLAYER_ID, kind: 'player', boardRef: 'inside' }
+    expect(() => parseLevel(data)).toThrow(/boardRef/i)
+  })
+
+  it('rejects a board with a cell of an invalid type', () => {
+    const data = serializeLevel(sampleWorld()) as { boards: Record<string, { cells: { type: string }[][] }> }
+    data.boards.root.cells[0][0].type = 'lava'
+    expect(() => parseLevel(data)).toThrow(/type/i)
+  })
+
+  it('rejects a cell with an invalid requirement value', () => {
+    const data = serializeLevel(sampleWorld()) as { boards: Record<string, { cells: { requirement?: string }[][] }> }
+    data.boards.root.cells[0][0].requirement = 'nonsense'
+    expect(() => parseLevel(data)).toThrow(/requirement/i)
+  })
+
+  it('rejects a requirement placed on a wall cell', () => {
+    const data = serializeLevel(sampleWorld()) as {
+      boards: Record<string, { cells: { type: string; requirement?: string }[][] }>
+    }
+    data.boards.root.cells[0][0].type = 'wall'
+    data.boards.root.cells[0][0].requirement = 'box'
+    expect(() => parseLevel(data)).toThrow(/wall/i)
+  })
 })
 
 describe('parseLevel board-ownership validation', () => {
@@ -104,5 +137,44 @@ describe('parseLevel board-ownership validation', () => {
     data.boards.orphan = makeFloorBoard('orphan', 1)
     // no piece references 'orphan', and it isn't 'root' — invalid
     expect(() => parseLevel(data)).toThrow(/owner/i)
+  })
+
+  it('rejects a container whose interior is the board it is itself located on (self-referential cycle)', () => {
+    const root = makeFloorBoard('root', 2)
+    const x = makeFloorBoard('x', 2)
+    const world = makeWorld(
+      [root, x],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'cx', kind: 'container', boardRef: 'x' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        cx: { board: 'x', x: 0, y: 0 }, // cx sits inside its own interior
+      },
+    )
+    const data = serializeLevel(world)
+    expect(() => parseLevel(data)).toThrow(/reachable/i)
+  })
+
+  it('rejects a mutual two-board containment cycle', () => {
+    const root = makeFloorBoard('root', 2)
+    const a = makeFloorBoard('a', 2)
+    const b = makeFloorBoard('b', 2)
+    const world = makeWorld(
+      [root, a, b],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'ca', kind: 'container', boardRef: 'a' }, // ca's interior is board a
+        { id: 'cb', kind: 'container', boardRef: 'b' }, // cb's interior is board b
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        ca: { board: 'b', x: 0, y: 0 }, // ca is located ON board b
+        cb: { board: 'a', x: 0, y: 0 }, // cb is located ON board a
+      },
+    )
+    const data = serializeLevel(world)
+    expect(() => parseLevel(data)).toThrow(/reachable/i)
   })
 })

@@ -258,7 +258,12 @@ describe('applyMove — enter', () => {
     // this sub-project), not a gap in this guard — and it can never arise
     // from a real level: parseLevel (Task 11) rejects any board that isn't
     // referenced by exactly one container (or, for the one true root,
-    // zero), which this shape violates. So instead: call tryEnter directly
+    // zero), which this shape violates. parseLevel also performs a full
+    // reachability walk from the root board (not just an ownership count),
+    // which is what would actually catch this specific self-referential
+    // shape — a board owned by a container located on itself trivially
+    // satisfies the ownership count but can never be reached by walking
+    // down from the root. So instead: call tryEnter directly
     // with a beingEntered set that already contains the target container's
     // id, and assert the guard's own `if (beingEntered.has(intoId)) return
     // null` line fires immediately — no push, no board traversal, no
