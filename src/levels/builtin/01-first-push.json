@@ -1,13 +1,21 @@
 {
-  "width": 5,
-  "height": 3,
-  "cells": [
-    ["wall", "wall", "wall", "wall", "wall"],
-    ["wall", "empty", "empty", "target", "wall"],
-    ["wall", "wall", "wall", "wall", "wall"]
-  ],
-  "boxes": [
-    { "id": "g1", "x": 2, "y": 1, "boxType": "normal", "isGoalBox": true, "interior": { "width": 1, "height": 1, "cells": [["empty"]], "boxes": [] } }
-  ],
-  "player": { "x": 1, "y": 1 }
+  "boards": {
+    "root": {
+      "id": "root",
+      "size": 3,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor", "requirement": "box" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    }
+  },
+  "pieces": {
+    "player": { "id": "player", "kind": "player" },
+    "box1": { "id": "box1", "kind": "normal" }
+  },
+  "locations": {
+    "player": { "board": "root", "x": 0, "y": 1 },
+    "box1": { "board": "root", "x": 1, "y": 1 }
+  }
 }

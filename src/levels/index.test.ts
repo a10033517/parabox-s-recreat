@@ -1,58 +1,40 @@
-import { beforeEach, expect, test, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { BUILTIN_LEVELS, CUSTOM_LEVEL_ID_PREFIX, loadCustomLevels, loadGeneratedLevels } from './index'
 import { checkWin } from '../game/engine/rules'
-import { createEmptyGrid } from '../game/engine/types'
-import { serializeLevel } from '../game/engine/levelSchema'
-import { saveCustomLevel } from '../storage/progress'
+import { PLAYER_ID } from '../game/engine/types'
 
-beforeEach(() => {
-  localStorage.clear()
+describe('BUILTIN_LEVELS', () => {
+  it('has one entry per shipped level file, each parsing to an unsolved world', () => {
+    expect(BUILTIN_LEVELS).toHaveLength(5)
+    for (const level of BUILTIN_LEVELS) {
+      expect(level.world.locations[PLAYER_ID]).toBeDefined()
+      expect(checkWin(level.world)).toBe(false)
+    }
+  })
+
+  it('includes the expected level ids in order', () => {
+    expect(BUILTIN_LEVELS.map((l) => l.id)).toEqual([
+      '01-first-push',
+      '02-enter-container',
+      '03-chain-push',
+      '04-eat',
+      '05-double-nested',
+    ])
+  })
 })
 
-test('every builtin level parses and starts unsolved', () => {
-  expect(BUILTIN_LEVELS).toHaveLength(3)
-  for (const level of BUILTIN_LEVELS) {
-    expect(level.grid.player).toBeDefined()
-    expect(checkWin(level.grid)).toBe(false)
-  }
+describe('loadGeneratedLevels', () => {
+  it('returns an empty array (sub-project 4 rebuilds the generator against the new format)', () => {
+    expect(loadGeneratedLevels()).toEqual([])
+  })
 })
 
-test('loadCustomLevels returns a saved level under a prefixed id and its stored name', () => {
-  const grid = createEmptyGrid(3, 3)
-  grid.player = { x: 0, y: 0 }
-  saveCustomLevel('my-level', serializeLevel(grid))
-
-  const levels = loadCustomLevels()
-  expect(levels).toHaveLength(1)
-  expect(levels[0].id).toBe(`${CUSTOM_LEVEL_ID_PREFIX}my-level`)
-  expect(levels[0].name).toBe('my-level')
-  expect(levels[0].grid.width).toBe(3)
+describe('loadCustomLevels', () => {
+  it('returns an empty array (sub-project 3 rebuilds the editor against the new format)', () => {
+    expect(loadCustomLevels()).toEqual([])
+  })
 })
 
-test('loadCustomLevels skips malformed entries instead of throwing', () => {
-  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-  saveCustomLevel('broken', '{ not json')
-  saveCustomLevel('good', serializeLevel(createEmptyGrid(2, 2)))
-
-  const levels = loadCustomLevels()
-  expect(levels.map((l) => l.name)).toEqual(['good'])
-  expect(warn).toHaveBeenCalled()
-  warn.mockRestore()
-})
-
-test('custom level ids never collide with builtin or generated ids', () => {
-  const shipped = new Set([...BUILTIN_LEVELS, ...loadGeneratedLevels()].map((l) => l.id))
-  saveCustomLevel('easy-01', serializeLevel(createEmptyGrid(2, 2)))
-  for (const level of loadCustomLevels()) {
-    expect(shipped.has(level.id)).toBe(false)
-  }
-})
-
-test('every generated level starts unsolved', () => {
-  const levels = loadGeneratedLevels()
-  expect(levels.length).toBeGreaterThan(0)
-  for (const level of levels) {
-    expect(level.grid.player).toBeDefined()
-    expect(checkWin(level.grid)).toBe(false)
-  }
+it('still exports CUSTOM_LEVEL_ID_PREFIX for future use', () => {
+  expect(CUSTOM_LEVEL_ID_PREFIX).toBe('custom:')
 })
