@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece } from './rules'
+import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece, checkWin } from './rules'
 import { HALF, makeFraction, ZERO, ONE } from './fraction'
-import { makeFloorBoard, makeWorld, setWall } from './testFixtures'
+import { makeFloorBoard, makeWorld, setWall, setRequirement } from './testFixtures'
 import { PLAYER_ID } from './types'
 
 describe('computeTarget', () => {
@@ -402,5 +402,93 @@ describe('tryMovePiece — inMotion loop guard', () => {
     const inMotion = new Map([['box1', 'right' as const]])
     const result = tryMovePiece(world, 'box1', 'up', inMotion, new Set())
     expect(result).toBeNull()
+  })
+})
+
+describe('checkWin', () => {
+  it('is true when there are no requirements anywhere', () => {
+    const world = makeWorld([makeFloorBoard('root', 2)], [], {})
+    expect(checkWin(world)).toBe(true)
+  })
+
+  it('accepts a normal box on a box requirement', () => {
+    const root = makeFloorBoard('root', 2)
+    setRequirement(root, 1, 0, 'box')
+    const world = makeWorld(
+      [root],
+      [{ id: 'box1', kind: 'normal' }],
+      { box1: { board: 'root', x: 1, y: 0 } },
+    )
+    expect(checkWin(world)).toBe(true)
+  })
+
+  it('accepts a container box on a box requirement', () => {
+    const root = makeFloorBoard('root', 2)
+    setRequirement(root, 1, 0, 'box')
+    const world = makeWorld(
+      [root, makeFloorBoard('inside', 1)],
+      [{ id: 'box1', kind: 'container', boardRef: 'inside' }],
+      { box1: { board: 'root', x: 1, y: 0 } },
+    )
+    expect(checkWin(world)).toBe(true)
+  })
+
+  it('rejects the player on a box requirement', () => {
+    const root = makeFloorBoard('root', 2)
+    setRequirement(root, 1, 0, 'box')
+    const world = makeWorld(
+      [root],
+      [{ id: PLAYER_ID, kind: 'player' }],
+      { [PLAYER_ID]: { board: 'root', x: 1, y: 0 } },
+    )
+    expect(checkWin(world)).toBe(false)
+  })
+
+  it('accepts only the player on a player requirement', () => {
+    const root = makeFloorBoard('root', 2)
+    setRequirement(root, 1, 0, 'player')
+    const worldWithPlayer = makeWorld(
+      [root],
+      [{ id: PLAYER_ID, kind: 'player' }],
+      { [PLAYER_ID]: { board: 'root', x: 1, y: 0 } },
+    )
+    expect(checkWin(worldWithPlayer)).toBe(true)
+
+    const worldWithBox = makeWorld(
+      [root],
+      [{ id: 'box1', kind: 'normal' }],
+      { box1: { board: 'root', x: 1, y: 0 } },
+    )
+    expect(checkWin(worldWithBox)).toBe(false)
+  })
+
+  it('is false when a requirement anywhere is unmet, even if others are satisfied', () => {
+    const root = makeFloorBoard('root', 3)
+    setRequirement(root, 1, 0, 'box')
+    setRequirement(root, 2, 0, 'box')
+    const world = makeWorld(
+      [root],
+      [{ id: 'box1', kind: 'normal' }],
+      { box1: { board: 'root', x: 1, y: 0 } }, // (2,0) has no occupant
+    )
+    expect(checkWin(world)).toBe(false)
+  })
+
+  it('checks requirements across every board, not just the root', () => {
+    const root = makeFloorBoard('root', 2)
+    const inside = makeFloorBoard('inside', 2)
+    setRequirement(inside, 1, 0, 'box')
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: 'outerBox', kind: 'container', boardRef: 'inside' },
+        { id: 'innerBox', kind: 'normal' },
+      ],
+      {
+        outerBox: { board: 'root', x: 0, y: 0 },
+        innerBox: { board: 'inside', x: 1, y: 0 },
+      },
+    )
+    expect(checkWin(world)).toBe(true)
   })
 })

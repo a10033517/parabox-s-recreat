@@ -150,3 +150,20 @@ export function resolveBlocked(
 
   return null
 }
+
+export function checkWin(world: World): boolean {
+  for (const board of Object.values(world.boards)) {
+    for (let y = 0; y < board.size; y++) {
+      for (let x = 0; x < board.size; x++) {
+        const cell = board.cells[y][x]
+        if (!cell.requirement) continue
+        const occupantId = occupantAt(world, { board: board.id, x, y })
+        if (!occupantId) return false
+        const occupant = world.pieces[occupantId]
+        if (cell.requirement === 'player' && occupant.kind !== 'player') return false
+        if (cell.requirement === 'box' && occupant.kind === 'player') return false
+      }
+    }
+  }
+  return true
+}
