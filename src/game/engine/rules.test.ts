@@ -101,3 +101,63 @@ describe('getEntryCell', () => {
     expect(getEntryCell(board, 'down', ZERO)).toEqual({ cell: { x: 0, y: 0 }, newRelativeCoord: ZERO })
   })
 })
+
+import { applyMove } from './rules'
+import { PLAYER_ID } from './types'
+import { setWall } from './testFixtures'
+
+describe('applyMove — push only', () => {
+  it('moves the player into an empty floor cell', () => {
+    const world = makeWorld(
+      [makeFloorBoard('root', 3)],
+      [{ id: PLAYER_ID, kind: 'player' }],
+      { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } },
+    )
+    const next = applyMove(world, 'right')
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 0 })
+  })
+
+  it('fails when the target cell is a wall', () => {
+    const root = makeFloorBoard('root', 3)
+    setWall(root, 1, 0)
+    const world = makeWorld(
+      [root],
+      [{ id: PLAYER_ID, kind: 'player' }],
+      { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } },
+    )
+    expect(applyMove(world, 'right')).toBeNull()
+  })
+
+  it('pushes a single normal box into empty space', () => {
+    const world = makeWorld(
+      [makeFloorBoard('root', 3)],
+      [{ id: PLAYER_ID, kind: 'player' }, { id: 'box1', kind: 'normal' }],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        box1: { board: 'root', x: 1, y: 0 },
+      },
+    )
+    const next = applyMove(world, 'right')
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 0 })
+    expect(next?.locations.box1).toEqual({ board: 'root', x: 2, y: 0 })
+  })
+
+  it('fails to push a chain of normal boxes against a wall — nothing moves', () => {
+    const root = makeFloorBoard('root', 4)
+    setWall(root, 3, 0)
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'box1', kind: 'normal' },
+        { id: 'box2', kind: 'normal' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        box1: { board: 'root', x: 1, y: 0 },
+        box2: { board: 'root', x: 2, y: 0 },
+      },
+    )
+    expect(applyMove(world, 'right')).toBeNull()
+  })
+})

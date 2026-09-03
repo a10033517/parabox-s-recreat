@@ -1,5 +1,8 @@
-import { Fraction, addInt, divideByInt, multiplyByInt, isZero, fractionDivMod, makeFraction } from './fraction'
-import { World, Location, Direction, Board, inBounds, step, findContainerFor } from './types'
+import { Fraction, addInt, divideByInt, multiplyByInt, isZero, fractionDivMod, makeFraction, HALF } from './fraction'
+import {
+  World, Location, Direction, Board, PieceId,
+  inBounds, step, findContainerFor, occupantAt, moveTo, PLAYER_ID,
+} from './types'
 
 export function computeTarget(
   world: World,
@@ -56,4 +59,54 @@ export function getEntryCell(
     return { cell: null, newRelativeCoord }
   }
   return { cell, newRelativeCoord }
+}
+
+export function applyMove(world: World, dir: Direction): World | null {
+  return tryMovePiece(world, PLAYER_ID, dir, new Map(), new Set())
+}
+
+export function tryMovePiece(
+  world: World,
+  pieceId: PieceId,
+  dir: Direction,
+  inMotion: Map<PieceId, Direction>,
+  beingEntered: Set<PieceId>,
+): World | null {
+  const already = inMotion.get(pieceId)
+  if (already !== undefined) {
+    return already === dir ? world : null
+  }
+
+  const loc = world.locations[pieceId]
+  const target = computeTarget(world, loc, dir, HALF)
+  if (target === null) return null
+
+  const targetBoard = world.boards[target.location.board]
+  if (targetBoard.cells[target.location.y][target.location.x].type === 'wall') return null
+
+  const occupant = occupantAt(world, target.location)
+  if (!occupant) return moveTo(world, pieceId, target.location)
+
+  return resolveBlocked(world, pieceId, occupant, target, dir, inMotion, beingEntered)
+}
+
+// beingEntered is threaded through but not yet used by this push-only
+// version — Task 6 wires it into the enter branch. Referencing it here
+// keeps the signature stable across tasks and satisfies noUnusedParameters.
+export function resolveBlocked(
+  world: World,
+  pieceId: PieceId,
+  occupantId: PieceId,
+  target: { location: Location; relativeCoord: Fraction },
+  dir: Direction,
+  inMotion: Map<PieceId, Direction>,
+  beingEntered: Set<PieceId>,
+): World | null {
+  void beingEntered
+  const nextInMotion = new Map(inMotion).set(pieceId, dir)
+
+  const pushed = tryMovePiece(world, occupantId, dir, nextInMotion, new Set())
+  if (pushed) return moveTo(pushed, pieceId, target.location)
+
+  return null
 }
