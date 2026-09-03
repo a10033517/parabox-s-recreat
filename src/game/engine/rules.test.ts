@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { computeTarget, getEntryCell } from './rules'
+import { computeTarget, getEntryCell, applyMove, tryEnter } from './rules'
 import { HALF, makeFraction, ZERO, ONE } from './fraction'
-import { makeFloorBoard, makeWorld } from './testFixtures'
+import { makeFloorBoard, makeWorld, setWall } from './testFixtures'
+import { PLAYER_ID } from './types'
 
 describe('computeTarget', () => {
   it('returns the adjacent cell unchanged when it stays within the board', () => {
@@ -101,10 +102,6 @@ describe('getEntryCell', () => {
     expect(getEntryCell(board, 'down', ZERO)).toEqual({ cell: { x: 0, y: 0 }, newRelativeCoord: ZERO })
   })
 })
-
-import { applyMove, tryEnter } from './rules'
-import { PLAYER_ID } from './types'
-import { setWall } from './testFixtures'
 
 describe('applyMove — push only', () => {
   it('moves the player into an empty floor cell', () => {
@@ -284,5 +281,50 @@ describe('applyMove — enter', () => {
       new Map(), new Set(['containerBox']),
     )
     expect(result).toBeNull()
+  })
+})
+
+describe('applyMove — eat', () => {
+  it('absorbs a normal box into the back of a container box being pushed into it', () => {
+    const root = makeFloorBoard('root', 4)
+    const inside = makeFloorBoard('inside', 3)
+    setWall(root, 3, 1) // wall behind the normal box — it cannot be pushed further
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'containerBox', kind: 'container', boardRef: 'inside' },
+        { id: 'normalBox', kind: 'normal' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+        containerBox: { board: 'root', x: 1, y: 1 },
+        normalBox: { board: 'root', x: 2, y: 1 },
+      },
+    )
+    const next = applyMove(world, 'right')
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 1 })
+    expect(next?.locations.containerBox).toEqual({ board: 'root', x: 2, y: 1 })
+    // Eaten from the opposite side (left) of the container's interior, entering at its center.
+    expect(next?.locations.normalBox).toEqual({ board: 'inside', x: 2, y: 1 })
+  })
+
+  it('fails outright when the mover is not a container (no eat possible)', () => {
+    const root = makeFloorBoard('root', 4)
+    setWall(root, 3, 1)
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'normalBox1', kind: 'normal' },
+        { id: 'normalBox2', kind: 'normal' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+        normalBox1: { board: 'root', x: 1, y: 1 },
+        normalBox2: { board: 'root', x: 2, y: 1 },
+      },
+    )
+    expect(applyMove(world, 'right')).toBeNull()
   })
 })

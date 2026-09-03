@@ -1,7 +1,7 @@
 import { Fraction, addInt, divideByInt, multiplyByInt, isZero, fractionDivMod, makeFraction, HALF } from './fraction'
 import {
   World, Location, Direction, Board, Piece, PieceId,
-  inBounds, step, findContainerFor, occupantAt, moveTo, PLAYER_ID,
+  inBounds, step, findContainerFor, occupantAt, moveTo, opposite, PLAYER_ID,
 } from './types'
 
 export function computeTarget(
@@ -141,6 +141,12 @@ export function resolveBlocked(
     nextInMotion, beingEntered,
   )
   if (entered) return entered
+
+  const eaten = tryEnter(
+    world, occupantId, pieceId, opposite(dir), HALF,
+    nextInMotion, new Set(),
+  )
+  if (eaten) return moveTo(eaten, pieceId, target.location)
 
   return null
 }
