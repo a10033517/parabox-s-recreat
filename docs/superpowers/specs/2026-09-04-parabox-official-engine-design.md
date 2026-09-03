@@ -43,6 +43,17 @@ official source. Confidence is high for the algorithm shape (verified by
 reading the raw code directly) but exact pixel/frame behavior can only be
 confirmed against the real game during later playtesting.
 
+**Revision note:** this spec went through a second correctness pass after
+the first draft was approved — a review caught that boards were declared
+rectangular (`width`/`height`) while the reference solver's boards are
+square, that nothing enforced who "owns" a board (two containers could
+reference the same board, making board-exit ambiguous), and that
+`getEntryCell`'s boundary-case arithmetic could compute a negative array
+index on deeply cascading entries. All three are fixed below, along with
+two smaller gaps (a missing wall check, and width/height axis confusion)
+fixed in an earlier pass. See the `World invariants` section for the
+complete list of assumptions the engine now enforces.
+
 ## Scope
 
 **In scope:**
@@ -62,6 +73,10 @@ confirmed against the real game during later playtesting.
 - Flipped/mirrored boxes (`FlippedHorizontal`/`FlippedVertical`/`FlippedBoth`
   in the reference solver) — a level-design polish feature, not core
   physics; deferred indefinitely, revisit only if a level design needs it
+- Rectangular (non-square) boards — the reference solver's boards are all
+  square, and square boards keep the crossing geometry in `computeTarget`/
+  `getEntryCell` simple and unambiguous. Revisit only if a level design
+  genuinely needs a non-square room.
 - Migrating or converting existing built-in/generated levels — the old
   levels are incompatible with the new rules and will simply be retired;
   new hand-written fixture levels validate this sub-project, full
@@ -93,9 +108,8 @@ interface Cell {
 
 interface Board {
   id: BoardId
-  width: number
-  height: number
-  cells: Cell[][] // [y][x]
+  size: number       // every board is size × size — see World invariants
+  cells: Cell[][]     // [y][x], cells.length === size, cells[y].length === size
 }
 
 type PieceKind = 'player' | 'normal' | 'container'
@@ -120,7 +134,6 @@ interface World {
 ```
 
 Notes:
-- Exactly one piece has `kind: 'player'`.
 - `normal` pieces have no `boardRef` — they can never be entered (maps to
   the reference solver's `Block`).
 - `container` pieces always have a `boardRef` pointing at a `Board` in
@@ -130,10 +143,45 @@ Notes:
   not part of the public shape.
 - `requirement` replaces the old `target` cell type and `Box.isGoalBox`
   flag entirely (see Win Condition below).
-- The root board has no piece referencing it as `boardRef` (nothing
-  contains the top-level world). Attempting to exit the root board fails
-  the move — the root board's outer boundary must be fully walled, same
-  as today.
+- Boards are square (`size`, not independent `width`/`height`) — see
+  invariant 2 below for why, and the Research basis revision note for how
+  this was caught.
+
+### World invariants
+
+The engine assumes — and `parseLevel` (see Testing strategy /
+`levelSchema.ts`) rejects any level that violates — the following:
+
+1. Exactly one piece has `kind === 'player'`.
+2. Every board is square: `board.cells.length === board.size` and
+   `board.cells[y].length === board.size` for every row.
+3. The root board (the one nothing renders "from outside") is referenced
+   by no container's `boardRef`.
+4. Every non-root board is referenced by **exactly one** container — never
+   zero, never two or more. This is what makes "which container did I
+   exit through" unambiguous in `computeTarget`; two containers sharing a
+   `boardRef` would make board-exit direction undefined.
+5. Every `container` piece's `boardRef` points to a board that exists in
+   `World.boards`.
+6. No two containers reference the same `BoardId` (restates invariant 4
+   from the container's side).
+7. Every piece has exactly one entry in `World.locations`, and every
+   location's `(board, x, y)` is in bounds for that board.
+8. No two pieces occupy the same `(board, x, y)`.
+9. `normal` pieces never have a `boardRef`.
+10. `container` pieces always have a valid `boardRef`.
+11. Flipped/mirrored container orientation is not implemented — board
+    boundary traversal in `computeTarget` always preserves `dir`
+    unchanged when crossing into a parent board. If orientation support
+    is added later (out of scope here), the exit direction will need to
+    be transformed per-container the way the reference solver's
+    `flipIfNeeded` does.
+
+`findContainerFor(world, boardId)` (used by `computeTarget` to find which
+container a board is exited through) relies on invariant 4 to return a
+single unambiguous answer. It is not itself responsible for enforcing the
+invariant — level validation is (see `levelSchema.ts` below) — but engine
+code should never construct a `World` that violates it.
 
 ## Fraction (exact rational)
 
@@ -158,12 +206,18 @@ const HALF: Fraction = makeFraction(1, 2) // starting position: dead center of y
 
 Kept as small integer-pair arithmetic (numerator/denominator both
 integers, reduced on construction) — no floating point anywhere in the
-move-resolution path.
+move-resolution path. This part of the design was reviewed and confirmed
+correct as originally written — keep it exactly as specified here.
 
 ## Move resolution algorithm
 
 Ported directly from the reference solver's `movePiece` /
-`onPieceInTheWay` / `movePieceIntoAnother` / `targetCell`.
+`onPieceInTheWay` / `movePieceIntoAnother` / `targetCell`. The
+push → enter → eat ordering, the `inMotion` loop guard, and the `eat`
+branch's fresh (reset) `beingEntered` set were all reviewed and confirmed
+correct as originally written — keep them exactly as specified here; only
+`computeTarget` and `getEntryCell` change (square-board axis, and
+boundary-safety on the entry cell).
 
 ```ts
 type Direction = 'up' | 'down' | 'left' | 'right'
@@ -226,7 +280,10 @@ function resolveBlocked(
   if (entered) return entered
 
   // 3. eat: occupantId tries to go into pieceId, opposite direction
-  //    (only succeeds if pieceId itself is a container)
+  //    (only succeeds if pieceId itself is a container). Uses a fresh
+  //    beingEntered set — this is a logically separate resolution (the
+  //    *occupant* entering the *mover*), not a continuation of the
+  //    mover's own entry chain.
   const eaten = tryEnter(
     world, occupantId, pieceId, opposite(dir), HALF,
     nextInMotion, new Set(),
@@ -252,6 +309,7 @@ function tryEnter(
 
   const board = world.boards[into.boardRef!]
   const { cell, newRelativeCoord } = getEntryCell(board, dir, relativeCoord)
+  if (cell === null) return null // boundary case landed outside the board — treat as blocked
   if (board.cells[cell.y][cell.x].type === 'wall') return null
 
   const target: Location = { board: board.id, x: cell.x, y: cell.y }
@@ -283,82 +341,74 @@ function computeTarget(
     return { location: { board: loc.board, x, y }, relativeCoord }
   }
 
-  // exiting: find the piece that references this board as its interior
+  // Exiting: find the single container that owns this board (invariant 4
+  // guarantees at most one — findContainerFor returning "no container" is
+  // exactly the "this is the root board" case).
   const containerId = findContainerFor(world, loc.board)
-  if (containerId === undefined) return null // root board, or dangling board — can't exit
+  if (containerId === undefined) return null // root board — can't exit
 
-  // Up/down crossings preserve horizontal (x) position, so the relevant
-  // edge length is the board's width; left/right crossings preserve
-  // vertical (y) position, so it's the board's height. Boards are not
-  // guaranteed square, unlike the reference solver's, so this can't
-  // reuse a single `width` like the source does.
-  const axisSize = dir === 'up' || dir === 'down' ? board.width : board.height
+  // Direction we're leaving in preserves the perpendicular position: an
+  // up/down crossing preserves x, a left/right crossing preserves y.
+  // Boards are square (invariant 2), so `board.size` is the one edge
+  // length that applies regardless of which pair we're using.
   const offset = dir === 'up' || dir === 'down' ? loc.x : loc.y
-  const newRelativeCoord = divideByInt(addInt(relativeCoord, offset), axisSize)
+  const newRelativeCoord = divideByInt(addInt(relativeCoord, offset), board.size)
 
   const containerLoc = world.locations[containerId]
+  // Note (invariant 11): dir is passed through unchanged. A flipped/
+  // mirrored container would need to transform it here; that's out of
+  // scope for this sub-project.
   return computeTarget(world, containerLoc, dir, newRelativeCoord)
 }
 ```
 
-`getEntryCell` (mirrors the reference solver's `getEntryCellXY`):
+`getEntryCell` (mirrors the reference solver's `getEntryCellXY`), now
+returning a nullable `cell` so a boundary computation that would land
+outside the board is reported instead of producing an invalid index:
 
 ```ts
 function getEntryCell(
   board: Board,
   dir: Direction,
   relativeCoord: Fraction,
-): { cell: { x: number; y: number }; newRelativeCoord: Fraction } {
-  // Same axis rule as computeTarget: up/down entry happens along the top
-  // or bottom edge (spans width); left/right entry happens along the
-  // left or right edge (spans height).
-  const axisSize = dir === 'up' || dir === 'down' ? board.width : board.height
-  const unit = makeFraction(1, axisSize)
+): { cell: { x: number; y: number } | null; newRelativeCoord: Fraction } {
+  const unit = makeFraction(1, board.size)
   const { offset, remainder } = fractionDivMod(relativeCoord, unit)
-  const scaled = multiplyByInt(remainder, axisSize)
+  const scaled = multiplyByInt(remainder, board.size)
 
-  switch (dir) {
-    case 'up':    return { cell: { x: offset, y: board.height - 1 }, newRelativeCoord: scaled }
-    case 'down':  return { cell: { x: offset, y: 0 },                newRelativeCoord: scaled }
-    case 'left':
-      return isZero(remainder)
-        ? { cell: { x: board.width - 1, y: offset - 1 }, newRelativeCoord: makeFraction(1, 1) }
-        : { cell: { x: board.width - 1, y: offset },     newRelativeCoord: scaled }
-    case 'right':
-      return isZero(remainder)
-        ? { cell: { x: 0, y: offset - 1 }, newRelativeCoord: makeFraction(1, 1) }
-        : { cell: { x: 0, y: offset },     newRelativeCoord: scaled }
+  const cell = (() => {
+    switch (dir) {
+      case 'up':    return { x: offset, y: board.size - 1 }
+      case 'down':  return { x: offset, y: 0 }
+      case 'left':
+        return isZero(remainder)
+          ? { x: board.size - 1, y: offset - 1 }
+          : { x: board.size - 1, y: offset }
+      case 'right':
+        return isZero(remainder)
+          ? { x: 0, y: offset - 1 }
+          : { x: 0, y: offset }
+    }
+  })()
+
+  const newRelativeCoord = isZero(remainder) && (dir === 'left' || dir === 'right')
+    ? makeFraction(1, 1)
+    : scaled
+
+  if (!inBounds(board, cell.x, cell.y)) {
+    return { cell: null, newRelativeCoord }
   }
+  return { cell, newRelativeCoord }
 }
 ```
-
-Notes:
-- `resolveBlocked` threads `beingEntered` through on every recursive call
-  so a container can't be asked to receive into itself within one
-  resolution chain (self-recursion guard — relevant even before we
-  implement true self-recursive boards, because a container could
-  otherwise indirectly reference itself through a push chain). The `eat`
-  branch resets `beingEntered` to a fresh empty set because it's a
-  logically separate resolution (the *occupant* entering the *mover*, not
-  a continuation of the mover's own entry chain).
-- For the overwhelmingly common case — pushing directly into an adjacent
-  box with no prior board-crossing — `relativeCoord` is `HALF` the whole
-  way through, so entry always lands on the center cell of the entered
-  edge, matching the developer's stated "room in the middle of the side"
-  rule.
-- The fraction only diverges from `HALF` when a move crosses more than one
-  board boundary in a single step (grows out of one box and immediately
-  needs to enter/interact with another within the same keypress) — that's
-  the scenario the user confirmed they'll actually hit and wants handled
-  correctly rather than approximated.
 
 ## Win condition
 
 ```ts
 function checkWin(world: World): boolean {
   for (const board of Object.values(world.boards)) {
-    for (let y = 0; y < board.height; y++) {
-      for (let x = 0; x < board.width; x++) {
+    for (let y = 0; y < board.size; y++) {
+      for (let x = 0; x < board.size; x++) {
         const cell = board.cells[y][x]
         if (!cell.requirement) continue
         const occupantId = occupantAt(world, { board: board.id, x, y })
@@ -373,10 +423,15 @@ function checkWin(world: World): boolean {
 }
 ```
 
-`requirement: 'box'` is satisfied by any non-player piece regardless of
-`kind` (`normal` or `container` both count equally) — no per-box flagging.
-`requirement: 'player'` is satisfied only by the player. This replaces the
-old `Box.isGoalBox` + `'target'` cell type from the shipped level schema.
+`requirement: 'player'` is satisfied only by the player.
+`requirement: 'box'` is satisfied by any *supported non-player* piece —
+today that means `kind === 'normal'` or `kind === 'container'`, which
+happen to be every non-player kind that exists, so `occupant.kind !==
+'player'` is currently an equivalent and sufficient check. If a future
+sub-project ever adds another piece kind, it must explicitly decide
+whether that kind satisfies a `box` requirement rather than inheriting
+this "anything non-player" default silently. This replaces the old
+`Box.isGoalBox` + `'target'` cell type from the shipped level schema.
 
 ## Box-type mapping
 
@@ -413,13 +468,52 @@ built for the retired mechanic). At minimum:
   box immediately followed by entering/interacting with another) —
   verifies the fractional offset lands on the geometrically-correct
   non-center cell, not just "some cell"
+- A fuller cross-board chain in one fixture: exit board A into the parent,
+  land on an occupied cell that requires entering board B, and B's entry
+  cell is itself occupied by a piece that must be pushed/entered/eaten to
+  resolve — this single fixture is the one that actually exercises the
+  fractional offset, board-exit, board-entry, recursive push, recursive
+  enter, eat, `beingEntered`, and `inMotion` together, rather than each in
+  isolation
 - Consistent loop (a push chain that wraps back to a piece already
   in motion, same direction) succeeds as a no-op-for-that-piece
 - Conflicting loop (wraps back with an opposing direction requirement)
   fails the whole move
+- `getEntryCell` boundary safety: a `relativeCoord` that lands exactly on
+  an edge boundary (`remainder` exactly zero at `offset === 0`) returns
+  `cell: null` rather than a negative index, and `tryEnter` treats that
+  the same as any other blocked entry
 - `checkWin`: `box` requirement satisfied by either `normal` or
   `container`; `player` requirement satisfied only by the player;
   unsatisfied requirement anywhere fails the whole check
+- `parseLevel` validation (see below): rejects a non-square board, a board
+  referenced by zero containers when it isn't the level's one root board,
+  a board referenced by two or more different containers, and the usual
+  structural problems (missing player, dangling `boardRef`, out-of-bounds
+  location, duplicate occupancy)
+
+### Level schema validation
+
+`levelSchema.ts`'s `parseLevel` is the single place `World invariants`
+1–10 get enforced (invariant 11 has no data shape to validate — it's a
+behavioral limitation of `computeTarget`, not a constraint on level
+files). There is no separate `rootBoard` field in the schema — "the root
+board" is derived: for every board, count how many containers reference
+it as `boardRef`. Exactly one board must have a count of zero (that board
+is the root); every other board must have a count of exactly one.
+Concretely, `parseLevel` must reject:
+- Zero or more-than-one `player` piece
+- A board where `cells.length !== size` or any row's `length !== size`
+- A `container` whose `boardRef` doesn't exist in `boards`
+- Two containers with the same `boardRef`
+- Any board whose reference count (per the derivation above) is not
+  exactly 1, unless it's the single board with count 0
+- Zero boards with a reference count of 0, or more than one (both mean
+  there's no unambiguous root)
+- A location referencing a nonexistent board, or out of bounds for its
+  board
+- Two pieces sharing the same `(board, x, y)`
+- A piece with no matching location, or a location with no matching piece
 
 ## Migration note
 
