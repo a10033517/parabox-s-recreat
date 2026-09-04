@@ -1,62 +1,50 @@
-// 已知范围限制:只处理链长度 1(单箱平移)与恰好 2(靠墙嵌套)的反向操作。
 import {
-  boxAt,
-  cellAt,
-  cloneGrid,
-  Direction,
-  DIRECTION_VECTORS,
-  Grid,
-  nestEntryPosition,
+  Board, Direction, PLAYER_ID, PieceId, World,
+  inBounds, step, opposite, occupantAt, cloneWorld,
 } from '../../src/game/engine/types'
+import { applyMove } from '../../src/game/engine/rules'
+import { canonicalKey } from './canonical'
 
-function isOpenCell(grid: Grid, x: number, y: number): boolean {
-  if (cellAt(grid, x, y) !== 'empty' && cellAt(grid, x, y) !== 'target') return false
-  return !boxAt(grid, x, y)
+function isOpenFloor(board: Board, x: number, y: number): boolean {
+  return inBounds(board, x, y) && board.cells[y][x].type !== 'wall'
 }
 
-export function inverseTranslate(grid: Grid, direction: Direction): Grid | null {
-  if (!grid.player) return null
-  const { dx, dy } = DIRECTION_VECTORS[direction]
-  const behind = { x: grid.player.x - dx, y: grid.player.y - dy }
-  if (!isOpenCell(grid, behind.x, behind.y)) return null
+function verifyPredecessor(candidate: World, dir: Direction, expected: World): World | null {
+  const result = applyMove(candidate, dir)
+  if (result === null) return null
+  if (canonicalKey(result) !== canonicalKey(expected)) return null
+  return candidate
+}
 
-  const ahead = { x: grid.player.x + dx, y: grid.player.y + dy }
-  const pushedBox = boxAt(grid, ahead.x, ahead.y)
+export function inversePush(world: World, dir: Direction): World | null {
+  const loc = world.locations[PLAYER_ID]
+  const board = world.boards[loc.board]
 
-  const prev = cloneGrid(grid)
-  prev.player = behind
-  if (pushedBox) {
-    const b = prev.boxes.find((bb) => bb.id === pushedBox.id)!
-    b.x = grid.player.x
-    b.y = grid.player.y
+  const behind = step(loc.x, loc.y, opposite(dir))
+  if (!isOpenFloor(board, behind.x, behind.y)) return null
+  if (occupantAt(world, { board: loc.board, x: behind.x, y: behind.y })) return null
+
+  const chain: PieceId[] = []
+  let cursor = step(loc.x, loc.y, dir)
+  while (inBounds(board, cursor.x, cursor.y)) {
+    const occupant = occupantAt(world, { board: loc.board, x: cursor.x, y: cursor.y })
+    if (!occupant) break
+    chain.push(occupant)
+    cursor = step(cursor.x, cursor.y, dir)
   }
-  return prev
-}
+  if (!isOpenFloor(board, cursor.x, cursor.y)) return null
+  if (occupantAt(world, { board: loc.board, x: cursor.x, y: cursor.y })) return null
 
-export function inverseNest(grid: Grid, direction: Direction): Grid | null {
-  if (!grid.player) return null
-  const { dx, dy } = DIRECTION_VECTORS[direction]
-  const receiverPos = { x: grid.player.x + dx, y: grid.player.y + dy }
-  const receiver = boxAt(grid, receiverPos.x, receiverPos.y)
-  if (!receiver || receiver.boxType !== 'container') return null
+  const candidate = cloneWorld(world)
+  candidate.locations[PLAYER_ID] = { board: loc.board, x: behind.x, y: behind.y }
+  let px = loc.x
+  let py = loc.y
+  for (const pieceId of chain) {
+    candidate.locations[pieceId] = { board: loc.board, x: px, y: py }
+    const forward = step(px, py, dir)
+    px = forward.x
+    py = forward.y
+  }
 
-  const wallPos = { x: receiver.x + dx, y: receiver.y + dy }
-  if (cellAt(grid, wallPos.x, wallPos.y) !== 'wall') return null
-
-  const behind = { x: grid.player.x - dx, y: grid.player.y - dy }
-  if (!isOpenCell(grid, behind.x, behind.y)) return null
-
-  const entryPos = nestEntryPosition(receiver.interior, direction)
-  const nested = boxAt(receiver.interior, entryPos.x, entryPos.y)
-  if (!nested) return null
-
-  const prev = cloneGrid(grid)
-  prev.player = behind
-  const prevReceiver = prev.boxes.find((b) => b.id === receiver.id)!
-  prevReceiver.interior.boxes = prevReceiver.interior.boxes.filter((b) => b.id !== nested.id)
-  const restored = structuredClone(nested)
-  restored.x = grid.player.x
-  restored.y = grid.player.y
-  prev.boxes.push(restored)
-  return prev
+  return verifyPredecessor(candidate, dir, world)
 }
