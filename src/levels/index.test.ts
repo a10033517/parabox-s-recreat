@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BUILTIN_LEVELS, CUSTOM_LEVEL_ID_PREFIX, loadCustomLevels, loadGeneratedLevels } from './index'
+import { BUILTIN_LEVELS, CUSTOM_LEVEL_ID_PREFIX, loadCustomLevels, loadGeneratedLevels, parseGeneratedModules } from './index'
 import { checkWin } from '../game/engine/rules'
 import { PLAYER_ID } from '../game/engine/types'
 
@@ -23,8 +23,50 @@ describe('BUILTIN_LEVELS', () => {
   })
 })
 
+describe('parseGeneratedModules', () => {
+  it('returns an empty array for an empty module map', () => {
+    expect(parseGeneratedModules({})).toEqual([])
+  })
+
+  it('parses a raw JSON module into a LevelMeta with an id derived from its filename', () => {
+    const raw = JSON.stringify({
+      boards: {
+        root: {
+          id: 'root',
+          size: 3,
+          cells: [
+            [{ type: 'floor' }, { type: 'floor' }, { type: 'floor' }],
+            [{ type: 'floor' }, { type: 'floor' }, { type: 'floor', requirement: 'box' }],
+            [{ type: 'floor' }, { type: 'floor' }, { type: 'floor' }],
+          ],
+        },
+      },
+      pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
+      locations: { player: { board: 'root', x: 0, y: 1 }, box1: { board: 'root', x: 1, y: 1 } },
+    })
+    const levels = parseGeneratedModules({ './builtin/generated/easy-01.json': raw })
+    expect(levels).toHaveLength(1)
+    expect(levels[0].id).toBe('easy-01')
+    expect(levels[0].name).toBe('easy-01')
+    expect(checkWin(levels[0].world)).toBe(false)
+  })
+
+  it('derives distinct ids for distinct filenames', () => {
+    const raw = JSON.stringify({
+      boards: { root: { id: 'root', size: 1, cells: [[{ type: 'floor' }]] } },
+      pieces: { player: { id: 'player', kind: 'player' } },
+      locations: { player: { board: 'root', x: 0, y: 0 } },
+    })
+    const levels = parseGeneratedModules({
+      './builtin/generated/easy-01.json': raw,
+      './builtin/generated/hard-01.json': raw,
+    })
+    expect(levels.map((l) => l.id).sort()).toEqual(['easy-01', 'hard-01'])
+  })
+})
+
 describe('loadGeneratedLevels', () => {
-  it('returns an empty array (sub-project 4 rebuilds the generator against the new format)', () => {
+  it('returns an empty array until the generator has been run (no files committed yet)', () => {
     expect(loadGeneratedLevels()).toEqual([])
   })
 })

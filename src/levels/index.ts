@@ -20,10 +20,21 @@ export const BUILTIN_LEVELS: LevelMeta[] = [
   { id: '05-double-nested', name: '双层嵌套', world: parseLevel(JSON.parse(level05)) },
 ]
 
-// Sub-project 4 rebuilds the generator against the new World format; nothing in
-// that format exists yet.
+const generatedModules = import.meta.glob('./builtin/generated/*.json', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>
+
+export function parseGeneratedModules(modules: Record<string, string>): LevelMeta[] {
+  return Object.entries(modules).map(([path, raw]) => {
+    const id = path.split('/').pop()!.replace('.json', '')
+    return { id, name: id, world: parseLevel(JSON.parse(raw)) }
+  })
+}
+
 export function loadGeneratedLevels(): LevelMeta[] {
-  return []
+  return parseGeneratedModules(generatedModules)
 }
 
 // Custom level names are chosen by the user, so they could collide with a
