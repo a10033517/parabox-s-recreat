@@ -197,8 +197,6 @@ import { applyMove, getEntryCell } from '../../src/game/engine/rules'
 import { HALF } from '../../src/game/engine/fraction'
 import { canonicalKey } from './canonical'
 
-const DIRECTIONS: Direction[] = ['up', 'down', 'left', 'right']
-
 function isOpenFloor(board: Board, x: number, y: number): boolean {
   return inBounds(board, x, y) && board.cells[y][x].type !== 'wall'
 }
