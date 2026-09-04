@@ -70,3 +70,39 @@ export function inverseEnter(world: World, dir: Direction): World | null {
 
   return verifyPredecessor(candidate, dir, world)
 }
+
+export function inverseEat(world: World, dir: Direction): World | null {
+  const loc = world.locations[PLAYER_ID]
+  const board = world.boards[loc.board]
+
+  const containerPos = step(loc.x, loc.y, dir)
+  const containerId = occupantAt(world, { board: loc.board, x: containerPos.x, y: containerPos.y })
+  if (!containerId) return null
+  const container = world.pieces[containerId]
+  if (container.kind !== 'container' || container.boardRef === undefined) return null
+
+  // wallAhead: the cell immediately ahead of the container in the push
+  // direction — player -> container -> wall, all three in a row. This is
+  // what blocks the container from being pushed further, forcing the eat
+  // branch.
+  const wallAhead = step(containerPos.x, containerPos.y, dir)
+  if (!inBounds(board, wallAhead.x, wallAhead.y)) return null
+  if (board.cells[wallAhead.y][wallAhead.x].type !== 'wall') return null
+
+  const interior = world.boards[container.boardRef]
+  const { cell: eatenCell } = getEntryCell(interior, opposite(dir), HALF)
+  if (eatenCell === null) return null
+  const eatenId = occupantAt(world, { board: interior.id, x: eatenCell.x, y: eatenCell.y })
+  if (!eatenId) return null
+
+  const behindPlayer = step(loc.x, loc.y, opposite(dir))
+  if (!isOpenFloor(board, behindPlayer.x, behindPlayer.y)) return null
+  if (occupantAt(world, { board: loc.board, x: behindPlayer.x, y: behindPlayer.y })) return null
+
+  const candidate = cloneWorld(world)
+  candidate.locations[PLAYER_ID] = { board: loc.board, x: behindPlayer.x, y: behindPlayer.y }
+  candidate.locations[containerId] = { board: loc.board, x: loc.x, y: loc.y }
+  candidate.locations[eatenId] = { board: loc.board, x: containerPos.x, y: containerPos.y }
+
+  return verifyPredecessor(candidate, dir, world)
+}

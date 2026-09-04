@@ -1,7 +1,7 @@
-import { Board, Cell, Direction, World, step } from '../../src/game/engine/types'
+import { Board, Cell, Direction, World, step, opposite } from '../../src/game/engine/types'
 import { applyMove, getEntryCell } from '../../src/game/engine/rules'
 import { HALF } from '../../src/game/engine/fraction'
-import { inversePush, inverseEnter } from './inverseMoves'
+import { inversePush, inverseEnter, inverseEat } from './inverseMoves'
 
 function makeBoard(id: string, size: number): Board {
   const cells: Cell[][] = Array.from({ length: size }, () =>
@@ -203,4 +203,137 @@ test('inverseEnter returns null when the cell behind the container is blocked', 
     },
   }
   expect(inverseEnter(world, 'right')).toBeNull()
+})
+
+test('inverseEat reconstructs a player-pushes-container-which-eats-a-box sequence', () => {
+  // Hand-traced against the real resolveBlocked recursion (see the spec's
+  // "Forward engine is the source of truth" section): player pre=(0,1),
+  // container pre=(1,1), box pre=(2,1), wall=(3,1), dir='right' produces
+  // player post=(1,1), container post=(2,1), box now inside the container.
+  // This is the exact scenario this test constructs as the POST state, and
+  // it is the case that caught a real arithmetic bug in an earlier draft of
+  // inverseEat (the container's reconstructed position was computed as
+  // step(loc, dir) again instead of loc itself) — keep this named test even
+  // though the generic round-trip check below would also have caught the
+  // bug, so a regression here fails readably instead of only via an opaque
+  // canonicalKey mismatch.
+  const root = makeBoard('root', 5)
+  root.cells[1][3] = { type: 'wall' }
+  const world: World = {
+    boards: { root, inside: makeBoard('inside', 3) },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      container1: { id: 'container1', kind: 'container', boardRef: 'inside' },
+      box1: { id: 'box1', kind: 'normal' },
+    },
+    locations: {
+      player: { board: 'root', x: 1, y: 1 },
+      container1: { board: 'root', x: 2, y: 1 },
+      box1: { board: 'inside', x: 2, y: 1 },
+    },
+  }
+  const prev = inverseEat(world, 'right')
+  expect(prev).not.toBeNull()
+  expect(prev!.locations.player).toEqual({ board: 'root', x: 0, y: 1 })
+  expect(prev!.locations.container1).toEqual({ board: 'root', x: 1, y: 1 })
+  expect(prev!.locations.box1).toEqual({ board: 'root', x: 2, y: 1 })
+  expect(applyMove(prev!, 'right')).toEqual(world)
+})
+
+test('inverseEat works in all four directions', () => {
+  const directions: Direction[] = ['up', 'down', 'left', 'right']
+  for (const dir of directions) {
+    const root = makeBoard('root', 5)
+    const playerPos = { x: 2, y: 2 }
+    const containerPos = step(playerPos.x, playerPos.y, dir)
+    const wallPos = step(containerPos.x, containerPos.y, dir)
+    root.cells[wallPos.y][wallPos.x] = { type: 'wall' }
+    const inside = makeBoard('inside', 3)
+    const { cell: eatenCell } = getEntryCell(inside, opposite(dir), HALF)
+    const world: World = {
+      boards: { root, inside },
+      pieces: {
+        player: { id: 'player', kind: 'player' },
+        container1: { id: 'container1', kind: 'container', boardRef: 'inside' },
+        box1: { id: 'box1', kind: 'normal' },
+      },
+      locations: {
+        player: { board: 'root', x: playerPos.x, y: playerPos.y },
+        container1: { board: 'root', x: containerPos.x, y: containerPos.y },
+        box1: { board: 'inside', x: eatenCell!.x, y: eatenCell!.y },
+      },
+    }
+    const prev = inverseEat(world, dir)
+    expect(prev, `direction ${dir}`).not.toBeNull()
+    expect(applyMove(prev!, dir)).toEqual(world)
+  }
+})
+
+test('inverseEat returns null when there is no wall ahead of the container', () => {
+  const root = makeBoard('root', 5)
+  const inside = makeBoard('inside', 3)
+  const { cell: eatenCell } = getEntryCell(inside, 'left', HALF)
+  const world: World = {
+    boards: { root, inside },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      container1: { id: 'container1', kind: 'container', boardRef: 'inside' },
+      box1: { id: 'box1', kind: 'normal' },
+    },
+    locations: {
+      player: { board: 'root', x: 1, y: 1 },
+      container1: { board: 'root', x: 2, y: 1 },
+      box1: { board: 'inside', x: eatenCell!.x, y: eatenCell!.y },
+    },
+  }
+  expect(inverseEat(world, 'right')).toBeNull()
+})
+
+test('inverseEat returns null when nothing is inside the container to eat', () => {
+  const root = makeBoard('root', 5)
+  root.cells[1][3] = { type: 'wall' }
+  const world: World = {
+    boards: { root, inside: makeBoard('inside', 3) },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      container1: { id: 'container1', kind: 'container', boardRef: 'inside' },
+    },
+    locations: {
+      player: { board: 'root', x: 1, y: 1 },
+      container1: { board: 'root', x: 2, y: 1 },
+    },
+  }
+  expect(inverseEat(world, 'right')).toBeNull()
+})
+
+test('inverseEat returns null when the piece ahead is not a container', () => {
+  const world: World = {
+    boards: { root: makeBoard('root', 5) },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      box1: { id: 'box1', kind: 'normal' },
+    },
+    locations: {
+      player: { board: 'root', x: 1, y: 1 },
+      box1: { board: 'root', x: 2, y: 1 },
+    },
+  }
+  expect(inverseEat(world, 'right')).toBeNull()
+})
+
+test('inverseEat returns null when the container has no boardRef', () => {
+  const root = makeBoard('root', 5)
+  root.cells[1][3] = { type: 'wall' }
+  const world: World = {
+    boards: { root },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      container1: { id: 'container1', kind: 'container' },
+    },
+    locations: {
+      player: { board: 'root', x: 1, y: 1 },
+      container1: { board: 'root', x: 2, y: 1 },
+    },
+  }
+  expect(inverseEat(world, 'right')).toBeNull()
 })
