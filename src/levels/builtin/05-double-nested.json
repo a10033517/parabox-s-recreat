@@ -1,0 +1,41 @@
+{
+  "boards": {
+    "root": {
+      "id": "root",
+      "size": 3,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "wall" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    },
+    "boardA": {
+      "id": "boardA",
+      "size": 3,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "wall" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    },
+    "boardB": {
+      "id": "boardB",
+      "size": 3,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor", "requirement": "player" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    }
+  },
+  "pieces": {
+    "player": { "id": "player", "kind": "player" },
+    "containerA": { "id": "containerA", "kind": "container", "boardRef": "boardA" },
+    "containerB": { "id": "containerB", "kind": "container", "boardRef": "boardB" }
+  },
+  "locations": {
+    "player": { "board": "root", "x": 0, "y": 1 },
+    "containerA": { "board": "root", "x": 1, "y": 1 },
+    "containerB": { "board": "boardA", "x": 1, "y": 1 }
+  }
+}

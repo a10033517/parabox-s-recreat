@@ -59,4 +59,15 @@ describe('GameState', () => {
     state.move('right')
     expect(state.isWon).toBe(true)
   })
+
+  it('reports moveCount as the number of moves currently in history, decremented by undo', () => {
+    const state = new GameState(simpleWorld())
+    expect(state.moveCount).toBe(0)
+    state.move('right')
+    expect(state.moveCount).toBe(1)
+    state.move('right')
+    expect(state.moveCount).toBe(2)
+    state.undo()
+    expect(state.moveCount).toBe(1)
+  })
 })

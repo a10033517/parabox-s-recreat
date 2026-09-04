@@ -1,23 +1,25 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { GameScreen } from './GameScreen'
-import { createEmptyGrid } from './engine/types'
+import { makeFloorBoard, makeWorld, setRequirement, setWall } from './engine/testFixtures'
+import { PLAYER_ID } from './engine/types'
 
 beforeEach(() => {
   HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
     fillRect: vi.fn(),
-    strokeRect: vi.fn(),
   }) as unknown as typeof HTMLCanvasElement.prototype.getContext
 })
 
-function grid() {
-  const g = createEmptyGrid(3, 3)
-  g.player = { x: 1, y: 1 }
-  return g
+function simpleWorld() {
+  return makeWorld(
+    [makeFloorBoard('root', 3)],
+    [{ id: PLAYER_ID, kind: 'player' }],
+    { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } },
+  )
 }
 
 test('pressing a DPad button increments the step counter', async () => {
-  render(<GameScreen initialGrid={grid()} onExit={() => {}} onWin={() => {}} />)
+  render(<GameScreen initialWorld={simpleWorld()} onExit={() => {}} onWin={() => {}} />)
   const user = userEvent.setup()
   expect(screen.getByText('步数: 0')).toBeInTheDocument()
   await user.click(screen.getByLabelText('右'))
@@ -25,28 +27,64 @@ test('pressing a DPad button increments the step counter', async () => {
 })
 
 test('undo button decrements the step counter', async () => {
-  render(<GameScreen initialGrid={grid()} onExit={() => {}} onWin={() => {}} />)
+  render(<GameScreen initialWorld={simpleWorld()} onExit={() => {}} onWin={() => {}} />)
   const user = userEvent.setup()
   await user.click(screen.getByLabelText('右'))
   await user.click(screen.getByText('复位上一步'))
   expect(screen.getByText('步数: 0')).toBeInTheDocument()
 })
 
-test('reaching the win condition calls onWin', async () => {
-  // 3x3 网格且 target 位于正中央时,无法透过推箱子达成胜利:
-  // 要把箱子从 target 旁边推回 target,玩家必须站在箱子的另一侧,
-  // 但 3 宽网格里那一侧永远超出边界 (index 3 越界)。
-  // 因此改用 4 宽网格,让玩家有空间站在箱子右侧,向左推回 target。
-  const g = createEmptyGrid(4, 3)
-  g.player = { x: 3, y: 1 }
-  g.cells[1][1] = 'target'
-  g.boxes.push({ id: 'g1', x: 1, y: 1, boxType: 'normal', interior: createEmptyGrid(1, 1), isGoalBox: true })
-  g.boxes[0].isGoalBox = true
-  // 把 g1 移出 target 一格,靠玩家推它回去触发胜利
-  g.boxes[0].x = 2
-  const onWin = vi.fn()
-  render(<GameScreen initialGrid={g} onExit={() => {}} onWin={onWin} />)
+test('entering a container swaps the rendered board and resizes the canvas', async () => {
+  const root = makeFloorBoard('root', 3)
+  setWall(root, 2, 1) // block the container from being pushed, forcing entry instead
+  const inside = makeFloorBoard('inside', 5)
+  const world = makeWorld(
+    [root, inside],
+    [
+      { id: PLAYER_ID, kind: 'player' },
+      { id: 'containerBox', kind: 'container', boardRef: 'inside' },
+    ],
+    {
+      [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+      containerBox: { board: 'root', x: 1, y: 1 },
+    },
+  )
+  const { container } = render(<GameScreen initialWorld={world} onExit={() => {}} onWin={() => {}} />)
   const user = userEvent.setup()
-  await user.click(screen.getByLabelText('左'))
-  expect(onWin).toHaveBeenCalled()
+  await user.click(screen.getByLabelText('右'))
+  const canvas = container.querySelector('canvas')!
+  expect(canvas.width).toBe(5 * 32) // 'inside' is size 5, CELL_SIZE is 32
+})
+
+test('reaching the win condition calls onWin exactly once', async () => {
+  const root = makeFloorBoard('root', 2)
+  setRequirement(root, 1, 0, 'player')
+  const world = makeWorld(
+    [root],
+    [{ id: PLAYER_ID, kind: 'player' }],
+    { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } },
+  )
+  const onWin = vi.fn()
+  render(<GameScreen initialWorld={world} onExit={() => {}} onWin={onWin} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('右'))
+  expect(onWin).toHaveBeenCalledTimes(1)
+})
+
+test('undoing out of a won state allows onWin to fire again on re-winning', async () => {
+  const root = makeFloorBoard('root', 2)
+  setRequirement(root, 1, 0, 'player')
+  const world = makeWorld(
+    [root],
+    [{ id: PLAYER_ID, kind: 'player' }],
+    { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } },
+  )
+  const onWin = vi.fn()
+  render(<GameScreen initialWorld={world} onExit={() => {}} onWin={onWin} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('右')) // win
+  expect(onWin).toHaveBeenCalledTimes(1)
+  await user.click(screen.getByText('复位上一步')) // undo out of the win
+  await user.click(screen.getByLabelText('右')) // re-win
+  expect(onWin).toHaveBeenCalledTimes(2)
 })
