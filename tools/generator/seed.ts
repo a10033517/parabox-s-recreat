@@ -9,7 +9,8 @@ export function createSeedWorld(): World {
       return { type: isBorder ? 'wall' : 'floor' } as Cell
     }),
   )
-  cells[2][5] = { type: 'floor', requirement: 'box' }
+  cells[3][4] = { type: 'wall' }
+  cells[3][3] = { type: 'floor', requirement: 'box' }
 
   const inside: Board = {
     id: 'goalInside',
@@ -23,10 +24,14 @@ export function createSeedWorld(): World {
     pieces: {
       [PLAYER_ID]: { id: PLAYER_ID, kind: 'player' },
       goal: { id: 'goal', kind: 'container', boardRef: 'goalInside' },
+      box1: { id: 'box1', kind: 'normal' },
+      box2: { id: 'box2', kind: 'normal' },
     },
     locations: {
-      [PLAYER_ID]: { board: 'root', x: 3, y: 2 },
-      goal: { board: 'root', x: 5, y: 2 },
+      [PLAYER_ID]: { board: 'root', x: 2, y: 2 },
+      goal: { board: 'root', x: 3, y: 3 },
+      box1: { board: 'goalInside', x: 2, y: 1 },
+      box2: { board: 'root', x: 2, y: 4 },
     },
   }
 }
