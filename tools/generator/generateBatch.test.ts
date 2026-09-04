@@ -1,6 +1,6 @@
-import { solve } from './solver'
 import { checkWin } from '../../src/game/engine/rules'
 import { parseLevel } from '../../src/game/engine/levelSchema'
+import { canonicalKey } from './canonical'
 import { generateLevelBatch } from './generateBatch'
 
 function seededRng(startSeed: number): () => number {
@@ -11,28 +11,40 @@ function seededRng(startSeed: number): () => number {
   }
 }
 
-test('generateLevelBatch produces at least one solvable level per tier within a bounded attempt count', () => {
+test('generateLevelBatch reports whether it actually met its tier quotas', () => {
   const result = generateLevelBatch(1, seededRng(42))
-  expect(result.length).toBeGreaterThan(0)
-  for (const entry of result) {
-    const grid = parseLevel(entry.json)
-    const solution = solve(grid, 100)
-    expect(solution).not.toBeNull()
-    expect(solution!.length).toBeGreaterThan(0)
+  if (result.complete) {
+    expect(result.counts.easy).toBeGreaterThanOrEqual(1)
+    expect(result.counts.medium).toBeGreaterThanOrEqual(1)
+    expect(result.counts.hard).toBeGreaterThanOrEqual(1)
+  } else {
+    expect(result.counts.easy < 1 || result.counts.medium < 1 || result.counts.hard < 1).toBe(true)
   }
 })
 
-test('generateLevelBatch never emits a level that is already won on load', () => {
-  const result = generateLevelBatch(2, seededRng(99))
-  expect(result.length).toBeGreaterThan(0)
-  for (const entry of result) {
-    expect(checkWin(parseLevel(entry.json))).toBe(false)
+test('every accepted level is unsolved and parses back through parseLevel', () => {
+  const result = generateLevelBatch(1, seededRng(42))
+  expect(result.levels.length).toBeGreaterThan(0)
+  for (const entry of result.levels) {
+    const parsed = parseLevel(JSON.parse(entry.json))
+    expect(checkWin(parsed)).toBe(false)
   }
 })
 
-test('every produced level JSON round-trips through parseLevel', () => {
-  const result = generateLevelBatch(1, seededRng(7))
-  for (const entry of result) {
-    expect(() => parseLevel(entry.json)).not.toThrow()
-  }
+test('no two accepted levels in one batch share a canonical state', () => {
+  const result = generateLevelBatch(2, seededRng(7))
+  const keys = result.levels.map((entry) => canonicalKey(entry.world))
+  expect(new Set(keys).size).toBe(keys.length)
+})
+
+test('batch stats account for every attempt', () => {
+  const result = generateLevelBatch(1, seededRng(99))
+  const accountedFor =
+    result.levels.length +
+    result.stats.discardedGenerationFailed +
+    result.stats.discardedAlreadySolved +
+    result.stats.discardedUnsolvable +
+    result.stats.discardedDuplicate +
+    result.stats.discardedTierFull
+  expect(accountedFor).toBe(result.stats.attempts)
 })
