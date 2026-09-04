@@ -1,4 +1,4 @@
-import { World } from '../src/game/engine/types'
+import { World } from '../../src/game/engine/types'
 import { canonicalKey } from './canonical'
 
 test('canonicalKey is identical for equivalent content built with different key insertion order', () => {

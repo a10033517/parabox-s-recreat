@@ -1,4 +1,4 @@
-import { World } from '../src/game/engine/types'
+import { World } from '../../src/game/engine/types'
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize)
