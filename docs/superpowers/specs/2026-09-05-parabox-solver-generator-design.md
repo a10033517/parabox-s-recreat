@@ -345,22 +345,26 @@ export function inverseEat(world: World, dir: Direction): World | null {
 
   const candidate = cloneWorld(world)
   candidate.locations[PLAYER_ID] = { board: loc.board, x: behindPlayer.x, y: behindPlayer.y }
-  candidate.locations[containerId] = {
-    board: loc.board,
-    x: loc.x + (dir === 'left' ? -1 : dir === 'right' ? 1 : 0),
-    y: loc.y + (dir === 'up' ? -1 : dir === 'down' ? 1 : 0),
-  }
+  candidate.locations[containerId] = { board: loc.board, x: loc.x, y: loc.y }
   candidate.locations[eatenId] = { board: loc.board, x: containerPos.x, y: containerPos.y }
 
   return verifyPredecessor(candidate, dir, world)
 }
 ```
 
-Note: `candidate.locations[containerId]` above is `loc` shifted one step in `dir` — i.e.
-exactly `containerPos` computed the same way as the original `step(loc.x, loc.y, dir)`
-call; the inline arithmetic is written out to avoid a second call to `step` with
-identical inputs. Implementers may factor this into a `step(loc.x, loc.y, dir)` call
-instead if clearer — the value is identical either way, `containerPos`.
+Note: the container's reconstructed position is exactly `loc` — the player's *current*
+position — not `containerPos` shifted any further. Concretely: post-state has
+`player@loc`, `container@containerPos` (`= step(loc, dir)`); the predecessor has
+`player` one step further back (`behindPlayer`) and `container` sitting exactly where
+the player currently stands (`loc`), because the player advanced into the cell the
+container vacated when it slid forward into the eaten piece's old spot. An earlier
+draft of this function computed the container's predecessor as `step(loc, dir)` again
+(i.e. `containerPos`, unchanged) instead of `loc` — that bug was caught by hand-tracing
+this exact scenario against `resolveBlocked` (player pre=(0,1), container pre=(1,1), box
+pre=(2,1), wall=(3,1), `dir='right'`) during plan-writing, before any code existed. The
+implementation plan's tests for this function must include exactly this traced scenario
+as a named test case, not only the generic round-trip check, so a regression here fails
+a human-readable test rather than only an opaque `canonicalKey` mismatch.
 
 `container.boardRef === undefined` is checked explicitly above (not cast away with
 `as string`) — per review §5.3, a container's `boardRef` is typed optional
