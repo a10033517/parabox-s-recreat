@@ -1,6 +1,7 @@
 import { Board, Cell, Direction, World, step } from '../../src/game/engine/types'
-import { applyMove } from '../../src/game/engine/rules'
-import { inversePush } from './inverseMoves'
+import { applyMove, getEntryCell } from '../../src/game/engine/rules'
+import { HALF } from '../../src/game/engine/fraction'
+import { inversePush, inverseEnter } from './inverseMoves'
 
 function makeBoard(id: string, size: number): Board {
   const cells: Cell[][] = Array.from({ length: size }, () =>
@@ -113,4 +114,93 @@ test('inversePush treats an unblocked container as an ordinary pushable piece', 
   const prev = inversePush(world, 'right')
   expect(prev).not.toBeNull()
   expect(applyMove(prev!, 'right')).toEqual(world)
+})
+
+test('inverseEnter reconstructs the predecessor of walking into a container from the right', () => {
+  const root = makeBoard('root', 5)
+  root.cells[2][3] = { type: 'wall' }
+  const world: World = {
+    boards: { root, inside: makeBoard('inside', 3) },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      container1: { id: 'container1', kind: 'container', boardRef: 'inside' },
+    },
+    locations: {
+      player: { board: 'inside', x: 0, y: 1 },
+      container1: { board: 'root', x: 2, y: 2 },
+    },
+  }
+  const prev = inverseEnter(world, 'right')
+  expect(prev).not.toBeNull()
+  expect(applyMove(prev!, 'right')).toEqual(world)
+})
+
+test('inverseEnter works in all four directions', () => {
+  const directions: Direction[] = ['up', 'down', 'left', 'right']
+  for (const dir of directions) {
+    const root = makeBoard('root', 5)
+    const containerPos = { x: 2, y: 2 }
+    const wallPos = step(containerPos.x, containerPos.y, dir)
+    root.cells[wallPos.y][wallPos.x] = { type: 'wall' }
+    const inside = makeBoard('inside', 3)
+    const { cell } = getEntryCell(inside, dir, HALF)
+    const world: World = {
+      boards: { root, inside },
+      pieces: {
+        player: { id: 'player', kind: 'player' },
+        container1: { id: 'container1', kind: 'container', boardRef: 'inside' },
+      },
+      locations: {
+        player: { board: 'inside', x: cell!.x, y: cell!.y },
+        container1: { board: 'root', x: containerPos.x, y: containerPos.y },
+      },
+    }
+    const prev = inverseEnter(world, dir)
+    expect(prev, `direction ${dir}`).not.toBeNull()
+    expect(applyMove(prev!, dir)).toEqual(world)
+  }
+})
+
+test('inverseEnter returns null when the player is not on the correct entry cell', () => {
+  const root = makeBoard('root', 5)
+  root.cells[2][3] = { type: 'wall' }
+  const world: World = {
+    boards: { root, inside: makeBoard('inside', 3) },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      container1: { id: 'container1', kind: 'container', boardRef: 'inside' },
+    },
+    locations: {
+      player: { board: 'inside', x: 1, y: 1 },
+      container1: { board: 'root', x: 2, y: 2 },
+    },
+  }
+  expect(inverseEnter(world, 'right')).toBeNull()
+})
+
+test('inverseEnter returns null on the root board (no owning container)', () => {
+  const world: World = {
+    boards: { root: makeBoard('root', 5) },
+    pieces: { player: { id: 'player', kind: 'player' } },
+    locations: { player: { board: 'root', x: 2, y: 2 } },
+  }
+  expect(inverseEnter(world, 'right')).toBeNull()
+})
+
+test('inverseEnter returns null when the cell behind the container is blocked', () => {
+  const root = makeBoard('root', 5)
+  root.cells[2][3] = { type: 'wall' }
+  root.cells[2][1] = { type: 'wall' }
+  const world: World = {
+    boards: { root, inside: makeBoard('inside', 3) },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      container1: { id: 'container1', kind: 'container', boardRef: 'inside' },
+    },
+    locations: {
+      player: { board: 'inside', x: 0, y: 1 },
+      container1: { board: 'root', x: 2, y: 2 },
+    },
+  }
+  expect(inverseEnter(world, 'right')).toBeNull()
 })

@@ -1,8 +1,9 @@
 import {
   Board, Direction, PLAYER_ID, PieceId, World,
-  inBounds, step, opposite, occupantAt, cloneWorld,
+  inBounds, step, opposite, occupantAt, findContainerFor, cloneWorld,
 } from '../../src/game/engine/types'
-import { applyMove } from '../../src/game/engine/rules'
+import { applyMove, getEntryCell } from '../../src/game/engine/rules'
+import { HALF } from '../../src/game/engine/fraction'
 import { canonicalKey } from './canonical'
 
 function isOpenFloor(board: Board, x: number, y: number): boolean {
@@ -45,6 +46,27 @@ export function inversePush(world: World, dir: Direction): World | null {
     px = forward.x
     py = forward.y
   }
+
+  return verifyPredecessor(candidate, dir, world)
+}
+
+export function inverseEnter(world: World, dir: Direction): World | null {
+  const loc = world.locations[PLAYER_ID]
+  const board = world.boards[loc.board]
+  const containerId = findContainerFor(world, loc.board)
+  if (containerId === undefined) return null
+
+  const { cell } = getEntryCell(board, dir, HALF)
+  if (cell === null || cell.x !== loc.x || cell.y !== loc.y) return null
+
+  const containerLoc = world.locations[containerId]
+  const parentBoard = world.boards[containerLoc.board]
+  const behind = step(containerLoc.x, containerLoc.y, opposite(dir))
+  if (!isOpenFloor(parentBoard, behind.x, behind.y)) return null
+  if (occupantAt(world, { board: containerLoc.board, x: behind.x, y: behind.y })) return null
+
+  const candidate = cloneWorld(world)
+  candidate.locations[PLAYER_ID] = { board: containerLoc.board, x: behind.x, y: behind.y }
 
   return verifyPredecessor(candidate, dir, world)
 }
