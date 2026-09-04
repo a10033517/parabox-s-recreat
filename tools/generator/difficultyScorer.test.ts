@@ -1,9 +1,9 @@
 import { difficultyTier, scoreDifficulty } from './difficultyScorer'
 
-test('scoreDifficulty weighs nesting events much higher than plain moves', () => {
-  const noNesting = scoreDifficulty(10, 0)
-  const oneNesting = scoreDifficulty(10, 1)
-  expect(oneNesting).toBeGreaterThan(noNesting)
+test('scoreDifficulty weighs crossing moves much higher than plain moves', () => {
+  const noCrossing = scoreDifficulty(10, 0)
+  const oneCrossing = scoreDifficulty(10, 1)
+  expect(oneCrossing).toBeGreaterThan(noCrossing)
 })
 
 test('difficultyTier buckets scores into easy/medium/hard', () => {
