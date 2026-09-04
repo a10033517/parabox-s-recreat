@@ -1,24 +1,32 @@
-import { createEmptyGrid, Grid } from '../../src/game/engine/types'
+import { Board, Cell, World, PLAYER_ID } from '../../src/game/engine/types'
 
-export function createSeedGrid(): Grid {
-  const grid = createEmptyGrid(7, 5)
-  for (let x = 0; x < grid.width; x++) {
-    grid.cells[0][x] = 'wall'
-    grid.cells[grid.height - 1][x] = 'wall'
+const SEED_SIZE = 7
+
+export function createSeedWorld(): World {
+  const cells: Cell[][] = Array.from({ length: SEED_SIZE }, (_, y) =>
+    Array.from({ length: SEED_SIZE }, (_, x) => {
+      const isBorder = x === 0 || y === 0 || x === SEED_SIZE - 1 || y === SEED_SIZE - 1
+      return { type: isBorder ? 'wall' : 'floor' } as Cell
+    }),
+  )
+  cells[2][5] = { type: 'floor', requirement: 'box' }
+
+  const inside: Board = {
+    id: 'goalInside',
+    size: 3,
+    cells: Array.from({ length: 3 }, () => Array.from({ length: 3 }, () => ({ type: 'floor' as const }))),
   }
-  for (let y = 0; y < grid.height; y++) {
-    grid.cells[y][0] = 'wall'
-    grid.cells[y][grid.width - 1] = 'wall'
+  const root: Board = { id: 'root', size: SEED_SIZE, cells }
+
+  return {
+    boards: { root, goalInside: inside },
+    pieces: {
+      [PLAYER_ID]: { id: PLAYER_ID, kind: 'player' },
+      goal: { id: 'goal', kind: 'container', boardRef: 'goalInside' },
+    },
+    locations: {
+      [PLAYER_ID]: { board: 'root', x: 3, y: 2 },
+      goal: { board: 'root', x: 5, y: 2 },
+    },
   }
-  grid.cells[2][5] = 'target'
-  grid.boxes.push({
-    id: 'goal',
-    x: 5,
-    y: 2,
-    boxType: 'container',
-    isGoalBox: true,
-    interior: createEmptyGrid(3, 3),
-  })
-  grid.player = { x: 3, y: 2 }
-  return grid
 }
