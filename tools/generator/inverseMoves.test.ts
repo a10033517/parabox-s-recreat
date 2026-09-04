@@ -116,6 +116,15 @@ test('inversePush treats an unblocked container as an ordinary pushable piece', 
   expect(applyMove(prev!, 'right')).toEqual(world)
 })
 
+test('inversePush reconstructs a plain walk toward a cell adjacent to a wall on its far side', () => {
+  const world = makeRootWorld(7)
+  world.boards.root.cells[0][5] = { type: 'wall' }
+  world.locations.player = { board: 'root', x: 5, y: 1 }
+  const prev = inversePush(world, 'up')
+  expect(prev).not.toBeNull()
+  expect(applyMove(prev!, 'up')).toEqual(world)
+})
+
 test('inverseEnter reconstructs the predecessor of walking into a container from the right', () => {
   const root = makeBoard('root', 5)
   root.cells[2][3] = { type: 'wall' }

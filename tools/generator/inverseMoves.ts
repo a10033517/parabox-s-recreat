@@ -33,8 +33,10 @@ export function inversePush(world: World, dir: Direction): World | null {
     chain.push(occupant)
     cursor = step(cursor.x, cursor.y, dir)
   }
-  if (!isOpenFloor(board, cursor.x, cursor.y)) return null
-  if (occupantAt(world, { board: loc.board, x: cursor.x, y: cursor.y })) return null
+  if (chain.length > 0) {
+    if (!isOpenFloor(board, cursor.x, cursor.y)) return null
+    if (occupantAt(world, { board: loc.board, x: cursor.x, y: cursor.y })) return null
+  }
 
   const candidate = cloneWorld(world)
   candidate.locations[PLAYER_ID] = { board: loc.board, x: behind.x, y: behind.y }
