@@ -35,7 +35,7 @@
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-import { World } from '../src/game/engine/types'
+import { World } from '../../src/game/engine/types'
 import { canonicalKey } from './canonical'
 
 test('canonicalKey is identical for equivalent content built with different key insertion order', () => {
@@ -89,7 +89,7 @@ Expected: FAIL — `Cannot find module './canonical'` (the module doesn't exist 
 - [ ] **Step 3: Write minimal implementation**
 
 ```ts
-import { World } from '../src/game/engine/types'
+import { World } from '../../src/game/engine/types'
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize)
