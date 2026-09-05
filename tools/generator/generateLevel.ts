@@ -9,6 +9,7 @@ export type GenerationEventKind = 'push' | 'enter' | 'eat'
 export interface GenerationEvent {
   kind: GenerationEventKind
   direction: Direction
+  affectedPieceIds: string[]
 }
 
 export interface GenerationResult {
@@ -29,6 +30,16 @@ function shuffled<T>(items: T[], rng: () => number): T[] {
     ;[copy[i], copy[j]] = [copy[j], copy[i]]
   }
   return copy
+}
+
+function affectedPieceIds(before: World, after: World): string[] {
+  const ids: string[] = []
+  for (const pieceId of Object.keys(before.locations)) {
+    const a = before.locations[pieceId]
+    const b = after.locations[pieceId]
+    if (a.board !== b.board || a.x !== b.x || a.y !== b.y) ids.push(pieceId)
+  }
+  return ids
 }
 
 export function generateLevel(seed: World, steps: number, rng: () => number): GenerationResult | null {
@@ -53,9 +64,10 @@ export function generateLevel(seed: World, steps: number, rng: () => number): Ge
     }
     if (!accepted) continue
 
+    const affected = affectedPieceIds(world, accepted.world)
     world = accepted.world
     seen.add(canonicalKey(world))
-    events.push({ kind: accepted.kind, direction })
+    events.push({ kind: accepted.kind, direction, affectedPieceIds: affected })
   }
 
   if (events.length < steps) return null

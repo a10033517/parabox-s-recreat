@@ -13,7 +13,7 @@ function seededRng(startSeed: number): () => number {
 }
 
 test('generateLevel with zero steps returns the seed unchanged with no events', () => {
-  const seed = createSeedWorld()
+  const seed = createSeedWorld(seededRng(1)).world
   const result = generateLevel(seed, 0, () => 0)!
   expect(result.events).toEqual([])
   expect(result.world).toEqual(seed)
@@ -39,7 +39,7 @@ test('generateLevel returns null when no reverse move is ever possible', () => {
 })
 
 test('generateLevel produces exactly `steps` events whose reverse replay is unique and reaches the seed', () => {
-  const seed = createSeedWorld()
+  const seed = createSeedWorld(seededRng(1)).world
   // seededRng(42) is the primary choice; because pattern/direction selection
   // has a random component, if this specific seed value ever fails to reach
   // 5 steps within the attempt budget (result is null), try 7, 99, or 123
@@ -59,4 +59,24 @@ test('generateLevel produces exactly `steps` events whose reverse replay is uniq
     replayed = next!
   }
   expect(replayed).toEqual(seed)
+})
+
+test('a push event records every piece that actually moved', () => {
+  const world: World = {
+    boards: {
+      root: {
+        id: 'root', size: 5,
+        cells: Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ type: 'floor' as const }))),
+      },
+    },
+    pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
+    locations: { player: { board: 'root', x: 2, y: 2 }, box1: { board: 'root', x: 2, y: 1 } },
+  }
+  const result = generateLevel(world, 1, () => 0)
+  expect(result).not.toBeNull()
+  expect(result!.events.length).toBe(1)
+  const event = result!.events[0]
+  expect(event.kind).toBe('push')
+  expect(event.direction).toBe('up')
+  expect(new Set(event.affectedPieceIds)).toEqual(new Set(['player', 'box1']))
 })
