@@ -1,31 +1,56 @@
 # Parabox PWA — Multi-Goal Seed & Level Pruning (Sub-project 4b)
 
+> Revision note: this spec was reviewed
+> (`2026-09-05-parabox-generator-multigoal-review.md`) before implementation
+> began. The review's central finding — that "container ended up back at its
+> original position" does **not** imply "this goal group was never used" —
+> is correct and is now the spec's core design fix: pruning is driven by
+> explicit provenance recorded *during* the reverse walk, not inferred from
+> the final `World`. Two of the review's other findings (the claim that
+> `generateLevel.ts` currently returns a bare `World`, and that requested
+> steps can silently become fewer) turned out to rest on a stale premise —
+> the shipped code already returns `GenerationResult | null` and already
+> refuses to return a partial result (`if (events.length < steps) return
+> null`) — confirmed by re-reading the actual file, not assumed. Everything
+> else the review raised is addressed inline. The review document is
+> superseded by this revision.
+
 ## Background
 
 Sub-project 4 (solver + level generator rewrite) shipped and merged. Its final review flagged an open, un-fixed limitation: the 10 committed generated levels are near-identical variants of one puzzle, and 7 of 10 never require the container mechanic at all (their optimal solve never crosses a board boundary) — the seed's single win-condition site and lone filler box meant most of what got scrambled was decorative. Separately, the `hard` difficulty tier was found empirically unreachable (score ceiling ~23, threshold 25) because the seed only ever offered up to 2 board-crossing events total.
-
-This sub-project addresses both by changing what the *seed* looks like and adding a post-generation cleanup pass — no changes to the engine (`src/game/engine/*`, already correct and out of scope) and no changes to the core reverse-walk/solver algorithms (`inverseMoves.ts`, `generateLevel.ts`, `solver.ts`, `canonicalKey`), which already operate generically over whatever `World` they're handed.
 
 ## Scope
 
 **In scope:**
 - `tools/generator/seed.ts`: rewritten to seed 3 or 4 independent, self-contained goal groups (container + its own pre-placed box + its own win-condition cell) on a bigger board, each group's container given a randomized wall-adjacent side (for `enter`/`eat` reachability) and a randomized interior board size (3 or 5), placed in a fixed, non-overlapping slot grid.
-- A new `tools/generator/pruneUntouchedGoals.ts`: after the reverse walk runs, any goal group whose container is still exactly at its original seed position gets removed entirely (container piece, its interior board, whatever's inside it, and its win-condition cell) — it was never disturbed, so it contributes nothing to solving and would only pad the level with decoration.
-- `tools/generator/generateBatch.ts`: wire the new seed shape and the new prune step into the pipeline, ahead of the existing `checkWin`/duplicate/solve/score checks (which need no logic changes — they already operate correctly on "whatever `World` they're handed," and pruning happens before them).
-- `tools/generator/seed.test.ts`, a new `pruneUntouchedGoals.test.ts`, and `generateBatch.test.ts`: updated/added for the new shapes.
+- `tools/generator/generateLevel.ts`: **this does need a small change**, corrected from the first draft's claim that it wouldn't. Each `GenerationEvent` gains two fields (`affectedPieceIds`, `playerBoard`) recording, at the moment the event is accepted, which pieces actually moved and which board the player ended up on. This is the only way to correctly detect that a group was used when the mechanic involved (`enter`) never moves the container or box at all — inferring "used" from the *final* `World` alone cannot distinguish that case from "never touched" (see "Why position-based pruning is unsound" below). `generateLevel`'s own signature, its null-on-incomplete-walk behavior, and its cycle-avoidance logic are all unchanged.
+- A new `tools/generator/pruneUntouchedGoals.ts`: computes which groups were actually touched from the event history (`computeTouchedGroups`), then removes every group that wasn't (`pruneUntouchedGoals`) — container piece, its interior board, whatever's inside it, and its win-condition cell.
+- `tools/generator/generateBatch.ts`: wire the new seed shape and the new touch-computation/prune steps into the pipeline, ahead of the existing `checkWin`/duplicate/solve/score checks (which need no logic changes — they already operate correctly on "whatever `World` they're handed").
+- `tools/generator/seed.test.ts`, `tools/generator/generateLevel.test.ts` (one call-site fix — see Migration note), a new `pruneUntouchedGoals.test.ts`, and `generateBatch.test.ts`: updated/added for the new shapes.
 
 **Explicitly out of scope:**
 - Any change to `src/game/engine/*` — already supports everything this needs (arbitrary board sizes, multiple simultaneous requirement cells) and is unrelated to this sub-project.
-- Any change to `inverseMoves.ts`, `generateLevel.ts`, `solver.ts`, `canonical.ts`, `difficultyScorer.ts` — all four already operate generically over an arbitrary `World`; none of them know or need to know how many goal groups exist.
+- Any change to `inverseMoves.ts`, `solver.ts`, `canonical.ts`, `difficultyScorer.ts` — all four already operate generically over an arbitrary `World` and don't need to know how many goal groups exist or which were touched.
 - Free-form/randomized placement of goal groups (collision detection, retry loops). See "Why a fixed slot grid" below.
-- Randomizing the *number* of grid rows/columns, or the overall board size beyond what's needed for 3–4 groups. Interior-size and group-count randomization already deliver the variety asked for; further scale randomization is a separate future ask, not this one.
-- Re-tuning `difficultyScorer.ts`'s tier thresholds. More groups mean more possible crossing events (up to 2 per group instead of a hard cap of ~2 total), which may make `hard` reachable as a side effect — that's worth checking empirically during implementation, but the thresholds themselves are a difficulty *definition*, not something this spec changes preemptively.
+- Randomizing the *number* of grid rows/columns, or the overall board size beyond what's needed for 3–4 groups.
+- Re-tuning `difficultyScorer.ts`'s tier thresholds. More groups mean more *possible* crossing events, which may make `hard` reachable as a side effect — that must be measured, not assumed (see "Expected effects," which is deliberately non-committal about exact numbers).
+- Symmetry/near-duplicate detection beyond the existing exact-`canonicalKey` check. Not this sub-project's problem.
+
+## Why position-based pruning is unsound
+
+The first draft of this spec defined "untouched" as "the container is still at its seed-time coordinates," and removed the whole group when that held. This is wrong, for a reason confirmed by hand-tracing the actual `inverseEnter` code (`tools/generator/inverseMoves.ts`): `inverseEnter`'s only mutation is `candidate.locations[PLAYER_ID] = {...}` — it **never touches the container's or the box's location**. A reverse walk that uses `inverseEnter` to put the player inside a group's interior leaves that group's container exactly where it started, while the group is very much in use — the level's *starting state* has the player standing inside it. Pruning by position would therefore delete a group the walk actually produced, and since `removeGroup` deletes every piece located on the interior board being removed, **it would delete the player itself** (the player's own location says `board: <that interior>`), corrupting the `World`. This is not a rare edge case — `inverseEnter` is one of exactly three patterns the reverse walk tries at every step, with no way to reverse back out of an interior once entered (none of `inversePush`/`inverseEnter`/`inverseEat` model "leaving" a board — that's ordinary forward movement across a boundary, not a distinct mechanic with its own inverse).
+
+A subtler version of the same problem: even for `inversePush`/`inverseEat`, which *do* move the container, a container that got pushed away and then pushed back to its exact starting cell would also read as "unchanged" by a position check, despite having genuinely been part of the walk's history. The final `World` alone does not carry enough information to answer "was this ever touched" — only the history does.
+
+**The fix:** `generateLevel` now records, per accepted event, which piece IDs actually moved (`affectedPieceIds`, computed by diffing every piece's location before and after the event) and which board the player ended up on (`playerBoard`). A group counts as touched if its container ID or box ID ever appears in some event's `affectedPieceIds`, or if its interior board ID ever appears as some event's `playerBoard`. The third condition is what correctly captures "player entered without moving the container" — `enter` is exactly the case where the first two conditions are silent.
+
+This also settles the "pushed away and back" case in the conservative direction: because the log is historical, not final-state, a group that was ever moved stays marked touched even if it happens to end up back where it started. A vanishingly small fraction of accepted levels may therefore keep a group whose requirement is, by coincidence, already satisfied at the end — which is a strictly safer failure mode than the alternative (silently deleting the player), and is called out explicitly in the testing strategy below rather than hidden.
 
 ## Why a fixed slot grid, not free-form placement
 
 Sub-project 4's own history is the argument here: hand-derived geometry for even a *single* wall-adjacent container needed two separate correction rounds after integration testing (a player start position one cell from a border, and an `inversePush` bug that only manifested near walls) despite careful hand-tracing at each step. Free-form random placement of 3–4 independent groups — checking each new candidate position against every previously placed group, retrying on collision — multiplies that class of risk considerably for a benefit (more organic-looking layouts) that doesn't matter to the actual goal (more solving variety).
 
-Instead, the root board is divided into a fixed 2×2 grid of non-overlapping 5×5 slots (using 3 of the 4 slots when `groupCount` is 3). Every slot is geometrically identical: a container sits at the exact center of its slot, 2 cells of buffer floor separate it from every board edge and from every other slot's slot boundary, and its one randomized wall side is guaranteed to land inside the same slot's own bounds no matter which of the 4 directions is chosen (a center cell with a 2-cell margin in a 5-wide slot has room in every direction). This eliminates cross-group interference **by construction** — no runtime collision check is needed because the grid math makes overlap geometrically impossible — while still randomizing wall side and interior size per group for real variety.
+Instead, the root board is divided into a fixed 2×2 grid of non-overlapping 5×5 slots (using 3 of the 4 slots when `groupCount` is 3). **The precise invariant, corrected from the first draft's inaccurate "2-cell buffer between slots" claim:** slots are directly adjacent with no gap at all (slot 0 spans absolute x-coordinates 1–5, slot 1 spans 6–10) — the guarantee against overlap comes entirely from placing each slot's container at its exact center (local offset `(2,2)` in a 5-wide slot), which means all four of that container's possible wall-cell offsets (`(1,2)`, `(3,2)`, `(2,1)`, `(2,3)` in local coordinates) stay strictly inside `[0,4]×[0,4]` — i.e. inside that same slot — no matter which direction is randomly chosen. Two slots being edge-adjacent is irrelevant to correctness because neither slot's content ever reaches its own boundary. Wall side and interior size are still randomized per group for real variety; only the *positions* are fixed.
 
 ## `seed.ts` — multi-goal seed
 
@@ -50,8 +75,15 @@ function makeFloorCells(size: number): Cell[][] {
   return Array.from({ length: size }, () => Array.from({ length: size }, () => ({ type: 'floor' as const })))
 }
 
+// A group's identity as constructed by the seed. `boxId` and `interiorId`
+// are needed (not just `containerId`) so generateBatch.ts can attribute a
+// touched-via-inverseEnter event (which never moves the container or box)
+// to the right group by checking whether the player ever visited
+// `interiorId` — see pruneUntouchedGoals.ts.
 export interface SeedGroup {
   containerId: string
+  boxId: string
+  interiorId: string
   originalPosition: { x: number; y: number }
 }
 
@@ -100,13 +132,17 @@ export function createSeedWorld(rng: () => number = Math.random): SeedResult {
     locations[containerId] = { board: 'root', x: containerX, y: containerY }
 
     const { cell: eatenCell } = getEntryCell(boards[interiorId], opposite(wallDir), HALF)
-    // eatenCell is guaranteed non-null: HALF always maps to an in-bounds
-    // center-of-edge cell for any board size >= 1 (verified for size 3 in
-    // sub-project 4's Tasks 4-5, and by the same reasoning for size 5 here
-    // — this is the exact hand-check the implementation plan must repeat).
-    locations[boxId] = { board: interiorId, x: eatenCell!.x, y: eatenCell!.y }
+    if (eatenCell === null) {
+      // Provably unreachable: HALF always maps to an in-bounds
+      // center-of-edge cell for any board size >= 1 (verified for size 3
+      // in sub-project 4's Tasks 4-5, and by the same reasoning for size 5
+      // here — see the hand-check below). A loud failure here is a
+      // construction-time bug, not a runtime condition to swallow.
+      throw new Error(`createSeedWorld: getEntryCell unexpectedly returned null for interior size ${interiorSize}`)
+    }
+    locations[boxId] = { board: interiorId, x: eatenCell.x, y: eatenCell.y }
 
-    groups.push({ containerId, originalPosition: { x: containerX, y: containerY } })
+    groups.push({ containerId, boxId, interiorId, originalPosition: { x: containerX, y: containerY } })
   }
 
   boards.root = { id: 'root', size: ROOT_SIZE, cells }
@@ -122,77 +158,147 @@ export function createSeedWorld(rng: () => number = Math.random): SeedResult {
 ```
 
 Hand-verified before writing this code (same practice as sub-project 4's own spec):
-- **All 4 slot positions stay clear of the outer border regardless of grid position.** Slot origins are `(1,1)`, `(6,1)`, `(1,6)`, `(6,6)`; every slot's center container is therefore at least 3 cells from the border on every axis (e.g. slot `(1,1)`'s container at `(3,3)` is 3 cells from the `x=0`/`y=0` border and `11-3=8` cells from the `x=11`/`y=11` border) — comfortably clear of the "2 cells minimum" rule this project already had to learn the hard way in sub-project 4.
-- **A center-of-slot container's wall never leaves its own slot.** With `SLOT_SIZE = 5` and the container at the slot's exact center (local offset `(2,2)`, 0-indexed), stepping one cell in any of the 4 directions lands at local `(1,2)`, `(3,2)`, `(2,1)`, or `(2,3)` — all within the slot's own `[0,4]×[0,4]` local range. No wall placement can spill into a neighboring slot or the board border.
-- **`getEntryCell` at size 5 behaves the same way as the already-verified size-3 case.** For `HALF = 1/2` and `unit = 1/5`: `fractionDivMod` gives `offset = 2`, `remainder = 1/10` (nonzero) — e.g. for `dir = 'right'`, `cell = { x: 0, y: offset } = (0, 2)`; for `'left'`, `(4, 2)`; for `'up'`, `(2, 4)`; for `'down'`, `(2, 0)`. All four are in-bounds, non-degenerate center-of-edge cells, consistent with the already-tested size-3 result — the formula is a straightforward affine scaling with no special-cased dependency on size 3.
-- **The old `box2`-style plain filler piece is gone.** With 3–4 independent, genuinely load-bearing goal groups, a decorative extra piece is no longer needed for push-chain variety — multi-piece chains can already occur incidentally between adjacent groups' own pieces when they happen to align.
+- **All 4 slot positions stay clear of the outer border regardless of grid position.** Slot origins are `(1,1)`, `(6,1)`, `(1,6)`, `(6,6)`; every slot's center container is therefore at least 3 cells from the border on every axis.
+- **A center-of-slot container's wall never leaves its own slot** (see "Why a fixed slot grid" above for the exact local-coordinate argument).
+- **`getEntryCell` at size 5 behaves the same way as the already-verified size-3 case.** For `HALF = 1/2` and `unit = 1/5`: `fractionDivMod` gives `offset = 2`, `remainder = 1/10` (nonzero) — e.g. for `dir = 'right'`, `cell = { x: 0, y: offset } = (0, 2)`; for `'left'`, `(4, 2)`; for `'up'`, `(2, 4)`; for `'down'`, `(2, 0)`. All four are in-bounds, non-degenerate center-of-edge cells. This reasoning is retained as *context* for why the code is expected to work, not as a substitute for the null-check above or for deterministic tests covering both sizes (see Testing strategy) — trust the engine's actual behavior, not a description of it.
+- **Player placement does not collide with group 0's geometry.** Container at `(3,3)`, its four possible wall cells at `(2,3)`, `(4,3)`, `(3,2)`, `(3,4)`, player at `(2,2)` — none coincide. Groups 1–3 are strictly farther from the player. The implementation plan must turn this into an executable test across *all* groups and the player (see below), not rely on this hand-argument alone.
+- **The old `box2`-style plain filler piece is gone.** With 3–4 independent, genuinely load-bearing goal groups, a decorative extra piece is no longer needed for push-chain variety.
 
-## `pruneUntouchedGoals.ts` — remove decoration after the walk
+**On "independent" groups:** this word is used narrowly here to mean *independent at seed construction* — each group has its own container, interior board, box, and requirement cell, and the seed contains no overlapping geometry or shared board ownership. It is not a claim that groups remain behaviorally independent after arbitrary reverse-walk moves (e.g. a long push chain could in principle span from one slot into another if their pieces end up aligned) — nothing in this design depends on that stronger claim, and it is not tested or asserted.
+
+## `generateLevel.ts` — event provenance (the one change outside `seed.ts`/`generateBatch.ts`)
+
+Add to the existing `GenerationEvent` interface:
 
 ```ts
-import { World, cloneWorld } from '../../src/game/engine/types'
+export interface GenerationEvent {
+  kind: GenerationEventKind
+  direction: Direction
+  affectedPieceIds: string[]
+  playerBoard: string
+}
+```
+
+Add a helper and use it where an event is accepted:
+
+```ts
+import { Direction, PLAYER_ID, World, cloneWorld } from '../../src/game/engine/types'
+// (PLAYER_ID is a new import; everything else in this file is unchanged)
+
+function affectedPieceIds(before: World, after: World): string[] {
+  const ids: string[] = []
+  for (const pieceId of Object.keys(before.locations)) {
+    const a = before.locations[pieceId]
+    const b = after.locations[pieceId]
+    if (a.board !== b.board || a.x !== b.x || a.y !== b.y) ids.push(pieceId)
+  }
+  return ids
+}
+```
+
+In the main loop, where the current code does `world = accepted.world; seen.add(...); events.push({ kind: accepted.kind, direction })`, change the last line to:
+
+```ts
+    const affected = affectedPieceIds(world, accepted.world)
+    world = accepted.world
+    seen.add(canonicalKey(world))
+    events.push({
+      kind: accepted.kind,
+      direction,
+      affectedPieceIds: affected,
+      playerBoard: world.locations[PLAYER_ID].board,
+    })
+```
+
+Nothing else in this file changes: the function's signature, its `null`-on-incomplete-walk return, and its cycle-avoidance logic via `canonicalKey` are exactly as sub-project 4 shipped them.
+
+**Why this doesn't need `generateLevel` to know about "groups" at all:** `affectedPieceIds` and `playerBoard` are raw, group-agnostic facts about what moved and where the player ended up. `computeTouchedGroups` (below) is what maps those raw facts onto the seed's specific group identities — that mapping lives in `pruneUntouchedGoals.ts`, which already imports from `seed.ts`, rather than making `generateLevel.ts` depend on `seed.ts`'s `SeedGroup` type. This keeps `generateLevel.ts` reusable independent of any particular seed shape, matching its existing design.
+
+## `pruneUntouchedGoals.ts` — provenance-driven removal
+
+```ts
+import { World, cloneWorld, PLAYER_ID } from '../../src/game/engine/types'
 import { SeedGroup } from './seed'
+import { GenerationEvent } from './generateLevel'
 
-function removeGroup(world: World, containerId: string): World {
-  const next = cloneWorld(world)
-  const container = next.pieces[containerId]
-  const loc = next.locations[containerId]
-
-  if (container.boardRef !== undefined) {
-    const interiorId = container.boardRef
-    for (const [pieceId, pieceLoc] of Object.entries(next.locations)) {
-      if (pieceLoc.board === interiorId) {
-        delete next.pieces[pieceId]
-        delete next.locations[pieceId]
-      }
-    }
-    delete next.boards[interiorId]
+export function computeTouchedGroups(events: GenerationEvent[], groups: SeedGroup[]): Set<string> {
+  const touchedPieceIds = new Set<string>()
+  const visitedBoards = new Set<string>()
+  for (const event of events) {
+    for (const id of event.affectedPieceIds) touchedPieceIds.add(id)
+    visitedBoards.add(event.playerBoard)
   }
 
-  const board = next.boards[loc.board]
-  board.cells[loc.y][loc.x] = { type: board.cells[loc.y][loc.x].type }
-  delete next.pieces[containerId]
-  delete next.locations[containerId]
+  const touched = new Set<string>()
+  for (const group of groups) {
+    if (
+      touchedPieceIds.has(group.containerId) ||
+      touchedPieceIds.has(group.boxId) ||
+      visitedBoards.has(group.interiorId)
+    ) {
+      touched.add(group.containerId)
+    }
+  }
+  return touched
+}
+
+function removeGroup(world: World, group: SeedGroup): World {
+  const next = cloneWorld(world)
+
+  for (const [pieceId, loc] of Object.entries(next.locations)) {
+    if (loc.board !== group.interiorId) continue
+    if (pieceId === PLAYER_ID) {
+      // Provably unreachable if computeTouchedGroups is correct — the
+      // player's own current board is always in `visitedBoards` (it's
+      // `playerBoard` on the last event), so a group the player is
+      // currently inside is always marked touched and never reaches
+      // this function. A loud failure here means that invariant broke,
+      // not something to paper over by skipping the deletion silently.
+      throw new Error(
+        `pruneUntouchedGoals: refusing to remove group ${group.containerId} — ` +
+          'the player is inside its interior. This indicates computeTouchedGroups ' +
+          'failed to mark this group as touched.',
+      )
+    }
+    delete next.pieces[pieceId]
+    delete next.locations[pieceId]
+  }
+  delete next.boards[group.interiorId]
+
+  const containerLoc = next.locations[group.containerId]
+  const board = next.boards[containerLoc.board]
+  board.cells[containerLoc.y][containerLoc.x] = { type: board.cells[containerLoc.y][containerLoc.x].type }
+  delete next.pieces[group.containerId]
+  delete next.locations[group.containerId]
 
   return next
 }
 
-// A group whose container is still exactly at its seed-time position was
-// never disturbed by the reverse walk — its own win-condition cell is
-// therefore still satisfied, meaning it contributes nothing to what a
-// solver would actually need to do. Removing it whole (container, its
-// interior board, whatever's inside it, and its requirement cell) leaves
-// only groups that are genuinely part of the puzzle: every KEPT group's
-// requirement is, by construction, currently unsatisfied (that's the
-// opposite of the removal condition), so checkWin() on the pruned result
-// is false unless every group got pruned — which is exactly the
+// A group not present in `touchedGroups` was never used by the reverse
+// walk by any of the three mechanics (see computeTouchedGroups) — its own
+// win-condition cell is still satisfied and it would only ship as
+// decoration. Every remaining (touched) group's requirement is, by
+// construction, currently unsatisfied, so checkWin() on the result is
+// false unless every group got pruned — which is exactly the
 // already-handled "level came out pre-solved" case generateBatch.ts
-// already discards.
-export function pruneUntouchedGoals(world: World, groups: SeedGroup[]): World {
+// already discards. No changes needed to checkWin, solve,
+// countCrossingMoves, or scoreDifficulty — all four already operate on
+// "whatever World they're handed."
+export function pruneUntouchedGoals(world: World, groups: SeedGroup[], touchedGroups: ReadonlySet<string>): World {
   let next = world
   for (const group of groups) {
-    const current = next.locations[group.containerId]
-    if (
-      current.board === 'root' &&
-      current.x === group.originalPosition.x &&
-      current.y === group.originalPosition.y
-    ) {
-      next = removeGroup(next, group.containerId)
-    }
+    if (touchedGroups.has(group.containerId)) continue
+    next = removeGroup(next, group)
   }
   return next
 }
 ```
 
-`SeedGroup` only needs `containerId` and `originalPosition` — a container's `boardRef` never changes during the reverse walk (none of `inversePush`/`inverseEnter`/`inverseEat` ever mutate `pieces`, only `locations`), so `removeGroup` looks it up fresh from the current world rather than needing it passed in.
-
-**Why this is correct without touching `checkWin`, `solve`, `scoreDifficulty`, or `countCrossingMoves` at all:** every one of those functions already operates on "whatever `World` it's handed" — none of them know or care how many goal groups exist. Pruning happens once, right after `generateLevel` returns and before any of the existing checks, so everything downstream sees a `World` where every remaining goal is genuinely load-bearing. This is the same principle sub-project 4 already established for the inverse-move functions ("forward engine is the source of truth") applied one level up: here, the *engine's own win-condition check* is the source of truth for whether a group did anything, not a separate tracking mechanism.
-
 ## `generateBatch.ts` — wiring
 
 ```ts
 import { createSeedWorld } from './seed'
-import { pruneUntouchedGoals } from './pruneUntouchedGoals'
+import { computeTouchedGroups, pruneUntouchedGoals } from './pruneUntouchedGoals'
 // ...(other imports unchanged)
 
 // inside generateLevelBatch's loop, replacing the old seed/generate block:
@@ -203,7 +309,9 @@ import { pruneUntouchedGoals } from './pruneUntouchedGoals'
       stats.discardedGenerationFailed++
       continue
     }
-    const world = pruneUntouchedGoals(generated.world, groups)
+
+    const touchedGroups = computeTouchedGroups(generated.events, groups)
+    const world = pruneUntouchedGoals(generated.world, groups, touchedGroups)
 
     if (checkWin(world)) {
       stats.discardedAlreadySolved++
@@ -216,23 +324,24 @@ import { pruneUntouchedGoals } from './pruneUntouchedGoals'
 
 No other line in `generateLevelBatch` changes. `main()` is untouched.
 
-## Expected effects on generation quality (to verify empirically, not assumed)
+## Expected effects on generation quality (measure, do not assume)
 
-- Every accepted level should now have at least one, and often 2-4, genuinely necessary board-crossing interactions — the "7 of 10 levels never use the container mechanic" finding should not recur, since an untouched group is removed rather than shipped as decoration.
-- The achievable `crossingMoveCount` ceiling should rise from ~2 (one group) to potentially 6-8 (up to 2 events × 3-4 groups), which may make the `hard` tier reachable as a side effect. This is a plausible outcome given the mechanism, not a guarantee — verify with the same kind of diagnostic sweep sub-project 4's Task 11 used before assuming it.
-- Bigger board (12×12 vs. 7×7) and more pieces (up to 9 vs. 5) will likely slow `solve()`'s BFS and `generateLevel`'s reverse walk somewhat. `generateBatch.ts`'s `MAX_ATTEMPTS`/`steps` range may need re-tuning the same way sub-project 4's did — expect this, don't be surprised by it.
+Per review, the first draft's "6–8" crossing-event ceiling claim was a theoretical `2 × groupCount` calculation, not something established by the actual seed/walk mechanics — there is no guarantee the reverse walk touches every group, that touching a group produces exactly 2 crossings, or that the solver's *optimal* path uses everything the walk touched. This spec makes no numeric promise. What the implementation plan must do instead, before treating this as done:
+
+- Run a direct diagnostic sample (same style as sub-project 4's Task 11 diagnostic sweep) calling `createSeedWorld` → `generateLevel` → `computeTouchedGroups` → `pruneUntouchedGoals` → `solve` → `countCrossingMoves` → `scoreDifficulty` across a large number of `rng` draws, and report the **distribution**, not a single number, of: successful-generation rate, touched-group count, optimal move count, crossing-move count, difficulty score, and resulting tier.
+- Judge success by whether the distribution shows *materially more* variety than sub-project 4's original 2-group seed (which produced exactly 2 distinct accepted levels, both trivial, before its own fixes — see that sub-project's ledger) — not by whether any specific target number (like "6-8" or "hard reachable") is hit.
+- If `hard` becomes reachable as a byproduct, that's a welcome side effect to report, not a requirement this sub-project is judged against.
 
 ## Testing strategy
 
-- **`seed.test.ts`** (rewritten for the new signature and return shape): `checkWin(createSeedWorld(rng).world)` is `true` for several different `rng` draws (covering both `groupCount` values, 3 and 4); `parseLevel(serializeLevel(world))` doesn't throw for the same draws; `groups.length` matches the `groupCount` actually produced; every group's `container` really sits at `originalPosition` on `root` with a `requirement: 'box'` cell there at seed time; every group's wall cell and every other group's cells are mutually distinct (no two groups' geometry overlaps) — check this directly by collecting every wall/container coordinate across all groups for a given draw and asserting no duplicates.
-- **`pruneUntouchedGoals.test.ts`** (new): a hand-built 2-group world where group A's container is still at its `originalPosition` and group B's has moved — pruning removes group A's container/interior/box/requirement entirely and leaves group B fully intact; pruning a world where every group is untouched removes all of them (and the result still passes `parseLevel`); the result of `pruneUntouchedGoals` always passes `parseLevel` validation (ownership/reachability/no-overlap all still hold after removal) for at least one nontrivial multi-group case.
-- **`generateBatch.test.ts`** (updated call sites only — its existing property-based assertions don't need to change in kind): the four existing tests (`complete`/quota reporting, unsolved+parseable levels, no duplicate canonical states, stats accounting) should hold unchanged in spirit against the new pipeline.
-- **New diagnostic step in the implementation plan (not a committed test):** before treating the new seed as done, run the same kind of direct sampling sub-project 4's Task 11 used — call `generateLevel`/`pruneUntouchedGoals`/`solve` directly across a range of `rng` seeds and step counts, and confirm (a) the reverse walk can reach the requested step count a reasonable fraction of the time from the new, larger seed, and (b) at least some fraction of accepted levels have `crossingMoveCount >= 2`. If either comes back far worse than sub-project 4's original 2-group seed, that's a signal to revisit `SLOT_SIZE`, `steps`, or `MAX_ATTEMPTS` before committing generated output — exactly the empirical-validation discipline sub-project 4 already established.
+- **`seed.test.ts`** (rewritten): using deterministic `rng` sequences (not relying on random draws to happen to cover cases) covering both `groupCount` values (3 and 4) and all 4 wall directions × both interior sizes: `checkWin(createSeedWorld(rng).world)` is `true`; `parseLevel(serializeLevel(world))` doesn't throw; `groups.length` matches the produced `groupCount`; every group's container sits at `originalPosition` on `root` with a `requirement: 'box'` cell there; every group's box sits inside its own `interiorId` at the cell `getEntryCell` computes for the direction opposite its wall; **a single test collects every wall cell, container cell, and the player cell across a full seed and asserts all coordinates (scoped per-board) are mutually distinct** — this replaces hand-argument with an executable, general check rather than reasoning about group 0 alone.
+- **`generateLevel.test.ts`** (one call-site fix plus new coverage): `createSeedWorld()` calls in this file change to `createSeedWorld().world` (this file doesn't need `groups`). New tests: an event's `affectedPieceIds` correctly reflects which pieces moved for a hand-built `inversePush` step (both the piece and the player, if a chain moved); an `inverseEnter` step's event has `affectedPieceIds` containing only the player (never the container) and `playerBoard` equal to the entered interior's ID — this is the exact case sub-project 4b exists to get right, so it gets a dedicated test proving the raw data is captured correctly, independent of `computeTouchedGroups`.
+- **`pruneUntouchedGoals.test.ts`** (new): `computeTouchedGroups` marks a group touched when a hand-built event list's `affectedPieceIds` includes that group's `containerId`; marks it touched when `affectedPieceIds` includes its `boxId`; **marks it touched when no event moved the container or box but some event's `playerBoard` equals its `interiorId`** (the direct regression test for the bug the review caught — construct an event list representing "player entered this group's interior without moving the container," confirm the group is NOT pruned); a group absent from every event is correctly left untouched and removed by `pruneUntouchedGoals`; removing an untouched group deletes its container, its interior board, and everything located on that interior board, and clears the `requirement` from its cell; pruning a world where every group is untouched removes all of them and the result still passes `parseLevel`; **calling `pruneUntouchedGoals` with a `touchedGroups` set that (incorrectly, for the test) omits a group the player is currently standing inside throws the documented error** rather than silently deleting the player — proving the defensive check actually fires; a mixed case (2 of 3 groups touched) leaves exactly the touched groups' pieces/boards/requirement cells intact and removes exactly the untouched one's, checked structurally (piece/board/cell presence), not only via `parseLevel` passing.
+- **`generateBatch.test.ts`** (updated call sites only): the four existing tests (`complete`/quota reporting, unsolved+parseable levels, no duplicate canonical states, stats accounting) hold unchanged in kind against the new pipeline.
+- **Mandatory diagnostic pass before shipping generated output** (not a committed automated test — matches sub-project 4's own Task 11 precedent): the distribution sampling described in "Expected effects," run and read by whoever implements this before generating and committing the real `src/levels/builtin/generated/*.json` batch.
 
 ## Migration note
 
-Files rewritten: `tools/generator/seed.ts` (signature change: `createSeedWorld` now takes an optional `rng` parameter and returns `SeedResult` instead of a bare `World`), `tools/generator/seed.test.ts`. New file: `tools/generator/pruneUntouchedGoals.ts` and its test. `tools/generator/generateBatch.ts` is modified only at its seed-creation and post-`generateLevel` lines, per the wiring section above — everything else in that file (the discard-reason stats, duplicate detection, scoring, tier bucketing, `main()`'s overwrite policy and reporting) is untouched. `inverseMoves.ts`, `generateLevel.ts`, `solver.ts`, `canonical.ts`, `difficultyScorer.ts`, and every file under `src/` are untouched by this sub-project.
-
-`createSeedWorld`'s signature change is a breaking change for its one other existing caller: `generateLevel.test.ts` (from sub-project 4) calls `createSeedWorld()` directly and passes the result straight into `generateLevel(seed, steps, rng)`, expecting a bare `World`. Every such call site must change to `createSeedWorld().world` (the test doesn't need `groups` — pruning is `generateBatch.ts`'s concern, not `generateLevel`'s). This file is not otherwise in this sub-project's scope; the implementation plan must still include this one call-site fix so `generateLevel.test.ts` keeps compiling and passing.
+Files rewritten: `tools/generator/seed.ts` (signature change: `createSeedWorld` now takes an optional `rng` parameter and returns `SeedResult` instead of a bare `World`), `tools/generator/seed.test.ts`. Files modified (not rewritten): `tools/generator/generateLevel.ts` (only the `GenerationEvent` interface and the event-construction line inside the existing loop — signature, null-return behavior, and cycle avoidance untouched), `tools/generator/generateLevel.test.ts` (only its `createSeedWorld()` call sites, changed to `createSeedWorld().world`), `tools/generator/generateBatch.ts` (only its seed-creation and post-`generateLevel` lines, per the wiring section above). New file: `tools/generator/pruneUntouchedGoals.ts` and its test. `inverseMoves.ts`, `solver.ts`, `canonical.ts`, `difficultyScorer.ts`, and every file under `src/` are untouched by this sub-project.
 
 The previously-committed `src/levels/builtin/generated/*.json` will be replaced wholesale the next time `npm run generate:levels` runs (per the existing overwrite policy) — this is expected, not a regression.
