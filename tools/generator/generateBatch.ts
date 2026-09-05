@@ -56,7 +56,7 @@ export function generateLevelBatch(targetPerTier: number, rng: () => number): Ba
     stats.attempts++
 
     const seed = createSeedWorld()
-    const steps = 3 + Math.floor(rng() * 8)
+    const steps = 3 + Math.floor(rng() * 20)
     const generated = generateLevel(seed, steps, rng)
     if (!generated) {
       stats.discardedGenerationFailed++

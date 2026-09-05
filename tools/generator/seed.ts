@@ -17,21 +17,28 @@ export function createSeedWorld(): World {
     size: 3,
     cells: Array.from({ length: 3 }, () => Array.from({ length: 3 }, () => ({ type: 'floor' as const }))),
   }
+  const inside2: Board = {
+    id: 'goal2Inside',
+    size: 3,
+    cells: Array.from({ length: 3 }, () => Array.from({ length: 3 }, () => ({ type: 'floor' as const }))),
+  }
   const root: Board = { id: 'root', size: SEED_SIZE, cells }
 
   return {
-    boards: { root, goalInside: inside },
+    boards: { root, goalInside: inside, goal2Inside: inside2 },
     pieces: {
       [PLAYER_ID]: { id: PLAYER_ID, kind: 'player' },
       goal: { id: 'goal', kind: 'container', boardRef: 'goalInside' },
       box1: { id: 'box1', kind: 'normal' },
-      box2: { id: 'box2', kind: 'normal' },
+      goal2: { id: 'goal2', kind: 'container', boardRef: 'goal2Inside' },
+      box3: { id: 'box3', kind: 'normal' },
     },
     locations: {
       [PLAYER_ID]: { board: 'root', x: 2, y: 2 },
       goal: { board: 'root', x: 3, y: 3 },
       box1: { board: 'goalInside', x: 2, y: 1 },
-      box2: { board: 'root', x: 2, y: 4 },
+      goal2: { board: 'root', x: 4, y: 5 },
+      box3: { board: 'goal2Inside', x: 1, y: 2 },
     },
   }
 }

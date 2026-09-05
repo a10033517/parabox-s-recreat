@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { BUILTIN_LEVELS, CUSTOM_LEVEL_ID_PREFIX, loadCustomLevels, loadGeneratedLevels, parseGeneratedModules } from './index'
 import { checkWin } from '../game/engine/rules'
 import { PLAYER_ID } from '../game/engine/types'
+import { solve } from '../../tools/generator/solver'
 
 describe('BUILTIN_LEVELS', () => {
   it('has one entry per shipped level file, each parsing to an unsolved world', () => {
@@ -66,8 +67,20 @@ describe('parseGeneratedModules', () => {
 })
 
 describe('loadGeneratedLevels', () => {
-  it('returns an empty array until the generator has been run (no files committed yet)', () => {
-    expect(loadGeneratedLevels()).toEqual([])
+  it('loads the committed generated levels, each unsolved with unique ids', () => {
+    const levels = loadGeneratedLevels()
+    expect(levels.length).toBeGreaterThan(0)
+    for (const level of levels) {
+      expect(checkWin(level.world)).toBe(false)
+    }
+    expect(new Set(levels.map((l) => l.id)).size).toBe(levels.length)
+  })
+
+  it('every generated level is solvable', () => {
+    for (const level of loadGeneratedLevels()) {
+      const solution = solve(level.world, 150)
+      expect(solution, `level ${level.id} should be solvable`).not.toBeNull()
+    }
   })
 })
 
