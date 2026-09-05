@@ -100,8 +100,13 @@ test('inversePush returns null when a container in the chain is wall-blocked (ne
   // which inversePush's own chain walk correctly rejects (the cell after
   // the chain is a wall, not open floor) before ever reaching
   // verifyPredecessor. The real engine resolves this via enter/eat instead
-  // of a uniform push (see inverseEnter/inverseEat in Tasks 4-5), which is
-  // exactly why a uniform-push candidate must not be accepted here.
+  // of a uniform push (see inverseEnter/inverseEat), which is exactly why
+  // a uniform-push candidate must not be accepted here. (This specific
+  // geometric shape happens to be caught by the pre-filter rather than the
+  // round-trip check — attempts to construct a case that reaches
+  // verifyPredecessor and is THEN rejected did not succeed, since the
+  // engine always tries push before enter/eat, so a chain that can move
+  // does move uniformly, and one that can't is always caught here first.)
   expect(inversePush(world, 'right')).toBeNull()
 })
 
@@ -344,5 +349,23 @@ test('inverseEat returns null when the container has no boardRef', () => {
       container1: { board: 'root', x: 2, y: 1 },
     },
   }
+  expect(inverseEat(world, 'right')).toBeNull()
+})
+
+test('inverseEat returns null when the container references a nonexistent board', () => {
+  const root = makeBoard('root', 5)
+  root.cells[1][3] = { type: 'wall' }
+  const world: World = {
+    boards: { root },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      container1: { id: 'container1', kind: 'container', boardRef: 'doesNotExist' },
+    },
+    locations: {
+      player: { board: 'root', x: 1, y: 1 },
+      container1: { board: 'root', x: 2, y: 1 },
+    },
+  }
+  expect(() => inverseEat(world, 'right')).not.toThrow()
   expect(inverseEat(world, 'right')).toBeNull()
 })

@@ -92,6 +92,7 @@ export function inverseEat(world: World, dir: Direction): World | null {
   if (board.cells[wallAhead.y][wallAhead.x].type !== 'wall') return null
 
   const interior = world.boards[container.boardRef]
+  if (interior === undefined) return null
   const { cell: eatenCell } = getEntryCell(interior, opposite(dir), HALF)
   if (eatenCell === null) return null
   const eatenId = occupantAt(world, { board: interior.id, x: eatenCell.x, y: eatenCell.y })

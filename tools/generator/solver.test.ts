@@ -1,4 +1,4 @@
-import { World } from '../../src/game/engine/types'
+import { Cell, World } from '../../src/game/engine/types'
 import { BUILTIN_LEVELS } from '../../src/levels'
 import { countCrossingMoves, solve } from './solver'
 
@@ -60,16 +60,23 @@ test('solve returns null when no solution exists', () => {
   expect(solve(world, 5)).toBeNull()
 })
 
-test('solve finds the shortest path even when longer alternate routes exist', () => {
+test('solve finds the shortest path even when a longer alternate route also exists', () => {
   const size = 5
-  const cells = makeSquareCells(size, () => ({ type: 'floor' }))
+  const cells: Cell[][] = Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => ({ type: 'floor' as const })),
+  )
   cells[2][4] = { type: 'floor', requirement: 'box' }
   const world: World = {
     boards: { root: { id: 'root', size, cells } },
     pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
-    locations: { player: { board: 'root', x: 2, y: 2 }, box1: { board: 'root', x: 3, y: 2 } },
+    locations: { player: { board: 'root', x: 1, y: 2 }, box1: { board: 'root', x: 3, y: 2 } },
   }
-  expect(solve(world)).toEqual(['right'])
+  // A direct 2-move solution exists (walk right, push right). A longer
+  // alternate route also exists (go around via row 0 or row 4 and approach
+  // from the other side), which takes strictly more moves. BFS must return
+  // the short one.
+  const solution = solve(world)
+  expect(solution).toEqual(['right', 'right'])
 })
 
 test('countCrossingMoves returns 0 for a plain push with no board change', () => {

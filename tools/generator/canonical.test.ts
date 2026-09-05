@@ -2,24 +2,35 @@ import { World } from '../../src/game/engine/types'
 import { canonicalKey } from './canonical'
 
 test('canonicalKey is identical for equivalent content built with different key insertion order', () => {
-  const board = {
-    id: 'root',
-    size: 3,
-    cells: [
-      [{ type: 'floor' as const }, { type: 'floor' as const }, { type: 'floor' as const }],
-      [{ type: 'floor' as const }, { type: 'floor' as const }, { type: 'floor' as const }],
-      [{ type: 'floor' as const }, { type: 'floor' as const }, { type: 'floor' as const }],
-    ],
-  }
   const a: World = {
-    boards: { root: board },
+    boards: {
+      root: {
+        id: 'root',
+        size: 3,
+        cells: [
+          [{ type: 'floor' }, { type: 'floor' }, { type: 'floor' }],
+          [{ type: 'floor' }, { type: 'floor' }, { type: 'floor' }],
+          [{ type: 'floor' }, { type: 'floor' }, { type: 'floor' }],
+        ],
+      },
+    },
     pieces: { player: { id: 'player', kind: 'player' } },
     locations: { player: { board: 'root', x: 1, y: 1 } },
   }
   const b: World = {
     locations: { player: { x: 1, board: 'root', y: 1 } },
     pieces: { player: { kind: 'player', id: 'player' } },
-    boards: { root: board },
+    boards: {
+      root: {
+        size: 3,
+        id: 'root',
+        cells: [
+          [{ type: 'floor' }, { type: 'floor' }, { type: 'floor' }],
+          [{ type: 'floor' }, { type: 'floor' }, { type: 'floor' }],
+          [{ type: 'floor' }, { type: 'floor' }, { type: 'floor' }],
+        ],
+      },
+    },
   }
   expect(canonicalKey(a)).toBe(canonicalKey(b))
 })

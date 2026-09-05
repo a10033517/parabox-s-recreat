@@ -32,7 +32,7 @@
 **Interfaces:**
 - Produces: `canonicalKey(world: World): string` — every later task that needs to compare two `World` values for equality (inverse-move validation, generator cycle avoidance, solver visited-state dedup, batch duplicate detection) imports this.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { World } from '../../src/game/engine/types'
@@ -81,12 +81,12 @@ test('canonicalKey differs when content differs', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tools/generator/canonical.test.ts`
 Expected: FAIL — `Cannot find module './canonical'` (the module doesn't exist yet).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 import { World } from '../../src/game/engine/types'
@@ -108,12 +108,12 @@ export function canonicalKey(world: World): string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tools/generator/canonical.test.ts`
 Expected: PASS (2 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/generator/canonical.ts tools/generator/canonical.test.ts
@@ -131,7 +131,7 @@ git commit -m "feat(generator): add deterministic canonicalKey for World state c
 **Interfaces:**
 - Produces: `createSeedWorld(): World` — Task 6 (`generateLevel.test.ts`) and Task 9 (`generateBatch.ts`) both call this directly.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { checkWin } from '../../src/game/engine/rules'
@@ -148,12 +148,12 @@ test('the seed world is internally consistent', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tools/generator/seed.test.ts`
 Expected: FAIL — `createSeedWorld` is not exported (the old file exports `createSeedGrid` instead) or a type error, since the old `seed.ts` still imports `createEmptyGrid`/`Grid` from `types.ts`, which no longer export those.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Replace the entire contents of `tools/generator/seed.ts`:
 
@@ -192,12 +192,12 @@ export function createSeedWorld(): World {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tools/generator/seed.test.ts`
 Expected: PASS (2 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/generator/seed.ts tools/generator/seed.test.ts
@@ -216,7 +216,7 @@ git commit -m "feat(generator): rewrite createSeedWorld against the current Worl
 - Consumes: `canonicalKey` from `./canonical` (Task 1).
 - Produces: `inversePush(world: World, dir: Direction): World | null`, plus two private helpers (`isOpenFloor`, `verifyPredecessor`) that Tasks 4 and 5 reuse without re-declaring — Task 4 and 5 append their exported functions below `inversePush` in the same file and use these two helpers as-is.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { Board, Cell, Direction, World, step } from '../../src/game/engine/types'
@@ -337,12 +337,12 @@ test('inversePush treats an unblocked container as an ordinary pushable piece', 
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tools/generator/inverseMoves.test.ts`
 Expected: FAIL — `inversePush` is not exported (the old file exports `inverseTranslate`/`inverseNest` instead).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Replace the entire contents of `tools/generator/inverseMoves.ts`:
 
@@ -399,12 +399,12 @@ export function inversePush(world: World, dir: Direction): World | null {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tools/generator/inverseMoves.test.ts`
 Expected: PASS (9 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/generator/inverseMoves.ts tools/generator/inverseMoves.test.ts
@@ -423,7 +423,7 @@ git commit -m "feat(generator): rewrite inversePush with applyMove-verified cand
 - Consumes: `isOpenFloor`, `verifyPredecessor` (private helpers from Task 3, same file).
 - Produces: `inverseEnter(world: World, dir: Direction): World | null` — Task 6 (`generateLevel.ts`) imports this alongside `inversePush` and `inverseEat`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tools/generator/inverseMoves.test.ts` (add `getEntryCell` and `HALF` to the test file's imports):
 
@@ -524,12 +524,12 @@ test('inverseEnter returns null when the cell behind the container is blocked', 
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tools/generator/inverseMoves.test.ts`
 Expected: FAIL — `inverseEnter` is not exported yet.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `tools/generator/inverseMoves.ts`, change the first import to add `findContainerFor`, add a `getEntryCell` import from `rules`, and a new `HALF` import:
 
@@ -568,12 +568,12 @@ export function inverseEnter(world: World, dir: Direction): World | null {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tools/generator/inverseMoves.test.ts`
 Expected: PASS (14 tests — 9 from Task 3 plus 5 new)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/generator/inverseMoves.ts tools/generator/inverseMoves.test.ts
@@ -592,7 +592,7 @@ git commit -m "feat(generator): add inverseEnter with applyMove-verified candida
 - Consumes: `isOpenFloor`, `verifyPredecessor` (Task 3), `getEntryCell`/`HALF` (already imported by Task 4).
 - Produces: `inverseEat(world: World, dir: Direction): World | null` — Task 6 imports this alongside the other two.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tools/generator/inverseMoves.test.ts` (add `inverseEat` to the import from `./inverseMoves`, and `opposite` to the import from engine types):
 
@@ -731,12 +731,12 @@ test('inverseEat returns null when the container has no boardRef', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tools/generator/inverseMoves.test.ts`
 Expected: FAIL — `inverseEat` is not exported yet.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Append to `tools/generator/inverseMoves.ts`, below `inverseEnter`:
 
@@ -778,12 +778,12 @@ export function inverseEat(world: World, dir: Direction): World | null {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tools/generator/inverseMoves.test.ts`
 Expected: PASS (20 tests — 14 from Tasks 3-4 plus 6 new)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/generator/inverseMoves.ts tools/generator/inverseMoves.test.ts
@@ -802,7 +802,7 @@ git commit -m "feat(generator): add inverseEat with applyMove-verified candidate
 - Consumes: `inversePush`, `inverseEnter`, `inverseEat` (Tasks 3-5), `canonicalKey` (Task 1), `createSeedWorld` (Task 2, test only).
 - Produces: `GenerationEventKind`, `GenerationEvent`, `GenerationResult`, `generateLevel(seed: World, steps: number, rng: () => number): GenerationResult | null` — Task 9 (`generateBatch.ts`) imports `generateLevel` and reads `.world` from a successful result.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { applyMove } from '../../src/game/engine/rules'
@@ -869,12 +869,12 @@ test('generateLevel produces exactly `steps` events whose reverse replay is uniq
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tools/generator/generateLevel.test.ts`
 Expected: FAIL — `generateLevel`'s current signature returns a `Grid`, and the old file imports `inverseNest`/`inverseTranslate`, which no longer exist.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Replace the entire contents of `tools/generator/generateLevel.ts`:
 
@@ -944,12 +944,12 @@ export function generateLevel(seed: World, steps: number, rng: () => number): Ge
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tools/generator/generateLevel.test.ts`
 Expected: PASS (3 tests). If the third test fails specifically because `result` is `null` (not because of an assertion mismatch), replace `seededRng(42)` with `seededRng(7)`, then `seededRng(99)`, then `seededRng(123)` in that one test until one succeeds — this is expected nondeterminism in which reverse-walk patterns get tried in which order, not a bug.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/generator/generateLevel.ts tools/generator/generateLevel.test.ts
@@ -968,7 +968,7 @@ git commit -m "feat(generator): rewrite generateLevel with cycle avoidance and e
 - Consumes: `canonicalKey` (Task 1), `BUILTIN_LEVELS` from `../../src/levels` (test only — already exports `{id, name, world}` per sub-project 2).
 - Produces: `solve(initialWorld: World, maxDepth?: number): Direction[] | null`, `countCrossingMoves(world: World, moves: Direction[]): number` — Task 9 (`generateBatch.ts`) imports both.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { World } from '../../src/game/engine/types'
@@ -1081,12 +1081,12 @@ test('every builtin level is solvable', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tools/generator/solver.test.ts`
 Expected: FAIL — `countCrossingMoves` is not exported (the old file exports `countNestingEvents`), and the old file's `Grid`-based types don't match `World`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Replace the entire contents of `tools/generator/solver.ts`:
 
@@ -1142,12 +1142,12 @@ export function countCrossingMoves(world: World, moves: Direction[]): number {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tools/generator/solver.test.ts`
 Expected: PASS (7 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/generator/solver.ts tools/generator/solver.test.ts
@@ -1165,7 +1165,7 @@ git commit -m "feat(generator): rewrite solver with canonicalKey dedup and count
 **Interfaces:**
 - Produces: `scoreDifficulty(moveCount: number, crossingMoveCount: number): number`, `difficultyTier(score: number): 'easy' | 'medium' | 'hard'` — Task 9 imports both. Behavior is unchanged from the retired version; only the second parameter's name changes (`nestingCount` → `crossingMoveCount`) to match `countCrossingMoves`'s naming.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Replace the entire contents of `tools/generator/difficultyScorer.test.ts`:
 
@@ -1185,12 +1185,12 @@ test('difficultyTier buckets scores into easy/medium/hard', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tools/generator/difficultyScorer.test.ts`
 Expected: PASS already, actually — this file's existing implementation already satisfies these tests unchanged (only the parameter name differs, which isn't observable from outside). Run it anyway to confirm the baseline is green before the rename.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Replace the entire contents of `tools/generator/difficultyScorer.ts`:
 
@@ -1208,12 +1208,12 @@ export function difficultyTier(score: number): 'easy' | 'medium' | 'hard' {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tools/generator/difficultyScorer.test.ts`
 Expected: PASS (2 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/generator/difficultyScorer.ts tools/generator/difficultyScorer.test.ts
@@ -1232,7 +1232,7 @@ git commit -m "refactor(generator): rename difficultyScorer's crossing parameter
 - Consumes: `createSeedWorld` (Task 2), `generateLevel`/`GenerationResult` (Task 6), `solve`/`countCrossingMoves` (Task 7), `scoreDifficulty`/`difficultyTier` (Task 8), `canonicalKey` (Task 1), `checkWin` from `../../src/game/engine/rules`, `serializeLevel` from `../../src/game/engine/levelSchema`.
 - Produces: `Tier`, `GeneratedLevel`, `BatchStats`, `BatchResult`, `generateLevelBatch(targetPerTier: number, rng: () => number): BatchResult`, plus the `main()` CLI entry point invoked by `npm run generate:levels`. Task 11 runs this CLI for real.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Replace the entire contents of `tools/generator/generateBatch.test.ts`:
 
@@ -1289,12 +1289,12 @@ test('batch stats account for every attempt', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tools/generator/generateBatch.test.ts`
 Expected: FAIL — `generateLevelBatch` currently returns a plain array, not a `BatchResult` with `.levels`/`.complete`/`.counts`/`.stats`, and the old file's imports (`createSeedGrid`, `countNestingEvents`) no longer exist.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Replace the entire contents of `tools/generator/generateBatch.ts`:
 
@@ -1441,12 +1441,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tools/generator/generateBatch.test.ts`
 Expected: PASS (4 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/generator/generateBatch.ts tools/generator/generateBatch.test.ts
@@ -1465,7 +1465,7 @@ git commit -m "feat(generator): rewrite generateBatch with quota reporting, dedu
 - Consumes: `parseLevel` from `../game/engine/levelSchema` (already imported by this file), `checkWin` from `../game/engine/rules` (test only).
 - Produces: `parseGeneratedModules(modules: Record<string, string>): LevelMeta[]` (a new export, factored out of `loadGeneratedLevels` for testability without depending on Vite's `import.meta.glob` resolving real files on disk), updated `loadGeneratedLevels(): LevelMeta[]`. Task 11 will exercise the *real* `loadGeneratedLevels()` (backed by real files) once it commits generated output.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `src/levels/index.test.ts`, replace the existing `loadGeneratedLevels` `describe` block:
 
@@ -1539,12 +1539,12 @@ import { PLAYER_ID } from '../game/engine/types'
 
 (`checkWin` and `PLAYER_ID` are both already imported by this file for the `BUILTIN_LEVELS` tests — just add `parseGeneratedModules` to the existing `./index` import list.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/levels/index.test.ts`
 Expected: FAIL — `parseGeneratedModules` is not exported from `./index` yet.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `src/levels/index.ts`, replace:
 
@@ -1577,12 +1577,12 @@ export function loadGeneratedLevels(): LevelMeta[] {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/levels/index.test.ts`
 Expected: PASS (all tests in the file, including the untouched `BUILTIN_LEVELS`/`loadCustomLevels`/`CUSTOM_LEVEL_ID_PREFIX` blocks)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/levels/index.ts src/levels/index.test.ts
@@ -1602,7 +1602,7 @@ git commit -m "feat(levels): un-stub loadGeneratedLevels via a testable parseGen
 - Consumes: `generateLevelBatch`'s CLI entry point (`npm run generate:levels`, Task 9), `loadGeneratedLevels` (Task 10).
 - Produces: the actual generated level files the shipped game reads at runtime.
 
-- [ ] **Step 1: Run the generator**
+- [x] **Step 1: Run the generator**
 
 ```bash
 npm run generate:levels
@@ -1610,7 +1610,7 @@ npm run generate:levels
 
 Read the printed summary line (attempts, tier counts, discard reasons, and whether it reports "Batch incomplete").
 
-- [ ] **Step 2: If incomplete, tune and re-run**
+- [x] **Step 2: If incomplete, tune and re-run**
 
 If the console output says "Batch incomplete" (exit code 1) — most likely because the `hard` tier (`score >= 25`) is rarely or never reached — widen the step range in `tools/generator/generateBatch.ts`'s `generateLevelBatch`:
 
@@ -1626,7 +1626,7 @@ to:
 
 (This is the spec's explicitly sanctioned knob — widen `steps`, not the tier thresholds, which are a difficulty *definition*.) Re-run `npm run generate:levels` and repeat this step (trying `rng() * 20`, then increasing `MAX_ATTEMPTS` from 500 if still incomplete) until the summary line reports full quota. If a `steps`/`MAX_ATTEMPTS` change was needed, note in the Task's commit message what changed and why (the actual attempt/discard numbers observed).
 
-- [ ] **Step 3: Update the `loadGeneratedLevels` integration test**
+- [x] **Step 3: Update the `loadGeneratedLevels` integration test**
 
 In `src/levels/index.test.ts`, replace the `loadGeneratedLevels` `describe` block written in Task 10:
 
@@ -1666,22 +1666,22 @@ Add `solve` to this test file's imports:
 import { solve } from '../../tools/generator/solver'
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `npx vitest run src/levels/index.test.ts`
 Expected: PASS (all tests, including the two new ones against real committed files)
 
-- [ ] **Step 5: Run the full test suite**
+- [x] **Step 5: Run the full test suite**
 
 Run: `npm test`
 Expected: PASS — every test file across `src/` and `tools/generator/` is green.
 
-- [ ] **Step 6: Confirm the project builds cleanly**
+- [x] **Step 6: Confirm the project builds cleanly**
 
 Run: `npm run build`
 Expected: succeeds with no TypeScript errors — this is the first point in the project where `tsc -b` type-checks the fully rewritten `tools/generator/*` alongside `src/` (per `tsconfig.json`'s `include: ["src", "tools"]`), so this step is what actually confirms no `noUnusedLocals`/`noUnusedParameters` violations or type mismatches slipped through the per-task Vitest runs.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/levels/builtin/generated/ src/levels/index.test.ts

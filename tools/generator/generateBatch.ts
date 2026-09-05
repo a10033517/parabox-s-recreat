@@ -34,9 +34,24 @@ export interface BatchResult {
   stats: BatchStats
 }
 
+// With the current seed (see seed.ts) and this steps range, the achievable
+// score ceiling tops out around 23 (BFS shortest-path moveCount plus the
+// board-crossing bonus) — the 'hard' tier (score >= 25, see
+// difficultyScorer.ts) has never been observed to fill, even at 100,000
+// attempts. main() below correctly reports this via a nonzero exit code
+// ("Batch incomplete") rather than silently succeeding. This is a known,
+// accepted limitation of the seed's geometry (only two independent
+// board-crossing sites, small well-connected board keeping optimal
+// solutions short), not a bug in the generation/scoring logic. Reaching
+// 'hard' reliably would need a seed redesign (more crossing sites, or a
+// larger board) or a lower hard threshold — out of scope for this pass.
 const MAX_ATTEMPTS = 500
 
-export function generateLevelBatch(targetPerTier: number, rng: () => number): BatchResult {
+export function generateLevelBatch(
+  targetPerTier: number,
+  rng: () => number,
+  maxAttempts: number = MAX_ATTEMPTS,
+): BatchResult {
   const counts: Record<Tier, number> = { easy: 0, medium: 0, hard: 0 }
   const results: GeneratedLevel[] = []
   const seenLevels = new Set<string>()
@@ -50,7 +65,7 @@ export function generateLevelBatch(targetPerTier: number, rng: () => number): Ba
   }
 
   while (
-    stats.attempts < MAX_ATTEMPTS &&
+    stats.attempts < maxAttempts &&
     (counts.easy < targetPerTier || counts.medium < targetPerTier || counts.hard < targetPerTier)
   ) {
     stats.attempts++
@@ -64,6 +79,11 @@ export function generateLevelBatch(targetPerTier: number, rng: () => number): Ba
     }
     const { world } = generated
 
+    // The generator's own contract is "produce an unsolved, playable
+    // level" — checked directly here, not merely inferred from solve()
+    // returning a non-empty path (which would also be true, but this
+    // makes the invariant explicit and independent of solve()'s
+    // implementation).
     if (checkWin(world)) {
       stats.discardedAlreadySolved++
       continue
@@ -102,6 +122,9 @@ export function generateLevelBatch(targetPerTier: number, rng: () => number): Ba
 
 function main() {
   const outputDir = join(dirname(fileURLToPath(import.meta.url)), '../../src/levels/builtin/generated')
+  // Overwrite policy: each run replaces the entire generated set rather
+  // than appending numbered files on top of a stale previous run, which
+  // would otherwise silently keep old levels around forever.
   rmSync(outputDir, { recursive: true, force: true })
   mkdirSync(outputDir, { recursive: true })
 
