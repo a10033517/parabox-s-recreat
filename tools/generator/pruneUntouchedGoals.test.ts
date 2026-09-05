@@ -65,14 +65,16 @@ test('computeTouchedGroups marks a group touched via its boxId alone', () => {
   expect(touched.has('goal0')).toBe(false)
 })
 
-test('computeTouchedGroups keeps a group touched even if it moved and later returned to its original position', () => {
-  const groups = [makeGroup(0, 3, 3)]
+test('computeTouchedGroups keeps a group touched even if only an early event moved it', () => {
+  const groups = [makeGroup(0, 3, 3), makeGroup(1, 8, 8)]
   const events: GenerationEvent[] = [
     { kind: 'push', direction: 'right', affectedPieceIds: ['player', 'goal0'] },
-    { kind: 'push', direction: 'left', affectedPieceIds: ['player', 'goal0'] },
+    { kind: 'push', direction: 'left', affectedPieceIds: ['player'] },
+    { kind: 'push', direction: 'up', affectedPieceIds: ['player'] },
   ]
   const touched = computeTouchedGroups(events, groups)
   expect(touched.has('goal0')).toBe(true)
+  expect(touched.has('goal1')).toBe(false)
 })
 
 test('pruneUntouchedGoals removes an untouched group and keeps a touched one', () => {

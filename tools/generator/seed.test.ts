@@ -85,9 +85,14 @@ test('every group container sits at its originalPosition with a box requirement 
 
 test('no two groups (or the player) occupy overlapping coordinates on root', () => {
   const { world, groups } = createSeedWorld(ALL_COMBOS_RNG())
+  const root = world.boards.root
   const rootCoords: string[] = [`${world.locations.player.x},${world.locations.player.y}`]
   for (const group of groups) {
     rootCoords.push(`${group.originalPosition.x},${group.originalPosition.y}`)
+    const { x, y } = group.originalPosition
+    const deltas: [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1]]
+    const [dx, dy] = deltas.find(([ddx, ddy]) => root.cells[y + ddy][x + ddx].type === 'wall')!
+    rootCoords.push(`${x + dx},${y + dy}`)
   }
   expect(new Set(rootCoords).size).toBe(rootCoords.length)
 })

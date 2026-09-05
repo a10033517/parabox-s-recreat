@@ -41,6 +41,8 @@ function removeGroup(world: World, group: SeedGroup): World {
     delete next.locations[pieceId]
   }
   delete next.boards[group.interiorId]
+  delete next.pieces[group.boxId]
+  delete next.locations[group.boxId]
 
   const containerLoc = next.locations[group.containerId]
   const board = next.boards[containerLoc.board]
