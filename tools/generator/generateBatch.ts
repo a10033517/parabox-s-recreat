@@ -35,18 +35,25 @@ export interface BatchResult {
   stats: BatchStats
 }
 
-// With the current seed (see seed.ts) and this steps range, the achievable
-// score ceiling tops out around 23 (BFS shortest-path moveCount plus the
-// board-crossing bonus) — the 'hard' tier (score >= 25, see
-// difficultyScorer.ts) has never been observed to fill, even at 100,000
-// attempts. main() below correctly reports this via a nonzero exit code
-// ("Batch incomplete") rather than silently succeeding. This is a known,
-// accepted limitation of the seed's geometry (only two independent
-// board-crossing sites, small well-connected board keeping optimal
-// solutions short), not a bug in the generation/scoring logic. Reaching
-// 'hard' reliably would need a seed redesign (more crossing sites, or a
-// larger board) or a lower hard threshold — out of scope for this pass.
-const MAX_ATTEMPTS = 500
+// With the current multi-goal seed (see seed.ts, 3-4 independent groups)
+// and this steps range, the achievable score has been observed as high as
+// 35 (well above the old single-goal ceiling of ~23), and the 'hard' tier
+// (score >= 25, see difficultyScorer.ts) is reachable — a direct diagnostic
+// sample of 1000 raw pipeline runs (bypassing tier-bucketing) found 1 hard
+// result out of 399 scored levels (~0.25%). That rarity means a real batch
+// run with targetPerTier=5 fills 'hard' unreliably: some 500-1000 attempt
+// runs produce hard=1, others hard=0, purely from Math.random variance.
+// MAX_ATTEMPTS was raised from 500 to 1000 (this task's sanctioned tuning
+// knob) to give 'hard' more chances to fill; raising it much further (e.g.
+// 2000) risks Node heap exhaustion from accumulated solver/world-clone
+// allocations within a single run. Widening the steps range further did
+// not help (a 3+rng()*30 trial produced hard=0). main() below correctly
+// reports an unmet quota via a nonzero exit code ("Batch incomplete")
+// rather than silently succeeding. This is a known, accepted limitation of
+// the seed's geometry, not a bug in the generation/scoring logic. Reaching
+// 'hard' reliably every run would need a seed redesign (more crossing
+// sites, or a larger board) or a lower hard threshold — out of scope here.
+const MAX_ATTEMPTS = 1000
 
 export function generateLevelBatch(
   targetPerTier: number,
