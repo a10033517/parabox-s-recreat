@@ -9,6 +9,7 @@ import { generateLevel } from './generateLevel'
 import { countCrossingMoves, solve } from './solver'
 import { difficultyTier, scoreDifficulty } from './difficultyScorer'
 import { canonicalKey } from './canonical'
+import { computeTouchedGroups, pruneUntouchedGoals } from './pruneUntouchedGoals'
 
 export type Tier = 'easy' | 'medium' | 'hard'
 
@@ -70,14 +71,16 @@ export function generateLevelBatch(
   ) {
     stats.attempts++
 
-    const seed = createSeedWorld()
+    const { world: seed, groups } = createSeedWorld(rng)
     const steps = 3 + Math.floor(rng() * 20)
     const generated = generateLevel(seed, steps, rng)
     if (!generated) {
       stats.discardedGenerationFailed++
       continue
     }
-    const { world } = generated
+
+    const touchedGroups = computeTouchedGroups(generated.events, groups)
+    const world = pruneUntouchedGoals(generated.world, groups, touchedGroups)
 
     // The generator's own contract is "produce an unsolved, playable
     // level" — checked directly here, not merely inferred from solve()
