@@ -1,89 +1,253 @@
-# Parabox Level Generator — Multi-Box Groups (Phase 1 of a two-phase mechanic-variety project)
+# Parabox Level Generator — Multi-Box Groups
 
-**Status:** Draft for review
-**Builds on:** `2026-09-06-parabox-generator-full-design.md` (Approach A, hard-tier scoring, seed profiles, direction-seeking walk, push-move metric — all unchanged and load-bearing here)
-**Scope:** This document covers **Phase 1 only** — multi-box groups. Phase 2 (nested containers, using the currently-dead `enter` mechanic for real) is a separate, larger, and riskier change deferred to its own future spec once Phase 1 is validated in production.
+## Phase 1: Multi-box groups
 
-## 1. Motivation
+**Status:** Accepted for implementation. Supersedes the initial draft (same filename, prior commit `d3695a9`) — that draft's §4.2 claim that old single-box RNG sequences stay valid at `multiBoxProbability = 0` was wrong (the unconditional `isMultiBox` draw shifts the stream regardless of its result); this revision's §2.3 versioned-seed-contract policy replaces that claim.
+**Builds on:** `2026-09-06-parabox-generator-full-design.md`
+**Scope:** This phase adds groups containing two boxes. Nested containers and real use of `enter` remain deferred to Phase 2.
+**Pre-implementation verification (§2.4/§12 step 1), done:** confirmed against current `src/game/engine/rules.ts` — `checkWin` (line 154) scans every board's every requirement cell globally and independently; any non-player occupant satisfies a `'box'` requirement (so two requirement cells on one interior board are already supported with zero engine changes). `getEntryCell` (line 30) maps each of the 4 directions to a distinct cell for both interior size 3 and size 5 (hand-verified: size 3 → {(1,2),(1,0),(2,1),(0,1)}; size 5 → {(2,4),(2,0),(4,2),(0,2)}, all four distinct in both cases). This phase requires no engine change.
 
-Live user feedback across several rounds of playtesting the shipped generator (session of 2026-09-10/11, commits `db2641c`, `7065427`, `e58d948`, `1521dc1`) converged on the same complaint in different words: every generated level has the *same shape*. Concretely: a "group" (container + box + interior) always resolves the same way — walk to the container, optionally push something out of the way, perform one `eat`, done. Adding `pushMoveCount` (commit `1521dc1`) made that walk contain more real box-pushing, but it did not change the fact that winning a group is always exactly one atomic event.
+---
 
-The user's own diagnosis, confirmed by re-reading `inverseMoves.ts` and the full design spec's own §4.2 proof: the player's board is invariant at `root` for the entire reverse walk, so the `enter` mechanic never fires — the only mechanic that has ever produced a win in this generator is `eat`. No amount of weight/threshold tuning can change that; it is a structural fact about what the seed can currently construct.
+## 1. Executive summary
 
-The user asked for two specific mechanic-variety features:
+The current generator creates a group with one container, one interior board, one wall/entry direction, and one box requirement. A group therefore normally resolves through one `eat` event.
 
-1. **Multi-stage boxes**: a single group requires more than one `eat` to fully solve, so a group *itself* has internal sequencing/variety, not just "more groups."
-2. **Nested containers**: a container inside another group's interior, requiring the player to genuinely walk *into* an interior (finally exercising `enter`) to reach it.
+This phase introduces a group with either:
 
-Per this session's own established practice (small, diagnosable, one-variable-at-a-time changes — every larger simultaneous change this session had to be partially reverted), the two features are split into separate sub-projects. **This spec is Phase 1: multi-box groups only.** It does not touch `enter`, board hierarchy depth, or `inverseEnter`'s dead-code status at all — that is entirely Phase 2's concern.
+- **one box** — existing behavior;
+- **two boxes** — two distinct wall directions and two distinct box requirements on the same interior board.
 
-## 2. What "multi-box" means, mechanically
+The implementation must preserve the following invariants:
 
-A group's container can have **two** walls instead of one — two of its four root-adjacent cells are walls instead of one, on two independently-chosen directions. Each wall direction independently enables an `eat` toward its own entry cell on the *same* interior board (per `getEntryCell(interior, dir, HALF)`, every one of the 4 possible directions maps to a distinct edge-center cell of that interior — up/down/left/right entry cells never coincide, for any interior size ≥ 3, regardless of which subset of directions is walled). The interior gets **two** independent `requirement: 'box'` cells, one per wall direction, each pre-occupied by its own box at seed time.
+1. Every generated group has one container and one interior board.
+2. A group has exactly one or two boxes.
+3. Every box belongs to exactly one group and is placed on its own interior board.
+4. Two-box groups use two distinct cardinal wall directions.
+5. The two requirement cells are distinct and valid.
+6. Untouched groups are pruned only when **all** of their boxes remain at their seed positions.
+7. Existing single-box behavior remains available when `multiBoxProbability = 0`.
+8. No Phase 2 behavior is introduced: no nested containers, no hierarchy deeper than root + one interior, and no changes to `enter`/`inverseEnter`.
 
-**Winning the group** means: both requirement cells are simultaneously satisfied (per `checkWin`'s existing global scan — unchanged, no engine modification). This can happen via two separate `eat` events (usually at different points in the solve), or, if the reverse walk only ever displaced one of the two boxes, the other box's requirement is already trivially met from the start (it never left) and only one `eat` is actually needed to finish that group.
+> Important: A two-box group does not automatically guarantee that the final level requires two `eat` events. The generator must measure how often both boxes are actually displaced. This is an empirical acceptance criterion, not an assumption.
 
-**This is the source of the "variety" the user asked for, and it falls out for free — no new generation heuristic is required to produce it:** whether a multi-box group ends up needing one `eat` or two depends entirely on how many of its boxes the reverse walk happens to displace. The existing touch-count/cooldown machinery (§6.3 of the full design spec, and this session's oscillation-cooldown addition) already governs that stochastically. Every group is still, individually, either "fully solved already" (untouched, pruned away) or "has ≥1 unsatisfied requirement" (survives) — multi-box only changes how many atomic events satisfying that group can take, not the pruning/survival logic's shape.
+---
 
-## 3. Data model change: `SeedGroup.boxes`
+## 2. Problems corrected from the previous draft
 
-The single biggest change is replacing `SeedGroup`'s flat `boxId`/`boxOriginalPosition` fields with an array, because every group-aware function in the pipeline (`pruneUntouchedGoals`, `generateLevel`'s `candidateWeight`, `solver`'s `countGroupsUsed`) currently assumes exactly one box per group.
+### 2.1 Do not equate probability with surviving-level incidence
+
+`multiBoxProbability` is the probability of selecting a two-box seed **before** reverse-walk generation and pruning. The final percentage of surviving groups that are multi-box can differ because:
+
+- multi-box groups have more pieces that can be touched;
+- multi-box groups may be more or less likely to survive pruning;
+- the reverse walk and cooldown logic may bias which groups are displaced;
+- invalid or rejected candidates may affect the final population.
+
+Diagnostics must therefore report at least three separate values:
+
+1. seed-time multi-box draw rate;
+2. surviving-group multi-box rate;
+3. shipped-level multi-box rate.
+
+Do not treat any one of these as a direct assertion that the configured probability is being respected.
+
+### 2.2 Two boxes do not prove two-stage gameplay
+
+A two-box group only creates the possibility of two independent `eat` events. It does not guarantee that both boxes leave their seed positions during the reverse walk.
+
+The design must measure:
+
+- zero displaced boxes — group should normally be pruned;
+- one displaced box — surviving group may require one `eat`;
+- two displaced boxes — surviving group may require two `eat`s.
+
+If the two-displaced-box rate is too low, the implementation must add per-box targeting or another explicitly tested mechanism before shipping.
+
+### 2.3 RNG compatibility needs an explicit policy
+
+Adding an unconditional `isMultiBox` draw changes the RNG stream even when the configured probability is `0`. This is not compatible with the old seed sequences.
+
+The implementation must choose one of these policies explicitly:
+
+- **Recommended:** accept a new RNG contract and rewrite all hand-authored RNG fixtures;
+- **Compatibility mode:** if `multiBoxProbability === 0`, use the old single-box seed path without the new draw;
+- **Versioned seed contract:** include a generator version in seed metadata and maintain separate expected fixtures.
+
+The preferred choice for this phase is the **versioned seed contract**, because it makes generated output reproducible and prevents silent changes to old fixtures.
+
+### 2.4 The `checkWin` assumption must be verified
+
+The design assumes that the existing global `checkWin` scan considers both requirement cells and succeeds only when both are satisfied. This must be verified against the actual implementation.
+
+Before implementation, confirm:
+
+- whether a requirement is satisfied by a box occupying the cell or by another condition;
+- whether a requirement can be satisfied while the box is still at its seed position;
+- whether `eat` removes/replaces the box or transfers it between boards;
+- whether `checkWin` scans all boards or only the active board;
+- whether two requirements on one interior board are supported by the current world model.
+
+If any answer is incompatible, this phase requires an engine change and is no longer a generator-only change.
+
+---
+
+## 3. Mechanical definition
+
+A two-box group has:
+
+- one root container cell;
+- two cardinal-adjacent wall cells around the container;
+- one interior board;
+- two distinct entry cells on that interior board;
+- two normal boxes, each initially occupying one requirement cell.
+
+Let the two wall directions be `d1` and `d2`, with `d1 !== d2`.
+
+For each direction `d`:
 
 ```ts
-// seed.ts
+const wallPos = step(containerPosition, d)
+const eatenCell = getEntryCell(interior, opposite(d), HALF)
+```
+
+The implementation must verify that:
+
+```ts
+wallPos !== playerCandidatePosition
+```
+
+and that the two calculated interior cells are distinct:
+
+```ts
+entryCell(d1) !== entryCell(d2)
+```
+
+Do not rely only on comments or an informal proof. Add executable assertions in tests.
+
+### 3.1 Win semantics
+
+A group is considered solved only when all of its requirement cells are satisfied.
+
+For a two-box group:
+
+- both requirements satisfied at seed time: the group is untouched and should be pruned;
+- one box displaced: the group survives and may need one `eat`;
+- both boxes displaced: the group survives and may need two `eat`s;
+- the container or either box is missing unexpectedly: the world is invalid and generation must fail loudly rather than silently shipping the level.
+
+The phrase “two independent `eat`s” must be treated as a measured outcome, not a guaranteed property of every two-box group.
+
+---
+
+## 4. Data model
+
+### 4.1 `GroupBox`
+
+```ts
 export interface GroupBox {
   boxId: string
-  originalPosition: { x: number; y: number } // the box's cell on its own interior board
-}
-
-export interface SeedGroup {
-  containerId: string
-  interiorId: string
-  originalPosition: { x: number; y: number } // container's root position (unchanged meaning)
-  boxes: GroupBox[] // length 1 (ordinary group) or 2 (multi-box group)
+  originalPosition: { x: number; y: number }
 }
 ```
 
-This is a **breaking** change to the type, not an additive one — the old `boxId`/`boxOriginalPosition` fields are removed entirely, not kept alongside `boxes`. Every consumer is updated below. There is no external caller of `SeedGroup` outside `tools/generator/*` (confirmed by the same grep sweep the original full-design spec did), so this is safe to do as a hard rename rather than a deprecate-and-migrate.
+### 4.2 `SeedGroup`
 
-## 4. `seed.ts` changes
+```ts
+export interface SeedGroup {
+  containerId: string
+  interiorId: string
+  originalPosition: { x: number; y: number }
+  boxes: GroupBox[] // exactly 1 or 2
+}
+```
 
-### 4.1 `SeedProfile` gains `multiBoxProbability`
+### 4.3 Runtime validation
+
+Add a validation helper and call it after seed construction in tests and diagnostic generation:
+
+```ts
+function assertValidSeedGroup(group: SeedGroup): void {
+  if (group.boxes.length !== 1 && group.boxes.length !== 2) {
+    throw new Error(`Invalid box count for group ${group.containerId}`)
+  }
+
+  const ids = new Set(group.boxes.map((box) => box.boxId))
+  if (ids.size !== group.boxes.length) {
+    throw new Error(`Duplicate box id in group ${group.containerId}`)
+  }
+}
+```
+
+The exact helper name may differ, but the invariant must be enforced somewhere in the implementation or test boundary.
+
+This is a breaking type change. Remove the old `boxId` and `boxOriginalPosition` fields rather than retaining two competing representations.
+
+---
+
+## 5. Seed generation
+
+### 5.1 `SeedProfile`
 
 ```ts
 export interface SeedProfile {
   fourGroupProbability: number
   largeInteriorProbability: number
   remoteStartProbability: number
-  multiBoxProbability: number // NEW: chance a given group gets 2 boxes instead of 1
+  multiBoxProbability: number
 }
 ```
 
-Per the user's own choice: this applies uniformly to *every* group draw in *both* `seedProfile` (general) and `hardSeedProfile`, exactly like `fourGroupProbability`/`largeInteriorProbability` already do — not gated to hard-only. Proposed values: `seedProfile.multiBoxProbability = 0.3`, `hardSeedProfile.multiBoxProbability = 0.5` (hard-biased runs skew toward the more complex shape, consistent with how the other two probabilities are already biased upward for hard). These are initial values, not validated — same status as every other weight in `generatorConfig.ts`, subject to the mandatory diagnostic pass in §8 before shipping.
+Initial proposed values:
 
-### 4.2 Picking 1 or 2 *distinct* wall directions with minimal RNG-contract disruption
+```ts
+seedProfile.multiBoxProbability = 0.3
+hardSeedProfile.multiBoxProbability = 0.5
+```
 
-The existing single-wall draw is exactly one `rng()` call: `DIRECTIONS[Math.floor(rng() * DIRECTIONS.length)]`. To keep every existing single-box test sequence valid unchanged when `multiBoxProbability` rolls false, the two-direction case is built as "first direction, then a distinct second direction via a nonzero offset" — never a full reshuffle (which would cost 3 `rng()` calls even for the 1-direction case and silently break every existing hand-tuned test sequence in `seed.test.ts`):
+These values are provisional. They must not be treated as validated difficulty settings until the diagnostic pass is complete.
+
+### 5.2 Direction selection
+
+Use a bounded, rejection-free selection for two distinct directions:
 
 ```ts
 function pickWallDirs(rng: () => number, count: 1 | 2): Direction[] {
   const first = Math.floor(rng() * DIRECTIONS.length)
-  if (count === 1) return [DIRECTIONS[first]]
-  // A nonzero offset in [1, DIRECTIONS.length-1] guarantees `second !== first`
-  // without rejection sampling (which would consume a variable, unbounded
-  // number of rng() calls).
+
+  if (count === 1) {
+    return [DIRECTIONS[first]]
+  }
+
   const offset = 1 + Math.floor(rng() * (DIRECTIONS.length - 1))
   const second = (first + offset) % DIRECTIONS.length
+
   return [DIRECTIONS[first], DIRECTIONS[second]]
 }
 ```
 
-**RNG-call contract per group** (this is the part every rewritten test in §7 must match exactly):
-1. `isMultiBox = rng() < profile.multiBoxProbability` — **1 call, always**, drawn *before* the wall-direction pick.
-2. `wallDirs = pickWallDirs(rng, isMultiBox ? 2 : 1)` — **1 call if single-box, 2 calls if multi-box**.
-3. `interiorSize = rng() < profile.largeInteriorProbability ? 5 : 3` — **1 call, always** (unchanged draw, now sequenced after the wall-direction pick instead of before — this shifts every downstream `rng()` call index for every group after this one, which is why every existing seed.test.ts sequence needs rebuilding, not just extending).
+Required properties:
 
-### 4.3 Per-group construction loop (replaces the current single-box body)
+- exactly one RNG call for the first direction;
+- exactly one additional RNG call for the second direction;
+- no rejection loop;
+- no duplicate directions;
+- no dependence on direction enum ordering beyond the existing `DIRECTIONS` array.
+
+### 5.3 RNG contract
+
+If using the new versioned seed contract, document the order exactly:
+
+1. draw `isMultiBox`;
+2. draw the first wall direction;
+3. if multi-box, draw the second-direction offset;
+4. draw interior size;
+5. construct the group;
+6. continue to the next group.
+
+Do not claim that old RNG fixtures remain unchanged unless the compatibility mode described in §2.3 is implemented.
+
+### 5.4 Construction pseudocode
 
 ```ts
 for (let i = 0; i < groupCount; i++) {
@@ -91,38 +255,71 @@ for (let i = 0; i < groupCount; i++) {
 
   const isMultiBox = rng() < profile.multiBoxProbability
   const wallDirs = pickWallDirs(rng, isMultiBox ? 2 : 1)
+  const interiorSize = rng() < profile.largeInteriorProbability ? 5 : 3
+
   for (const wallDir of wallDirs) {
     const wallPos = step(containerX, containerY, wallDir)
     cells[wallPos.y][wallPos.x] = { type: 'wall' }
   }
+
   cells[containerY][containerX] = { type: 'floor' }
 
-  const interiorSize = rng() < profile.largeInteriorProbability ? 5 : 3
   const interiorId = `goal${i}Inside`
   const containerId = `goal${i}`
-  const interior = { id: interiorId, size: interiorSize, cells: makeFloorCells(interiorSize) }
+  const interior = {
+    id: interiorId,
+    size: interiorSize,
+    cells: makeFloorCells(interiorSize),
+  }
 
   const boxes: GroupBox[] = []
-  for (const [boxIndex, wallDir] of wallDirs.entries()) {
-    // Single-box groups keep the old id shape (`box0`) exactly, so any code
-    // or fixture that assumed that naming outside this file is unaffected.
-    const boxId = wallDirs.length > 1 ? `box${i}_${boxIndex}` : `box${i}`
-    const { cell: eatenCell } = getEntryCell(interior, opposite(wallDir), HALF)
-    if (eatenCell === null) {
-      // Provably unreachable, same reasoning as the single-box case: HALF
-      // always maps to an in-bounds center-of-edge cell for any board size
-      // >= 1, for any of the 4 directions independently.
-      throw new Error(`createSeedWorld: getEntryCell unexpectedly returned null for interior size ${interiorSize}`)
-    }
-    interior.cells[eatenCell.y][eatenCell.x] = { type: 'floor', requirement: 'box' }
-    pieces[boxId] = { id: boxId, kind: 'normal' }
-    locations[boxId] = { board: interiorId, x: eatenCell.x, y: eatenCell.y }
-    boxes.push({ boxId, originalPosition: { x: eatenCell.x, y: eatenCell.y } })
-  }
-  boards[interiorId] = interior
 
-  pieces[containerId] = { id: containerId, kind: 'container', boardRef: interiorId }
-  locations[containerId] = { board: 'root', x: containerX, y: containerY }
+  for (const [boxIndex, wallDir] of wallDirs.entries()) {
+    const boxId = wallDirs.length === 1
+      ? `box${i}`
+      : `box${i}_${boxIndex}`
+
+    const { cell: eatenCell } = getEntryCell(
+      interior,
+      opposite(wallDir),
+      HALF,
+    )
+
+    if (eatenCell === null) {
+      throw new Error(
+        `createSeedWorld: invalid entry cell for ${containerId}`,
+      )
+    }
+
+    interior.cells[eatenCell.y][eatenCell.x] = {
+      type: 'floor',
+      requirement: 'box',
+    }
+
+    pieces[boxId] = { id: boxId, kind: 'normal' }
+    locations[boxId] = {
+      board: interiorId,
+      x: eatenCell.x,
+      y: eatenCell.y,
+    }
+
+    boxes.push({
+      boxId,
+      originalPosition: { x: eatenCell.x, y: eatenCell.y },
+    })
+  }
+
+  boards[interiorId] = interior
+  pieces[containerId] = {
+    id: containerId,
+    kind: 'container',
+    boardRef: interiorId,
+  }
+  locations[containerId] = {
+    board: 'root',
+    x: containerX,
+    y: containerY,
+  }
 
   groups.push({
     containerId,
@@ -133,16 +330,32 @@ for (let i = 0; i < groupCount; i++) {
 }
 ```
 
-### 4.4 Safety proof for two walls (extends §6.1 of the full design spec, does not replace it)
+After construction, validate:
 
-The existing proof already covers this without modification: "a slot's 4 possible wall cells are the center ± 1 in exactly one axis (cardinal-adjacent); the player candidate is the center − 1 in *both* axes (diagonal) — these can never coincide." That statement is about *any* subset of the 4 cardinal-adjacent cells relative to the fixed diagonal player candidate — it was never dependent on exactly one of the four being chosen. Two walls instead of one changes nothing about this proof. The two entry cells on the interior (for two different directions) are likewise always distinct: `getEntryCell` maps each of the 4 directions to a different edge-center cell (top/bottom/left/right center), and no two distinct directions ever produce the same cell, for any interior size ≥ 3 — this needs no new proof, it is a direct property of `getEntryCell`'s existing per-direction formula (unchanged, out of scope).
+- exactly one or two boxes;
+- unique box IDs globally;
+- every box exists in `pieces` and `locations`;
+- every box location points to the group interior;
+- every box location is a requirement cell;
+- two-box entry cells are distinct;
+- all wall positions are in bounds;
+- no wall overlaps the player candidate or another required root cell.
 
-## 5. `pruneUntouchedGoals.ts` changes
+---
+
+## 6. Pruning
+
+### 6.1 `isGroupUntouched`
 
 ```ts
-export function isGroupUntouched(world: World, group: SeedGroup): boolean {
+export function isGroupUntouched(
+  world: World,
+  group: SeedGroup,
+): boolean {
   return group.boxes.every((box) => {
     const loc = world.locations[box.boxId]
+    if (!loc) return false
+
     return (
       loc.board === group.interiorId &&
       loc.x === box.originalPosition.x &&
@@ -150,123 +363,133 @@ export function isGroupUntouched(world: World, group: SeedGroup): boolean {
     )
   })
 }
+```
 
-export function getSurvivingGroups(world: World, groups: SeedGroup[]): SeedGroup[] {
-  return groups.filter(
-    (group) =>
-      world.pieces[group.containerId] !== undefined &&
-      world.boards[group.interiorId] !== undefined &&
-      group.boxes.every((box) => world.pieces[box.boxId] !== undefined),
+The missing-location case must be handled explicitly. Returning `true` for a missing box would incorrectly prune a broken group.
+
+### 6.2 Surviving groups
+
+```ts
+export function getSurvivingGroups(
+  world: World,
+  groups: SeedGroup[],
+): SeedGroup[] {
+  return groups.filter((group) =>
+    world.pieces[group.containerId] !== undefined &&
+    world.boards[group.interiorId] !== undefined &&
+    group.boxes.every((box) =>
+      world.pieces[box.boxId] !== undefined,
+    ),
   )
 }
-
-function removeGroup(world: World, group: SeedGroup): World {
-  const next = cloneWorld(world)
-  // This loop already deletes every piece located on the interior board
-  // generically — for any number of boxes, not just one — so no per-box
-  // enumeration is needed here at all (this is actually a simplification
-  // versus the single-box version, which had a redundant explicit
-  // `delete next.pieces[group.boxId]` alongside this same loop).
-  for (const [pieceId, loc] of Object.entries(next.locations)) {
-    if (loc.board !== group.interiorId) continue
-    if (pieceId === PLAYER_ID) {
-      throw new Error(
-        `pruneUntouchedGoals: refusing to remove group ${group.containerId} — ` +
-          'the player is inside its interior. This indicates isGroupUntouched ' +
-          'incorrectly classified a live group as untouched.',
-      )
-    }
-    delete next.pieces[pieceId]
-    delete next.locations[pieceId]
-  }
-  delete next.boards[group.interiorId]
-  delete next.pieces[group.containerId]
-  delete next.locations[group.containerId]
-  return next
-}
 ```
 
-`pruneUntouchedGoals` itself (the loop calling `isGroupUntouched`/`removeGroup` per group) is unchanged — it already treats a group as one opaque unit.
+A multi-box group survives if at least one box was displaced, assuming the container, interior, and all expected pieces still exist.
 
-**A multi-box group only gets pruned if *every* one of its boxes is still exactly at its seed position.** If even one box moved, the *entire* group survives — including the box(es) that never moved, which keep their (already-satisfied) requirement. This is the mechanism described in §2: a surviving multi-box group may need one or two more `eat`s depending on how much the reverse walk actually displaced, and that is intentional, emergent variety, not a bug.
+### 6.3 Removal
 
-## 6. `generateLevel.ts` changes
+The removal routine should delete all pieces located on the interior board generically, then delete the board and container. It must reject removal if the player is inside the interior.
 
-Both places `candidateWeight` and the touch-count-update loop check "did this candidate touch group X" need to check the box *array*, not a single id:
+Add a test specifically covering:
+
+- one untouched box and one moved box;
+- both boxes removed from the world unexpectedly;
+- a missing location entry;
+- the player inside the interior.
+
+---
+
+## 7. `generateLevel.ts`
+
+Both candidate scoring and touch-count updates must treat a group as touched when the container **or any box** moved.
 
 ```ts
-// candidateWeight's per-group loop:
-for (const group of groups) {
-  const touchedThisGroup =
-    moved.includes(group.containerId) || group.boxes.some((box) => moved.includes(box.boxId))
-  if (!touchedThisGroup) continue
-  const touches = touchCounts.get(group.containerId) ?? 0
-  const recentCount = recentTouches.filter((id) => id === group.containerId).length
-  const repeatPenalty = 1 / (1 + recentCount)
-  weight += (touches === 0 ? weights.newGroupBonus : weights.repeatedGroupWeight / touches) * repeatPenalty
-}
+const touchedThisGroup =
+  moved.includes(group.containerId) ||
+  group.boxes.some((box) => moved.includes(box.boxId))
 ```
 
+The group-level counter can remain keyed by `containerId` for the first implementation, but this is a known risk:
+
+> Touching box A can make touching box B look like a repeated group touch, even when box B has never moved.
+
+Therefore, diagnostics must report the displacement rate of the first and second boxes separately. If the two-box displacement rate is below the agreed threshold, implement per-box touch tracking before shipping.
+
+### 7.1 Recommended acceptance threshold
+
+Use the following as an initial engineering threshold, not a gameplay truth:
+
+- if fewer than **10%** of surviving two-box groups have both boxes displaced, stop and investigate;
+- if the rate is acceptable but the resulting difficulty distribution is too low, tune scoring separately;
+- do not hide a low two-box displacement rate by increasing `multiBoxProbability` alone.
+
+The final threshold may be changed after observing a sufficiently large diagnostic sample.
+
+---
+
+## 8. `solver.ts`
+
+Generalize `countGroupsUsed` from a fixed container + one box list to the container plus every box:
+
 ```ts
-// after weightedPick, the touch-count/recency update loop:
-for (const group of groups) {
-  const touchedThisGroup =
-    accepted.moved.includes(group.containerId) || group.boxes.some((box) => accepted.moved.includes(box.boxId))
-  if (touchedThisGroup) {
-    touchCounts.set(group.containerId, (touchCounts.get(group.containerId) ?? 0) + 1)
-    recentTouches.push(group.containerId)
-    if (recentTouches.length > OSCILLATION_RECENT_WINDOW) recentTouches.shift()
-  }
-}
-```
-
-Touch-count/cooldown tracking stays keyed by `containerId` (group-level), not per-box — deliberately: this is Phase 1's simplest correct option. If diagnostics (§8) show multi-box groups rarely get *both* boxes displaced (because touching one box already marks the whole group as "touched", making the second box's displacement look like a discouraged repeat rather than a fresh target), per-box touch tracking is the natural documented follow-up — not implemented preemptively here, matching this design's own established principle of not building a mechanism until diagnostics show it's needed (see the full design spec's §6.3 on the oscillation cooldown itself, which was deferred for exactly this reason and only added once diagnostics confirmed the need).
-
-`directionSeekWeights`/`untouchedGroupPositions` are unaffected — they already operate on `group.originalPosition` (the container's root position), never on box identity.
-
-## 7. `solver.ts` changes
-
-`countGroupsUsed`'s inner loop generalizes from a fixed 2-element list to the container plus every box:
-
-```ts
-export function countGroupsUsed(world: World, moves: Direction[], groups: SeedGroup[]): number {
+export function countGroupsUsed(
+  world: World,
+  moves: Direction[],
+  groups: SeedGroup[],
+): number {
   const usedGroups = new Set<string>()
   let current = world
+
   for (const direction of moves) {
     const next = applyMove(current, direction)
-    if (!next) throw new Error('countGroupsUsed received an invalid move for this world')
+    if (!next) {
+      throw new Error(
+        'countGroupsUsed received an invalid move for this world',
+      )
+    }
+
     for (const group of groups) {
       if (usedGroups.has(group.containerId)) continue
-      for (const pieceId of [group.containerId, ...group.boxes.map((b) => b.boxId)]) {
+
+      const pieceIds = [
+        group.containerId,
+        ...group.boxes.map((box) => box.boxId),
+      ]
+
+      for (const pieceId of pieceIds) {
         const before = current.locations[pieceId]
         const after = next.locations[pieceId]
         if (!before || !after) continue
-        if (before.board !== after.board || before.x !== after.x || before.y !== after.y) {
+
+        if (
+          before.board !== after.board ||
+          before.x !== after.x ||
+          before.y !== after.y
+        ) {
           usedGroups.add(group.containerId)
           break
         }
       }
     }
+
     current = next
   }
+
   return usedGroups.size
 }
 ```
 
-A multi-box group counts as "used" if *either* box (or the container) moved at all — same semantic as before, just generalized. `countEatMoves`/`countCrossingMoves`/`countPushMoves` are already piece-agnostic (they scan every piece in `world.locations`, not specific group members) and need **no changes at all**.
+Add tests proving that moving only the second box counts as one used group.
 
-## 8. `generatorConfig.ts` changes
+Do not modify `countEatMoves`, `countCrossingMoves`, or `countPushMoves` until tests demonstrate that their current piece-agnostic scans are insufficient.
+
+---
+
+## 9. Configuration
 
 ```ts
-export interface SeedProfile {
-  fourGroupProbability: number
-  largeInteriorProbability: number
-  remoteStartProbability: number
-  multiBoxProbability: number
-}
-
 export const GENERATOR_CONFIG: GeneratorConfig = {
-  // ...
+  // ... existing settings
   seedProfile: {
     fourGroupProbability: 0.5,
     largeInteriorProbability: 0.5,
@@ -279,36 +502,200 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
     remoteStartProbability: 0.25,
     multiBoxProbability: 0.5,
   },
-  // ... (everything else unchanged)
 }
 ```
 
-`generateBatch.ts` needs no changes beyond this — it never references `boxId` directly, only `getSurvivingGroups`/`isGroupUntouched`/`countGroupsUsed`, all already updated above.
+Validate configuration values at startup:
 
-## 9. Mandatory diagnostic pass before shipping (same discipline as every prior phase this session)
+```ts
+function assertProbability(value: number, name: string): void {
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`${name} must be a probability in [0, 1]`)
+  }
+}
+```
 
-Per this project's own established practice (every phase of the original full-design spec, and every change this session — several of which were reverted after diagnostics showed they made things worse), a diagnostic batch must run and report before regenerating shipped JSON:
+`generateBatch.ts` should not need direct box-ID logic if all group-aware helpers are correctly generalized.
 
-- **Multi-box incidence**: fraction of surviving groups that are multi-box, compared against `multiBoxProbability` (sanity-check the draw rate survives pruning proportionally, not skewed).
-- **Both-boxes-displaced rate**: among surviving multi-box groups, what fraction have *both* boxes away from their seed position (needing 2 `eat`s to finish) versus only one (needing 1, same as an ordinary group)? This is the number that validates or refutes §6's "no extra heuristic needed" claim — if it's very low (e.g., <10%), the per-box touch-tracking follow-up flagged in §6 should be implemented before shipping, not deferred further.
-- **Score/tier distribution shift**: multi-box groups don't change `scoreDifficulty`'s formula, but they do change what `eatCount`/`groupsUsed` values are achievable for a *single* surviving group — re-measure the easy/medium/hard split (currently `EASY_MEDIUM_SCORE_THRESHOLD = 45`) in case it needs retuning, same as every previous metric addition this session required.
-- **Crash/invariant check**: the Approach-A invariant check in `generateBatch.ts` (every surviving group must have `!isGroupUntouched`) must never fire on a real batch run — this is the direct multi-box analog of the crash the original full-design spec's own review caught for the single-box case.
-- **Regression baseline**: single-box behavior (when `multiBoxProbability` rolls false, the overwhelming majority of groups) must be measurably unchanged from the `1521dc1` baseline — same `pushMoveCount`/`eatCount`/`moveCount` distributions for those groups, confirming the RNG-contract change in §4.2 didn't silently alter unrelated behavior.
+---
 
-## 10. Test impact
+## 10. Required diagnostics before shipping
 
-- **`seed.test.ts`**: full rewrite of every hand-tuned RNG sequence (the §4.2 call-order change shifts every downstream draw). New coverage: a multi-box group has exactly 2 walls and 2 distinct `requirement: 'box'` cells on its interior, at the correct entry cells for its two wall directions; `boxes.length` matches the `isMultiBox` draw; a single-box group's exact RNG consumption (1 call for `isMultiBox` returning false, 1 call for the wall direction) matches the documented contract; `pickWallDirs(rng, 2)` always returns two distinct directions for every possible `first` value (0-3) crossed with every possible `offset` value (1-3) — a small exhaustive table, not a probabilistic spot-check.
-- **`pruneUntouchedGoals.test.ts`**: `makeGroup` test helper rebuilt to construct `boxes: GroupBox[]`. New: a multi-box group where only one box moved survives with *both* boxes intact (the untouched one keeps its satisfied requirement); a multi-box group where *neither* box moved gets fully pruned (container + interior + both boxes deleted); `getSurvivingGroups` correctly requires *every* box's piece to exist, not just one.
-- **`generateLevel.test.ts`**: any inline `SeedGroup` literal updated to the `boxes` shape. New: a candidate that moves the *second* box of a multi-box group (not the first) is still recognized as touching that group by `candidateWeight`.
-- **`solver.test.ts`**: `countGroupsUsed`'s existing `SeedGroup` fixture updated to `boxes` shape; new test with a 2-box group where only the second box moves (still counts as 1 used group, same as either box alone).
-- **`generateBatch.test.ts`**: no `SeedGroup` literals directly constructed here (it drives the real pipeline end-to-end) — existing tests should pass unchanged once the above compile; add one assertion that a real batch run's shipped levels include at least one multi-box group somewhere in a large-enough sample (guards against the feature silently never firing).
-- **New empirical diagnostic pass** (§9) — required before regenerating `src/levels/builtin/generated/*.json`, matching this project's own precedent every single time before this.
+Run a large batch using fixed seeds and report both absolute counts and percentages.
 
-## 11. Explicitly deferred to Phase 2 (nested containers) — not in this spec
+### 10.1 Seed composition
 
-- Any change to `inverseEnter`'s dead-code status, or to the "player's board is invariant at root" proof (full design spec §4.2).
-- Seeding a container whose "root" is another group's interior board.
-- Any seed construction that starts the reverse walk with the player already inside an interior (required for `inverseEnter` to ever have a valid predecessor to reverse into).
-- Any change to board-hierarchy depth beyond the current 2 tiers (root + one level of interiors).
+Report:
 
-Phase 2 is a separate brainstorming → spec → plan cycle, only after Phase 1 ships and its diagnostics are reviewed.
+- total seeded groups;
+- number of single-box groups;
+- number of two-box groups;
+- actual seed-time multi-box rate;
+- configured `multiBoxProbability`.
+
+### 10.2 Survival and pruning
+
+Report separately:
+
+- surviving single-box groups;
+- surviving two-box groups;
+- surviving-group multi-box rate;
+- number of groups pruned as untouched;
+- number of invalid groups rejected.
+
+### 10.3 Two-box displacement
+
+Among surviving two-box groups, report:
+
+- neither box displaced;
+- only box 0 displaced;
+- only box 1 displaced;
+- both boxes displaced;
+- percentage requiring one potential `eat`;
+- percentage requiring two potential `eat`s.
+
+The “neither displaced” category should normally be zero among correctly surviving groups. If not, investigate `isGroupUntouched`, reverse-walk bookkeeping, or pruning order.
+
+### 10.4 Difficulty distribution
+
+Compare the new output with the `1521dc1` baseline:
+
+- `moveCount`;
+- `pushMoveCount`;
+- `eatCount`;
+- `groupsUsed`;
+- score distribution;
+- easy/medium/hard tier distribution;
+- percentage of generated levels rejected by validation.
+
+Do not assume that the old threshold `EASY_MEDIUM_SCORE_THRESHOLD = 45` remains appropriate.
+
+### 10.5 Regression and invariants
+
+The diagnostic run must verify:
+
+- no duplicate piece IDs;
+- no missing locations;
+- every group has one or two boxes;
+- every box belongs to the correct interior;
+- all two-box requirement cells are distinct;
+- no wall overlaps the player candidate;
+- `isGroupUntouched` is false for every surviving group;
+- solver replay succeeds for every shipped level;
+- no generation crash occurs in the full batch.
+
+---
+
+## 11. Test plan
+
+### 11.1 `seed.test.ts`
+
+Add tests for:
+
+1. one-box and two-box group construction;
+2. exactly two walls for a two-box group;
+3. distinct wall directions;
+4. distinct requirement cells;
+5. correct entry cell for every direction;
+6. exact box count;
+7. unique box IDs;
+8. invalid probability rejection;
+9. exhaustive `pickWallDirs(rng, 2)` combinations;
+10. the documented RNG contract;
+11. versioned or compatibility seed behavior, depending on the chosen policy.
+
+### 11.2 `pruneUntouchedGoals.test.ts`
+
+Cover:
+
+- one-box untouched group is pruned;
+- two-box untouched group is pruned;
+- only first box moved → group survives;
+- only second box moved → group survives;
+- both boxes moved → group survives;
+- untouched box remains present when the other box moved;
+- missing box/location does not classify the group as untouched;
+- player inside the interior prevents removal.
+
+### 11.3 `generateLevel.test.ts`
+
+Cover:
+
+- moving the container touches the group;
+- moving the first box touches the group;
+- moving the second box touches the group;
+- touch counts remain keyed by `containerId`;
+- candidate scoring does not silently ignore the second box.
+
+### 11.4 `solver.test.ts`
+
+Cover:
+
+- moving the container counts one group;
+- moving the first box counts one group;
+- moving only the second box counts one group;
+- moving both boxes still counts one group;
+- unrelated movement does not count the group.
+
+### 11.5 `generateBatch.test.ts`
+
+Cover:
+
+- end-to-end generation with `multiBoxProbability = 0`;
+- end-to-end generation with a nonzero probability;
+- fixed-seed reproducibility;
+- at least one two-box group in a sufficiently large sample;
+- no surviving untouched group;
+- all shipped levels pass solver/invariant validation.
+
+---
+
+## 12. Implementation order
+
+1. Confirm the actual semantics of `checkWin`, `eat`, `getEntryCell`, and world locations.
+2. Add `GroupBox` and replace the old single-box fields.
+3. Add runtime validation for group structure.
+4. Implement direction selection and seed construction.
+5. Decide and document the RNG compatibility/versioning policy.
+6. Update pruning.
+7. Update candidate scoring and touch tracking.
+8. Update `countGroupsUsed`.
+9. Rewrite and extend unit tests.
+10. Run fixed-seed diagnostics.
+11. Tune `multiBoxProbability`, scoring, or touch tracking only after reviewing measurements.
+12. Regenerate built-in JSON only after all diagnostics pass.
+
+---
+
+## 13. Explicitly deferred to Phase 2
+
+The following are out of scope:
+
+- nested containers;
+- placing a container inside another group's interior;
+- starting the reverse walk with the player inside an interior;
+- changing `inverseEnter`;
+- changing the proof that the player's board remains at root;
+- hierarchy deeper than root + one interior;
+- any engine-wide change to board traversal;
+- any new win condition unrelated to the two box requirements.
+
+Phase 2 must have its own design, implementation plan, invariant review, and diagnostic pass.
+
+---
+
+## 14. Final shipping criteria
+
+Phase 1 is ready to ship only when all of the following are true:
+
+- [ ] The actual engine semantics support two simultaneous requirements on one interior.
+- [ ] All group consumers use `boxes`, not the removed single-box fields.
+- [ ] Two-box groups always have two distinct valid directions and requirement cells.
+- [ ] The RNG policy is explicit and all fixtures use it.
+- [ ] Untouched two-box groups are pruned correctly.
+- [ ] The second box is recognized by scoring, touch tracking, pruning, and solver metrics.
+- [ ] The two-box displacement rate is measured and acceptable.
+- [ ] Difficulty/tier distributions are reviewed against the baseline.
+- [ ] Full regression and invariant tests pass.
+- [ ] Fixed-seed generation is reproducible.
+- [ ] Built-in generated JSON is regenerated only after diagnostics pass.
