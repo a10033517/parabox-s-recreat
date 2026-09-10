@@ -6,7 +6,7 @@ import { checkWin } from '../../src/game/engine/rules'
 import { serializeLevel } from '../../src/game/engine/levelSchema'
 import { createSeedWorld } from './seed'
 import { generateLevel } from './generateLevel'
-import { countCrossingMoves, countEatMoves, countGroupsUsed, solve } from './solver'
+import { countCrossingMoves, countEatMoves, countGroupsUsed, countPushMoves, solve } from './solver'
 import {
   DifficultyMetrics, checkHardRequirements, difficultyTier, scoreDifficulty,
 } from './difficultyScorer'
@@ -52,6 +52,7 @@ export interface DifficultyProfile {
   survivingGroupCount: number
   groupsUsed: number
   expandedStates: number
+  pushMoveCount: number
 }
 
 export interface HardCandidate {
@@ -82,7 +83,8 @@ export function profileDistance(a: DifficultyProfile, b: DifficultyProfile): num
     term(a.eatCount, b.eatCount, 3) +
     term(a.survivingGroupCount, b.survivingGroupCount, 2) +
     term(a.groupsUsed, b.groupsUsed, 2) +
-    term(a.expandedStates, b.expandedStates, 5000)
+    term(a.expandedStates, b.expandedStates, 5000) +
+    term(a.pushMoveCount, b.pushMoveCount, 3)
   )
 }
 
@@ -204,6 +206,7 @@ export function generateLevelBatch(
       groupsUsed: countGroupsUsed(world, solved.moves, survivingGroups),
       expandedStates: solved.expandedStates,
       maxFrontierSize: solved.maxFrontierSize,
+      pushMoveCount: countPushMoves(world, solved.moves),
     }
     const tier = difficultyTier(metrics)
 
@@ -249,6 +252,7 @@ export function generateLevelBatch(
           survivingGroupCount: metrics.survivingGroupCount,
           groupsUsed: metrics.groupsUsed,
           expandedStates: metrics.expandedStates,
+          pushMoveCount: metrics.pushMoveCount,
         },
         score: scoreDifficulty(metrics),
       })

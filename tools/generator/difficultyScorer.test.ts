@@ -9,6 +9,7 @@ function baseMetrics(overrides: Partial<DifficultyMetrics> = {}): DifficultyMetr
     groupsUsed: 0,
     expandedStates: 0,
     maxFrontierSize: 0,
+    pushMoveCount: 0,
     ...overrides,
   }
 }
@@ -20,6 +21,7 @@ test('scoreDifficulty weighs each metric as an independent additive contribution
   expect(scoreDifficulty(baseMetrics({ groupsUsed: 1 }))).toBeGreaterThan(base)
   expect(scoreDifficulty(baseMetrics({ crossingMoveCount: 1 }))).toBeGreaterThan(base)
   expect(scoreDifficulty(baseMetrics({ expandedStates: 100 }))).toBeGreaterThan(base)
+  expect(scoreDifficulty(baseMetrics({ pushMoveCount: 1 }))).toBeGreaterThan(base)
 })
 
 test('checkHardRequirements reports exactly which requirement a near-miss candidate failed', () => {

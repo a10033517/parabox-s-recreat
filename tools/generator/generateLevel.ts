@@ -51,6 +51,13 @@ function candidateWeight(
   weights: GeneratorWeights,
 ): number {
   let weight = weights[kind]
+  // A 'push' candidate where nothing but the player moved is just plain
+  // walking — the cheapest, always-available candidate at almost every
+  // step, so without this bonus the walk defaults to it constantly and
+  // generated levels end up mechanically identical (walk + eat, nothing
+  // else). Rewarding a push that actually displaces a real piece pushes
+  // generation toward genuine Sokoban-style box manipulation instead.
+  if (kind === 'push' && moved.length > 1) weight += weights.boxPushBonus
   for (const group of groups) {
     if (!moved.includes(group.containerId) && !moved.includes(group.boxId)) continue
     const touches = touchCounts.get(group.containerId) ?? 0

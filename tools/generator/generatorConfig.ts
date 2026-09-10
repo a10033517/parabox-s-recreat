@@ -10,6 +10,13 @@ export interface GeneratorWeights {
   // uniform-random direction rarely let the walk reach a second isolated
   // group within budget, capping survivingGroupCount near 2.
   groupSeekBias: number
+  // Extra weight for a 'push' candidate that actually moves a real piece
+  // (not just the player walking with nothing in front of it). Added
+  // alongside pushMoveCount (see difficultyScorer.ts) per user feedback
+  // that generated levels felt mechanically identical — this biases the
+  // reverse walk toward genuine box-manipulation instead of the plain
+  // walk that's otherwise always the cheapest available candidate.
+  boxPushBonus: number
 }
 
 // Phase-5 diagnostics (see the full design spec's §6.3, §14 point 5) found
@@ -44,6 +51,7 @@ export interface GeneratorConfig {
     survivingGroupWeight: number
     groupsUsedWeight: number
     expandedStatesLogWeight: number
+    pushMoveWeight: number
   }
   hard: {
     minMoveCount: number
@@ -84,6 +92,7 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
     newGroupBonus: 3.0,
     repeatedGroupWeight: 1.0,
     groupSeekBias: 4.0,
+    boxPushBonus: 2.0,
   },
   seedProfile: {
     fourGroupProbability: 0.5,
@@ -101,6 +110,7 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
     survivingGroupWeight: 8,
     groupsUsedWeight: 5,
     expandedStatesLogWeight: 2,
+    pushMoveWeight: 2,
   },
   // Retuned from the spec's initial values (minMoveCount 20, minScore 25)
   // after the mandatory diagnostic pass (§12): across two empirical

@@ -1,6 +1,6 @@
 import { Cell, World } from '../../src/game/engine/types'
 import { BUILTIN_LEVELS } from '../../src/levels'
-import { countCrossingMoves, countEatMoves, countGroupsUsed, solve } from './solver'
+import { countCrossingMoves, countEatMoves, countGroupsUsed, countPushMoves, solve } from './solver'
 import { SeedGroup } from './seed'
 
 function makeSquareCells(size: number, fill: () => { type: 'floor' | 'wall'; requirement?: 'box' | 'player' }) {
@@ -138,6 +138,50 @@ function makeEatWorld(): World {
     },
   }
 }
+
+test('countPushMoves counts a same-board box push and ignores plain player-only movement', () => {
+  const root = { id: 'root', size: 5, cells: makeSquareCells(5, () => ({ type: 'floor' as const })) }
+  const world: World = {
+    boards: { root },
+    pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
+    locations: { player: { board: 'root', x: 0, y: 2 }, box1: { board: 'root', x: 1, y: 2 } },
+  }
+  // 'right' pushes box1 one cell — a genuine same-board push.
+  expect(countPushMoves(world, ['right'])).toBe(1)
+
+  const emptyWorld: World = {
+    boards: { root },
+    pieces: { player: { id: 'player', kind: 'player' } },
+    locations: { player: { board: 'root', x: 0, y: 2 } },
+  }
+  // Plain player movement with nothing to push counts as 0.
+  expect(countPushMoves(emptyWorld, ['right'])).toBe(0)
+})
+
+test('countPushMoves counts the container advancing during an eat, separately from the box crossing', () => {
+  const root = { id: 'root', size: 6, cells: makeSquareCells(6, () => ({ type: 'floor' as const })) }
+  root.cells[2][4] = { type: 'wall' }
+  const inside = { id: 'inside', size: 3, cells: makeSquareCells(3, () => ({ type: 'floor' as const })) }
+  const world: World = {
+    boards: { root, inside },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      container1: { id: 'container1', kind: 'container', boardRef: 'inside' },
+      box1: { id: 'box1', kind: 'normal' },
+    },
+    locations: {
+      player: { board: 'root', x: 1, y: 2 },
+      container1: { board: 'root', x: 2, y: 2 },
+      box1: { board: 'root', x: 3, y: 2 },
+    },
+  }
+  // Same eat scenario as the countEatMoves test below (§2's hand-trace):
+  // container1 advances from (2,2) to (3,2) on the SAME board — a genuine
+  // push — while box1 separately crosses onto 'inside' (counted by
+  // countEatMoves/countCrossingMoves, not this function). Both are true at
+  // once for this one move, since they're different pieces.
+  expect(countPushMoves(world, ['right'])).toBe(1)
+})
 
 test('countEatMoves counts a real eat interaction and 0 for a push-only solution', () => {
   const eatWorld = makeEatWorld()

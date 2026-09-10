@@ -73,6 +73,35 @@ export function countCrossingMoves(world: World, moves: Direction[]): number {
   return count
 }
 
+// Counts moves where at least one non-player piece changes position while
+// staying on the SAME board — a genuine "pushed a box along the floor"
+// event, distinct from countCrossingMoves (any board change) and
+// countEatMoves (specifically landing inside a container's interior).
+// Added per user feedback that generated levels all looked mechanically
+// the same (walk + eat, nothing else): this measures the previously
+// unmeasured Sokoban-style box-pushing dimension so it can be scored and
+// biased for in generation (see generateLevel.ts's weights.boxPushBonus).
+export function countPushMoves(world: World, moves: Direction[]): number {
+  let current = world
+  let count = 0
+  for (const direction of moves) {
+    const next = applyMove(current, direction)
+    if (!next) throw new Error('countPushMoves received an invalid move for this world')
+    for (const pieceId of Object.keys(current.locations)) {
+      if (pieceId === PLAYER_ID) continue
+      const before = current.locations[pieceId]
+      const after = next.locations[pieceId]
+      if (before.board !== after.board) continue // crossing/eat, not a plain push
+      if (before.x !== after.x || before.y !== after.y) {
+        count++
+        break
+      }
+    }
+    current = next
+  }
+  return count
+}
+
 export function countEatMoves(world: World, moves: Direction[]): number {
   const interiorIds = new Set(
     Object.values(world.pieces)

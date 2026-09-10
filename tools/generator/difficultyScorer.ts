@@ -8,6 +8,14 @@ export interface DifficultyMetrics {
   groupsUsed: number
   expandedStates: number
   maxFrontierSize: number
+  // Same-board box-push moves (solver.ts's countPushMoves) — added per user
+  // feedback that generated levels all felt mechanically identical (walk +
+  // eat, nothing else varied): this is the previously-unmeasured Sokoban
+  // dimension. Deliberately NOT added to checkHardRequirements below — this
+  // session's own experience is that every new hard-tier structural
+  // minimum makes the pool sharply harder to fill, so this only influences
+  // scoreDifficulty/ranking, not pass/fail.
+  pushMoveCount: number
 }
 
 export function scoreDifficulty(metrics: DifficultyMetrics): number {
@@ -18,6 +26,7 @@ export function scoreDifficulty(metrics: DifficultyMetrics): number {
     metrics.survivingGroupCount * scoring.survivingGroupWeight +
     metrics.groupsUsed * scoring.groupsUsedWeight +
     metrics.crossingMoveCount * scoring.crossingMoveWeight +
+    metrics.pushMoveCount * scoring.pushMoveWeight +
     Math.log2(metrics.expandedStates + 1) * scoring.expandedStatesLogWeight
   )
 }
