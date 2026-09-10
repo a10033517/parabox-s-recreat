@@ -4,6 +4,12 @@ export interface GeneratorWeights {
   eat: number
   newGroupBonus: number
   repeatedGroupWeight: number
+  // See generateLevel.ts's directionSeekWeights: extra weight given to a
+  // reverse-walk direction that reduces distance to the nearest
+  // still-untouched group's root position. Added after diagnostics found
+  // uniform-random direction rarely let the walk reach a second isolated
+  // group within budget, capping survivingGroupCount near 2.
+  groupSeekBias: number
 }
 
 // Phase-5 diagnostics (see the full design spec's §6.3, §14 point 5) found
@@ -71,6 +77,7 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
     eat: 2.5,
     newGroupBonus: 3.0,
     repeatedGroupWeight: 1.0,
+    groupSeekBias: 4.0,
   },
   seedProfile: {
     fourGroupProbability: 0.5,

@@ -12,6 +12,7 @@ import {
 } from './difficultyScorer'
 import { canonicalKey } from './canonical'
 import { getSurvivingGroups, isGroupUntouched, pruneUntouchedGoals } from './pruneUntouchedGoals'
+import { trimUnusedCells } from './trimUnusedCells'
 import { GENERATOR_CONFIG } from './generatorConfig'
 
 export type Tier = 'easy' | 'medium' | 'hard'
@@ -61,16 +62,17 @@ export interface HardCandidate {
 }
 
 // Tuning history: MAX_ATTEMPTS was 500, then raised to 1000 in sub-project
-// 4b. The mandatory diagnostic pass (section 12) for this redesign measured
-// the real hard-candidate rate at roughly 0.5-1% of attempts even under the
-// hard-biased seed profile (structurally hard multi-group survival is rare
-// — see generatorConfig.ts's own comment on the retuned `hard` thresholds).
-// Raised to 2000 so a real batch run has good odds of collecting
-// targetPerTier(5) hard candidates once the hard-biased profile kicks in
-// (roughly 90%+ of attempts, once easy/medium are filled) — at the
-// diagnosed ~110ms/attempt this costs a few minutes of wall-clock for the
-// one-off generation script, not shipped runtime code.
-const MAX_ATTEMPTS = 2000
+// 4b, then 2000 in this redesign's own diagnostic pass (section 12): the
+// real hard-candidate rate is rare (roughly 0.5-1% of attempts, high
+// run-to-run variance) even under the hard-biased seed profile — see
+// generatorConfig.ts's own comment on the retuned `hard` thresholds.
+// Raised again to 5000 after adding directionSeekWeights (generateLevel.ts)
+// — a real 2000-attempt run found anywhere from 0 to 13 hard candidates
+// depending on rng luck, so a bigger budget buys more consistent odds of
+// clearing targetPerTier(5). At the diagnosed ~100-200ms/attempt this costs
+// on the order of 10-15 minutes of wall-clock for the one-off generation
+// script, not shipped runtime code.
+const MAX_ATTEMPTS = 5000
 
 export function profileDistance(a: DifficultyProfile, b: DifficultyProfile): number {
   const term = (x: number, y: number, scale: number) => Math.abs(x - y) / scale
@@ -205,6 +207,22 @@ export function generateLevelBatch(
     }
     const tier = difficultyTier(metrics)
 
+    // Cosmetic-only pass (see trimUnusedCells.ts's own comment for the proof
+    // this can't change any metric above): walls off floor cells the solved
+    // path never visits. Done after scoring so every metric is measured
+    // against the exact world solve() actually searched, not a
+    // pre-emptively trimmed one.
+    const shippedWorld = trimUnusedCells(world, solved.moves)
+    // Trimming can (rarely) make two otherwise-distinct seeds converge to
+    // the same playable puzzle once their unused decoration is stripped —
+    // re-check uniqueness on the shipped (trimmed) board, not just the
+    // pre-trim `levelKey` already checked above.
+    const shippedKey = canonicalKey(shippedWorld)
+    if (seenLevels.has(shippedKey)) {
+      stats.discardedDuplicate++
+      continue
+    }
+
     if (tier !== 'hard') {
       const check = checkHardRequirements(metrics)
       if (!check.meetsMinMoveCount) stats.rejectedTooShort++
@@ -220,9 +238,10 @@ export function generateLevelBatch(
         continue
       }
       seenLevels.add(levelKey)
+      seenLevels.add(shippedKey)
       hardCandidates.push({
-        world,
-        json: JSON.stringify(serializeLevel(world)),
+        world: shippedWorld,
+        json: JSON.stringify(serializeLevel(shippedWorld)),
         profile: {
           moveCount: metrics.moveCount,
           crossingMoveCount: metrics.crossingMoveCount,
@@ -243,7 +262,7 @@ export function generateLevelBatch(
 
     seenLevels.add(levelKey)
     counts[tier]++
-    results.push({ tier, world, json: JSON.stringify(serializeLevel(world)) })
+    results.push({ tier, world: shippedWorld, json: JSON.stringify(serializeLevel(shippedWorld)) })
   }
 
   for (const candidate of selectDiverseTopN(hardCandidates, targetPerTier)) {

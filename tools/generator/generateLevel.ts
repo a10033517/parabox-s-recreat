@@ -1,4 +1,4 @@
-import { Direction, World, cloneWorld } from '../../src/game/engine/types'
+import { Direction, PLAYER_ID, World, cloneWorld, step } from '../../src/game/engine/types'
 import { inverseEat, inverseEnter, inversePush } from './inverseMoves'
 import { canonicalKey } from './canonical'
 import { SeedGroup } from './seed'
@@ -71,6 +71,52 @@ function weightedPick<T>(items: { weight: number; value: T }[], rng: () => numbe
   return items[items.length - 1].value
 }
 
+function manhattan(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
+}
+
+// Diagnostics (see the full design spec's §12, and the follow-up session
+// that added this) found survivingGroupCount rarely exceeded 2 even under
+// the hard-biased seed profile: direction was previously drawn uniformly at
+// random every step, uninformed by where any other group actually sits, so
+// a walk on the 12x12 root board rarely diffused far enough within budget
+// to reach a second group's isolated 5x5 slot at all. This gives a
+// direction extra weight (`1 + groupSeekBias`, never a hard requirement —
+// every direction stays reachable) when it strictly reduces the player's
+// Manhattan distance to the nearest still-untouched group's root position.
+// Once every group has been touched at least once, `targets` is empty and
+// this returns to pure uniform weighting — this only shortens the "travel"
+// phase toward a first contact, it never influences what happens once
+// there (that's still candidateWeight's job).
+//
+// Exported as a pure function (no rng) specifically so it's unit-testable
+// without needing to drive weightedPick's random draw.
+export function directionSeekWeights(
+  playerPos: { x: number; y: number },
+  targets: { x: number; y: number }[],
+  groupSeekBias: number,
+): { direction: Direction; weight: number }[] {
+  if (targets.length === 0) {
+    return DIRECTIONS.map((direction) => ({ direction, weight: 1 }))
+  }
+  const distanceFrom = (p: { x: number; y: number }) => Math.min(...targets.map((t) => manhattan(p, t)))
+  const baseline = distanceFrom(playerPos)
+  return DIRECTIONS.map((direction) => {
+    const next = step(playerPos.x, playerPos.y, direction)
+    const improves = distanceFrom(next) < baseline
+    return { direction, weight: improves ? 1 + groupSeekBias : 1 }
+  })
+}
+
+function untouchedGroupPositions(
+  groups: SeedGroup[],
+  touchCounts: Map<string, number>,
+): { x: number; y: number }[] {
+  return groups
+    .filter((group) => (touchCounts.get(group.containerId) ?? 0) === 0)
+    .map((group) => group.originalPosition)
+}
+
 export function generateLevel(
   seed: World,
   groups: SeedGroup[],
@@ -88,7 +134,15 @@ export function generateLevel(
 
   while (events.length < steps && attempts < maxAttempts) {
     attempts++
-    const direction = DIRECTIONS[Math.floor(rng() * DIRECTIONS.length) % DIRECTIONS.length]
+    // Direction bias only applies on 'root' — inside an interior there is
+    // no other group to seek, so uniform weighting (targets: []) applies.
+    const playerLoc = world.locations[PLAYER_ID]
+    const targets = playerLoc.board === 'root' ? untouchedGroupPositions(groups, touchCounts) : []
+    const directionWeights = directionSeekWeights(playerLoc, targets, weights.groupSeekBias)
+    const direction = weightedPick(
+      directionWeights.map((d) => ({ weight: d.weight, value: d.direction })),
+      rng,
+    )
 
     const candidates: { kind: GenerationEventKind; world: World; moved: string[] }[] = []
     for (const pattern of PATTERNS) {

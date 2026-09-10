@@ -2,7 +2,7 @@ import { applyMove } from '../../src/game/engine/rules'
 import { World } from '../../src/game/engine/types'
 import { canonicalKey } from './canonical'
 import { createSeedWorld } from './seed'
-import { generateLevel } from './generateLevel'
+import { directionSeekWeights, generateLevel } from './generateLevel'
 import { GENERATOR_CONFIG } from './generatorConfig'
 
 function seededRng(startSeed: number): () => number {
@@ -79,6 +79,32 @@ test('a push event is recorded with the direction that produced it', () => {
   const event = result!.events[0]
   expect(event.kind).toBe('push')
   expect(event.direction).toBe('up')
+})
+
+test('directionSeekWeights returns uniform weights when there is no untouched-group target', () => {
+  const weights = directionSeekWeights({ x: 3, y: 3 }, [], 4.0)
+  expect(weights.every((w) => w.weight === 1)).toBe(true)
+  expect(weights.map((w) => w.direction).sort()).toEqual(['down', 'left', 'right', 'up'])
+})
+
+test('directionSeekWeights favors exactly the directions that reduce distance to the nearest target', () => {
+  // Target due right of the player: only 'right' strictly reduces Manhattan
+  // distance; 'up'/'down' keep it the same, 'left' increases it.
+  const weights = directionSeekWeights({ x: 2, y: 2 }, [{ x: 8, y: 2 }], 4.0)
+  const byDirection = Object.fromEntries(weights.map((w) => [w.direction, w.weight]))
+  expect(byDirection.right).toBe(5) // 1 + groupSeekBias
+  expect(byDirection.up).toBe(1)
+  expect(byDirection.down).toBe(1)
+  expect(byDirection.left).toBe(1)
+})
+
+test('directionSeekWeights seeks the nearest of multiple targets', () => {
+  // One target close above, one far below — only the close one should
+  // determine which direction gets the bonus.
+  const weights = directionSeekWeights({ x: 5, y: 5 }, [{ x: 5, y: 2 }, { x: 5, y: 50 }], 4.0)
+  const byDirection = Object.fromEntries(weights.map((w) => [w.direction, w.weight]))
+  expect(byDirection.up).toBe(5)
+  expect(byDirection.down).toBe(1)
 })
 
 test('candidateWeight favors a candidate touching an as-yet-untouched group via the newGroupBonus', () => {
