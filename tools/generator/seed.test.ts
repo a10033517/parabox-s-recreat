@@ -17,10 +17,11 @@ function sequenceRng(values: number[]): () => number {
 // *expected* positions independently of the implementation under test.
 const GRID_COLS = 2
 const SLOT_SIZE = 5
+const SLOT_CENTER_OFFSET = Math.floor(SLOT_SIZE / 2)
 function slotCenter(index: number): { x: number; y: number } {
   const row = Math.floor(index / GRID_COLS)
   const col = index % GRID_COLS
-  return { x: 1 + col * SLOT_SIZE + 2, y: 1 + row * SLOT_SIZE + 2 }
+  return { x: 1 + col * SLOT_SIZE + SLOT_CENTER_OFFSET, y: 1 + row * SLOT_SIZE + SLOT_CENTER_OFFSET }
 }
 
 // This one sequence is reused across most tests below. Call order per

@@ -7,6 +7,15 @@ import { HALF } from '../../src/game/engine/fraction'
 import { GENERATOR_CONFIG, SeedProfile } from './generatorConfig'
 
 const GRID_COLS = 2
+// Tried and reverted: bumping this to 7 (root=16) to lengthen moveCount via
+// more travel distance made things strictly worse — a 600-attempt
+// diagnostic went from 39 solved candidates down to 5, and moveCount
+// actually got *shorter* (p50 5 vs 7-10), not longer: a bigger board makes
+// completing a full-length reverse walk within its attempt budget harder,
+// so only the simplest, shortest-traveling walks survive to become solved
+// candidates at all (survivorship bias working against the intended
+// effect). Left at 5 (root=12), the value this generator has actually been
+// validated against.
 const SLOT_SIZE = 5
 const ROOT_SIZE = 2 + GRID_COLS * SLOT_SIZE // = 12
 // GRID_COLS(2) x 2 rows, matching ROOT_SIZE's own derivation (groupCount is

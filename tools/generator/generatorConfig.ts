@@ -66,6 +66,12 @@ export interface GeneratorConfig {
   // observed in diagnostics (worst sampled: ~2500 expanded / ~4300
   // visited), so it only ever trims genuine pathological outliers.
   maxSolverExpandedStates: number
+  // See trimUnusedCells.ts: BFS-graph-distance margin (in existing-floor
+  // cells) kept around the solved path before the rest gets walled off. 0
+  // reproduces the original bare-single-corridor behavior; user feedback
+  // after playing the first trimmed batch was that a bare corridor read as
+  // "only one path" — this keeps real maneuvering/wrong-turn room instead.
+  trimBufferRadius: number
 }
 
 export const GENERATOR_CONFIG: GeneratorConfig = {
@@ -117,4 +123,5 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
   hardCandidatePoolSize: 60,
   diversityWeight: 10,
   maxSolverExpandedStates: 5000,
+  trimBufferRadius: 2,
 }
