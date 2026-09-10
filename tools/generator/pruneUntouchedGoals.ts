@@ -1,20 +1,32 @@
 import { World, cloneWorld, PLAYER_ID } from '../../src/game/engine/types'
 import { SeedGroup } from './seed'
-import { GenerationEvent } from './generateLevel'
 
-export function computeTouchedGroups(events: GenerationEvent[], groups: SeedGroup[]): Set<string> {
-  const touchedPieceIds = new Set<string>()
-  for (const event of events) {
-    for (const id of event.affectedPieceIds) touchedPieceIds.add(id)
-  }
+// A group is untouched iff its box still sits exactly where the seed placed
+// it, on its own interior board — a one-way-door check (see the full design
+// spec's section 4.2): nothing but a real eat/inverse-eat move ever changes
+// the box's board or position, and once it leaves its interior nothing ever
+// puts it back. Exported because section 4.6's Approach-A invariant check
+// reuses this exact condition rather than re-deriving it.
+export function isGroupUntouched(world: World, group: SeedGroup): boolean {
+  const loc = world.locations[group.boxId]
+  return (
+    loc.board === group.interiorId &&
+    loc.x === group.boxOriginalPosition.x &&
+    loc.y === group.boxOriginalPosition.y
+  )
+}
 
-  const touched = new Set<string>()
-  for (const group of groups) {
-    if (touchedPieceIds.has(group.containerId) || touchedPieceIds.has(group.boxId)) {
-      touched.add(group.containerId)
-    }
-  }
-  return touched
+// Groups whose pieces and interior board still exist in `world` after
+// pruning. Every metric that iterates groups against a post-pruning World
+// must use this, not the original seed's full `groups` array — see section
+// 4.6 for the crash this fixes.
+export function getSurvivingGroups(world: World, groups: SeedGroup[]): SeedGroup[] {
+  return groups.filter(
+    (group) =>
+      world.pieces[group.containerId] !== undefined &&
+      world.pieces[group.boxId] !== undefined &&
+      world.boards[group.interiorId] !== undefined,
+  )
 }
 
 function removeGroup(world: World, group: SeedGroup): World {
@@ -23,18 +35,14 @@ function removeGroup(world: World, group: SeedGroup): World {
   for (const [pieceId, loc] of Object.entries(next.locations)) {
     if (loc.board !== group.interiorId) continue
     if (pieceId === PLAYER_ID) {
-      // Provably unreachable today: the player's board never leaves
-      // 'root' for the whole reverse walk (none of the three reverse
-      // functions can put the player on an interior board starting from
-      // a root-seeded walk), so this branch should never execute in
-      // practice. Kept as a loud failure rather than removed, so that if
-      // a future change to inverseMoves.ts/generateLevel.ts ever breaks
-      // that invariant, it surfaces immediately instead of silently
-      // corrupting the World.
+      // Provably unreachable today (see the full design spec's section 4.2)
+      // — kept as a loud failure rather than removed, so a future change to
+      // inverseMoves.ts/generateLevel.ts that breaks that invariant
+      // surfaces immediately instead of silently corrupting the World.
       throw new Error(
         `pruneUntouchedGoals: refusing to remove group ${group.containerId} — ` +
-          'the player is inside its interior. This indicates computeTouchedGroups ' +
-          'failed to mark this group as touched.',
+          'the player is inside its interior. This indicates isGroupUntouched ' +
+          'incorrectly classified a live group as untouched.',
       )
     }
     delete next.pieces[pieceId]
@@ -43,20 +51,16 @@ function removeGroup(world: World, group: SeedGroup): World {
   delete next.boards[group.interiorId]
   delete next.pieces[group.boxId]
   delete next.locations[group.boxId]
-
-  const containerLoc = next.locations[group.containerId]
-  const board = next.boards[containerLoc.board]
-  board.cells[containerLoc.y][containerLoc.x] = { type: board.cells[containerLoc.y][containerLoc.x].type }
   delete next.pieces[group.containerId]
   delete next.locations[group.containerId]
 
   return next
 }
 
-export function pruneUntouchedGoals(world: World, groups: SeedGroup[], touchedGroups: ReadonlySet<string>): World {
+export function pruneUntouchedGoals(world: World, groups: SeedGroup[]): World {
   let next = world
   for (const group of groups) {
-    if (touchedGroups.has(group.containerId)) continue
+    if (!isGroupUntouched(next, group)) continue
     next = removeGroup(next, group)
   }
   return next

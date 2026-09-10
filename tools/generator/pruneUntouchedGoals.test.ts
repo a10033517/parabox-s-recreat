@@ -1,15 +1,15 @@
 import { World, Cell, PLAYER_ID } from '../../src/game/engine/types'
 import { parseLevel, serializeLevel } from '../../src/game/engine/levelSchema'
 import { SeedGroup } from './seed'
-import { GenerationEvent } from './generateLevel'
-import { computeTouchedGroups, pruneUntouchedGoals } from './pruneUntouchedGoals'
+import { getSurvivingGroups, isGroupUntouched, pruneUntouchedGoals } from './pruneUntouchedGoals'
 
-function makeGroup(i: number, x: number, y: number): SeedGroup {
+function makeGroup(i: number, x: number, y: number, boxX = 1, boxY = 1): SeedGroup {
   return {
     containerId: `goal${i}`,
     boxId: `box${i}`,
     interiorId: `goal${i}Inside`,
     originalPosition: { x, y },
+    boxOriginalPosition: { x: boxX, y: boxY },
   }
 }
 
@@ -20,8 +20,6 @@ function makeSmallBoard(id: string, size: number) {
 function makeTwoGroupWorld(): World {
   const size = 12
   const cells: Cell[][] = Array.from({ length: size }, () => Array.from({ length: size }, () => ({ type: 'floor' as const })))
-  cells[3][3] = { type: 'floor', requirement: 'box' }
-  cells[8][8] = { type: 'floor', requirement: 'box' }
   return {
     boards: {
       root: { id: 'root', size, cells },
@@ -45,63 +43,64 @@ function makeTwoGroupWorld(): World {
   }
 }
 
-test('computeTouchedGroups marks a group touched via its containerId', () => {
-  const groups = [makeGroup(0, 3, 3), makeGroup(1, 8, 8)]
-  const events: GenerationEvent[] = [
-    { kind: 'push', direction: 'right', affectedPieceIds: ['player', 'goal1'] },
-  ]
-  const touched = computeTouchedGroups(events, groups)
-  expect(touched.has('goal1')).toBe(true)
-  expect(touched.has('goal0')).toBe(false)
+test('isGroupUntouched is true when the box is still at its seed interior position', () => {
+  const world = makeTwoGroupWorld()
+  const group = makeGroup(0, 3, 3)
+  expect(isGroupUntouched(world, group)).toBe(true)
 })
 
-test('computeTouchedGroups marks a group touched via its boxId alone', () => {
-  const groups = [makeGroup(0, 3, 3), makeGroup(1, 8, 8)]
-  const events: GenerationEvent[] = [
-    { kind: 'eat', direction: 'right', affectedPieceIds: ['box1'] },
-  ]
-  const touched = computeTouchedGroups(events, groups)
-  expect(touched.has('goal1')).toBe(true)
-  expect(touched.has('goal0')).toBe(false)
+test('isGroupUntouched is false once the box has left its seed interior position', () => {
+  const world = makeTwoGroupWorld()
+  world.locations.box1 = { board: 'root', x: 5, y: 3 } // eaten out to root
+  const group = makeGroup(1, 8, 8)
+  expect(isGroupUntouched(world, group)).toBe(false)
 })
 
-test('computeTouchedGroups keeps a group touched even if only an early event moved it', () => {
-  const groups = [makeGroup(0, 3, 3), makeGroup(1, 8, 8)]
-  const events: GenerationEvent[] = [
-    { kind: 'push', direction: 'right', affectedPieceIds: ['player', 'goal0'] },
-    { kind: 'push', direction: 'left', affectedPieceIds: ['player'] },
-    { kind: 'push', direction: 'up', affectedPieceIds: ['player'] },
-  ]
-  const touched = computeTouchedGroups(events, groups)
-  expect(touched.has('goal0')).toBe(true)
-  expect(touched.has('goal1')).toBe(false)
+test('isGroupUntouched is false if the box moved within the same interior board', () => {
+  const world = makeTwoGroupWorld()
+  world.locations.box1 = { board: 'goal1Inside', x: 2, y: 2 }
+  const group = makeGroup(1, 8, 8, 1, 1)
+  expect(isGroupUntouched(world, group)).toBe(false)
 })
 
 test('pruneUntouchedGoals removes an untouched group and keeps a touched one', () => {
   const world = makeTwoGroupWorld()
-  world.locations.goal1 = { board: 'root', x: 5, y: 3 } // moved away from (8,8)
+  world.locations.box1 = { board: 'root', x: 5, y: 3 } // eaten out — group1 touched
   const groups = [makeGroup(0, 3, 3), makeGroup(1, 8, 8)]
-  const touched = new Set(['goal1'])
 
-  const result = pruneUntouchedGoals(world, groups, touched)
+  const result = pruneUntouchedGoals(world, groups)
 
   expect(result.pieces.goal0).toBeUndefined()
   expect(result.locations.goal0).toBeUndefined()
   expect(result.pieces.box0).toBeUndefined()
   expect(result.locations.box0).toBeUndefined()
   expect(result.boards.goal0Inside).toBeUndefined()
-  expect(result.boards.root.cells[3][3].requirement).toBeUndefined()
 
   expect(result.pieces.goal1).toBeDefined()
-  expect(result.locations.goal1).toEqual({ board: 'root', x: 5, y: 3 })
+  expect(result.locations.box1).toEqual({ board: 'root', x: 5, y: 3 })
   expect(result.boards.goal1Inside).toBeDefined()
-  expect(result.pieces.box1).toBeDefined()
+})
+
+test('getSurvivingGroups returns exactly the groups whose pieces/board still exist', () => {
+  const world = makeTwoGroupWorld()
+  world.locations.box1 = { board: 'root', x: 5, y: 3 }
+  const groups = [makeGroup(0, 3, 3), makeGroup(1, 8, 8)]
+  const pruned = pruneUntouchedGoals(world, groups)
+  const survivors = getSurvivingGroups(pruned, groups)
+  expect(survivors.map((g) => g.containerId)).toEqual(['goal1'])
+})
+
+test('getSurvivingGroups returns an empty list when every group was pruned', () => {
+  const world = makeTwoGroupWorld()
+  const groups = [makeGroup(0, 3, 3), makeGroup(1, 8, 8)]
+  const pruned = pruneUntouchedGoals(world, groups)
+  expect(getSurvivingGroups(pruned, groups)).toEqual([])
 })
 
 test('pruneUntouchedGoals leaves the player untouched', () => {
   const world = makeTwoGroupWorld()
   const groups = [makeGroup(0, 3, 3), makeGroup(1, 8, 8)]
-  const result = pruneUntouchedGoals(world, groups, new Set())
+  const result = pruneUntouchedGoals(world, groups)
   expect(result.pieces[PLAYER_ID]).toBeDefined()
   expect(result.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 1 })
 })
@@ -109,7 +108,7 @@ test('pruneUntouchedGoals leaves the player untouched', () => {
 test('pruneUntouchedGoals removing every group still passes parseLevel', () => {
   const world = makeTwoGroupWorld()
   const groups = [makeGroup(0, 3, 3), makeGroup(1, 8, 8)]
-  const result = pruneUntouchedGoals(world, groups, new Set())
+  const result = pruneUntouchedGoals(world, groups)
   expect(Object.keys(result.pieces)).toEqual([PLAYER_ID])
   expect(() => parseLevel(serializeLevel(result))).not.toThrow()
 })
@@ -121,5 +120,5 @@ test('removeGroup refuses to delete the player and throws instead', () => {
   // exercise the defensive check.
   world.locations.player = { board: 'goal0Inside', x: 0, y: 0 }
   const groups = [makeGroup(0, 3, 3), makeGroup(1, 8, 8)]
-  expect(() => pruneUntouchedGoals(world, groups, new Set())).toThrow(/refusing to remove group goal0/)
+  expect(() => pruneUntouchedGoals(world, groups)).toThrow(/refusing to remove group goal0/)
 })

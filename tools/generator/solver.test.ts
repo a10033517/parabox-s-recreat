@@ -1,6 +1,7 @@
 import { Cell, World } from '../../src/game/engine/types'
 import { BUILTIN_LEVELS } from '../../src/levels'
-import { countCrossingMoves, solve } from './solver'
+import { countCrossingMoves, countEatMoves, countGroupsUsed, solve } from './solver'
+import { SeedGroup } from './seed'
 
 function makeSquareCells(size: number, fill: () => { type: 'floor' | 'wall'; requirement?: 'box' | 'player' }) {
   return Array.from({ length: size }, () => Array.from({ length: size }, fill))
@@ -21,7 +22,11 @@ test('solve returns an empty path for an already-won world', () => {
     pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
     locations: { player: { board: 'root', x: 0, y: 1 }, box1: { board: 'root', x: 2, y: 1 } },
   }
-  expect(solve(world)).toEqual([])
+  const result = solve(world)
+  expect(result).not.toBeNull()
+  expect(result!.moves).toEqual([])
+  expect(result!.expandedStates).toBe(0)
+  expect(result!.visitedStates).toBe(1)
 })
 
 test('solve finds a single-move solution', () => {
@@ -39,7 +44,12 @@ test('solve finds a single-move solution', () => {
     pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
     locations: { player: { board: 'root', x: 0, y: 1 }, box1: { board: 'root', x: 1, y: 1 } },
   }
-  expect(solve(world)).toEqual(['right'])
+  const result = solve(world)
+  expect(result).not.toBeNull()
+  expect(result!.moves).toEqual(['right'])
+  expect(result!.expandedStates).toBeGreaterThanOrEqual(0)
+  expect(result!.maxFrontierSize).toBeGreaterThanOrEqual(1)
+  expect(result!.visitedStates).toBeGreaterThanOrEqual(1)
 })
 
 test('solve returns null when no solution exists', () => {
@@ -75,8 +85,8 @@ test('solve finds the shortest path even when a longer alternate route also exis
   // alternate route also exists (go around via row 0 or row 4 and approach
   // from the other side), which takes strictly more moves. BFS must return
   // the short one.
-  const solution = solve(world)
-  expect(solution).toEqual(['right', 'right'])
+  const result = solve(world)
+  expect(result!.moves).toEqual(['right', 'right'])
 })
 
 test('countCrossingMoves returns 0 for a plain push with no board change', () => {
@@ -107,9 +117,63 @@ test('countCrossingMoves counts a move where a piece changes board', () => {
   expect(countCrossingMoves(world, ['right'])).toBe(1)
 })
 
+function makeEatWorld(): World {
+  // player -> container -> box -> wall, four cells in a row. Pushing right
+  // forces the box to be eaten into the container's interior (see the full
+  // design spec's section 2 hand-trace).
+  const root = { id: 'root', size: 6, cells: makeSquareCells(6, () => ({ type: 'floor' as const })) }
+  root.cells[2][4] = { type: 'wall' }
+  const inside = { id: 'inside', size: 3, cells: makeSquareCells(3, () => ({ type: 'floor' as const })) }
+  return {
+    boards: { root, inside },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      container1: { id: 'container1', kind: 'container', boardRef: 'inside' },
+      box1: { id: 'box1', kind: 'normal' },
+    },
+    locations: {
+      player: { board: 'root', x: 1, y: 2 },
+      container1: { board: 'root', x: 2, y: 2 },
+      box1: { board: 'root', x: 3, y: 2 },
+    },
+  }
+}
+
+test('countEatMoves counts a real eat interaction and 0 for a push-only solution', () => {
+  const eatWorld = makeEatWorld()
+  expect(countEatMoves(eatWorld, ['right'])).toBe(1)
+
+  const pushOnly: World = {
+    boards: { root: { id: 'root', size: 3, cells: makeSquareCells(3, () => ({ type: 'floor' as const })) } },
+    pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
+    locations: { player: { board: 'root', x: 0, y: 1 }, box1: { board: 'root', x: 1, y: 1 } },
+  }
+  expect(countEatMoves(pushOnly, ['right'])).toBe(0)
+})
+
+test('countGroupsUsed counts a group whose container or box moved, and does not throw on a group missing from the world', () => {
+  const eatWorld = makeEatWorld()
+  const realGroup: SeedGroup = {
+    containerId: 'container1', boxId: 'box1', interiorId: 'inside',
+    originalPosition: { x: 2, y: 2 }, boxOriginalPosition: { x: 1, y: 1 },
+  }
+  const missingGroup: SeedGroup = {
+    containerId: 'ghost', boxId: 'ghostBox', interiorId: 'ghostInside',
+    originalPosition: { x: 0, y: 0 }, boxOriginalPosition: { x: 0, y: 0 },
+  }
+
+  // Filtered to survivors only — the intended usage.
+  expect(countGroupsUsed(eatWorld, ['right'], [realGroup])).toBe(1)
+
+  // Unfiltered, including a group whose pieces don't exist in this world —
+  // the defensive-guard regression test for the crash the review caught.
+  expect(() => countGroupsUsed(eatWorld, ['right'], [realGroup, missingGroup])).not.toThrow()
+  expect(countGroupsUsed(eatWorld, ['right'], [realGroup, missingGroup])).toBe(1)
+})
+
 test('every builtin level is solvable', () => {
   for (const level of BUILTIN_LEVELS) {
-    const solution = solve(level.world, 100)
-    expect(solution, `level ${level.id} should be solvable`).not.toBeNull()
+    const result = solve(level.world, 100)
+    expect(result, `level ${level.id} should be solvable`).not.toBeNull()
   }
 })
