@@ -1,6 +1,6 @@
 import { Cell, World } from '../../src/game/engine/types'
 import { BUILTIN_LEVELS } from '../../src/levels'
-import { countCrossingMoves, countEatMoves, countGroupsUsed, countPushMoves, solve } from './solver'
+import { countCrossingMoves, countEatMoves, countFillerBoxesUsed, countGroupsUsed, countPushMoves, solve } from './solver'
 import { SeedGroup } from './seed'
 
 function makeSquareCells(size: number, fill: () => { type: 'floor' | 'wall'; requirement?: 'box' | 'player' }) {
@@ -228,6 +228,23 @@ test('countGroupsUsed counts a two-box group as used when only the second box mo
     ],
   }
   expect(countGroupsUsed(eatWorld, ['right'], [twoBoxGroup])).toBe(1)
+})
+
+test('countFillerBoxesUsed counts a filler box only if it actually moves, and does not throw for a missing id', () => {
+  const root = { id: 'root', size: 5, cells: makeSquareCells(5, () => ({ type: 'floor' as const })) }
+  const world: World = {
+    boards: { root },
+    pieces: { player: { id: 'player', kind: 'player' }, filler0: { id: 'filler0', kind: 'normal' }, filler1: { id: 'filler1', kind: 'normal' } },
+    locations: {
+      player: { board: 'root', x: 0, y: 2 },
+      filler0: { board: 'root', x: 1, y: 2 }, // in the push path
+      filler1: { board: 'root', x: 4, y: 4 }, // untouched
+    },
+  }
+  expect(countFillerBoxesUsed(world, ['right'], ['filler0', 'filler1'])).toBe(1)
+  // A ghost id with no piece in this world must not throw (defensive guard,
+  // matching countGroupsUsed's own established pattern).
+  expect(() => countFillerBoxesUsed(world, ['right'], ['filler0', 'ghostFiller'])).not.toThrow()
 })
 
 test('every builtin level is solvable', () => {

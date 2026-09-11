@@ -83,7 +83,7 @@ test('a push event is recorded with the direction that produced it', () => {
 
 test('generateLevel handles a multi-box group end-to-end: reverse replay is unique and reaches the seed', () => {
   const multiBoxProfile = {
-    fourGroupProbability: 0, largeInteriorProbability: 0.5, remoteStartProbability: 0, multiBoxProbability: 1,
+    fourGroupProbability: 0, largeInteriorProbability: 0.5, remoteStartProbability: 0, multiBoxProbability: 1, fillerBoxCount: 0,
   }
   const { world: seed, groups } = createSeedWorld(seededRng(7), multiBoxProfile)
   expect(groups.every((g) => g.boxes.length === 2)).toBe(true)

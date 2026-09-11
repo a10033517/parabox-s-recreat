@@ -4,7 +4,7 @@ import {
 } from '../../src/game/engine/types'
 import { getEntryCell } from '../../src/game/engine/rules'
 import { HALF } from '../../src/game/engine/fraction'
-import { GENERATOR_CONFIG, SeedProfile } from './generatorConfig'
+import { GENERATOR_CONFIG, SeedProfile, assertFillerBoxCount } from './generatorConfig'
 
 const GRID_COLS = 2
 // Tried and reverted: bumping this to 7 (root=16) to lengthen moveCount via
@@ -103,9 +103,28 @@ export function assertValidSeedGroup(group: SeedGroup): void {
   }
 }
 
+// The 4 corners of a SLOT_SIZE x SLOT_SIZE block, in local (offset-from-
+// origin) coordinates. Always safe regardless of that slot's wall
+// direction(s), container position, or whether the player starts there:
+// the container sits at local (center,center), its wall cells are
+// cardinal-adjacent to that (local (center±1,center) or (center,center±1)),
+// and the player candidate is local (center-1,center-1) — none of these
+// are ever a corner (0,0)/(0,SLOT_SIZE-1)/(SLOT_SIZE-1,0)/(SLOT_SIZE-1,SLOT_SIZE-1)
+// for any SLOT_SIZE >= 3, so a corner is always plain, unclaimed floor.
+function getSlotCorner(slotIndex: number, cornerIndex: number): { x: number; y: number } {
+  const origin = getSlotOrigin(slotIndex)
+  const corners: [number, number][] = [[0, 0], [0, SLOT_SIZE - 1], [SLOT_SIZE - 1, 0], [SLOT_SIZE - 1, SLOT_SIZE - 1]]
+  const [cx, cy] = corners[cornerIndex % corners.length]
+  return { x: origin.x + cx, y: origin.y + cy }
+}
+
 export interface SeedResult {
   world: World
   groups: SeedGroup[]
+  // Plain, goal-less pushable boxes (see generatorConfig.ts's own comment
+  // on SeedProfile.fillerBoxCount) — extra reverse-walk material, not
+  // tied to any win condition. Never consulted by pruning.
+  fillerBoxIds: string[]
 }
 
 export function createSeedWorld(
@@ -200,5 +219,19 @@ export function createSeedWorld(
   const { x: playerX, y: playerY } = getSlotCenter(playerSlot)
   locations[PLAYER_ID] = { board: 'root', x: playerX - 1, y: playerY - 1 }
 
-  return { world: { boards, pieces, locations }, groups }
+  // Filler boxes: no rng consumed (deterministic placement), so this never
+  // shifts the RNG contract documented above for group construction.
+  assertFillerBoxCount(profile.fillerBoxCount, 'profile.fillerBoxCount')
+  const fillerBoxIds: string[] = []
+  for (let i = 0; i < profile.fillerBoxCount; i++) {
+    const slotIndex = i % PLAYER_START_SLOTS
+    const cornerIndex = Math.floor(i / PLAYER_START_SLOTS)
+    const { x, y } = getSlotCorner(slotIndex, cornerIndex)
+    const fillerId = `filler${i}`
+    pieces[fillerId] = { id: fillerId, kind: 'normal' }
+    locations[fillerId] = { board: 'root', x, y }
+    fillerBoxIds.push(fillerId)
+  }
+
+  return { world: { boards, pieces, locations }, groups, fillerBoxIds }
 }

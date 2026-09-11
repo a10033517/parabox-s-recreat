@@ -45,6 +45,7 @@ function singleBoxProfile(overrides: Partial<SeedProfile> = {}): SeedProfile {
     largeInteriorProbability: 0.5,
     remoteStartProbability: 0,
     multiBoxProbability: 0,
+    fillerBoxCount: 0,
     ...overrides,
   }
 }
@@ -154,7 +155,7 @@ test('no two groups (or the player) occupy overlapping coordinates on root', () 
 
 test('createSeedWorld respects a passed SeedProfile forcing the 4-group / large-interior branch', () => {
   const forcedProfile: SeedProfile = {
-    fourGroupProbability: 1, largeInteriorProbability: 1, remoteStartProbability: 0, multiBoxProbability: 0,
+    fourGroupProbability: 1, largeInteriorProbability: 1, remoteStartProbability: 0, multiBoxProbability: 0, fillerBoxCount: 0,
   }
   const { world, groups } = createSeedWorld(() => 0.99, forcedProfile)
   expect(groups.length).toBe(4)
@@ -165,7 +166,7 @@ test('createSeedWorld respects a passed SeedProfile forcing the 4-group / large-
 
 test('createSeedWorld respects a passed SeedProfile forcing the 3-group / small-interior branch', () => {
   const forcedProfile: SeedProfile = {
-    fourGroupProbability: 0, largeInteriorProbability: 0, remoteStartProbability: 0, multiBoxProbability: 0,
+    fourGroupProbability: 0, largeInteriorProbability: 0, remoteStartProbability: 0, multiBoxProbability: 0, fillerBoxCount: 0,
   }
   const { world, groups } = createSeedWorld(() => 0.01, forcedProfile)
   expect(groups.length).toBe(3)
@@ -198,7 +199,7 @@ test('player-start position is derived correctly for every active slot and never
 
 test('a remote player start (inactive slot) lands on plain floor and never collides with any group', () => {
   const remoteProfile: SeedProfile = {
-    fourGroupProbability: 0, largeInteriorProbability: 0.5, remoteStartProbability: 1, multiBoxProbability: 0,
+    fourGroupProbability: 0, largeInteriorProbability: 0.5, remoteStartProbability: 1, multiBoxProbability: 0, fillerBoxCount: 0,
   }
   const rng = sequenceRng([
     0.9, // groupCount=3
@@ -214,7 +215,7 @@ test('a remote player start (inactive slot) lands on plain floor and never colli
 
 test('a two-box group has two distinct walls and two distinct requirement cells on its interior', () => {
   const multiBoxProfile: SeedProfile = {
-    fourGroupProbability: 0, largeInteriorProbability: 0.5, remoteStartProbability: 0, multiBoxProbability: 1,
+    fourGroupProbability: 0, largeInteriorProbability: 0.5, remoteStartProbability: 0, multiBoxProbability: 1, fillerBoxCount: 0,
   }
   const rng = sequenceRng([
     0.9, // groupCount=3 (fourGroupProbability=0, draw irrelevant)
@@ -305,6 +306,46 @@ test('pickWallDirs(rng, 2) is exhaustively distinct and consumes exactly two rng
       expect(DIRECTIONS).toContain(second)
     }
   }
+})
+
+test('createSeedWorld places exactly fillerBoxCount plain boxes, each on a distinct safe corner', () => {
+  const profile = singleBoxProfile({ fillerBoxCount: 3 })
+  const { world, fillerBoxIds } = createSeedWorld(ALL_COMBOS_RNG(), profile)
+
+  expect(fillerBoxIds).toEqual(['filler0', 'filler1', 'filler2'])
+  const positions = new Set<string>()
+  for (const id of fillerBoxIds) {
+    expect(world.pieces[id]).toEqual({ id, kind: 'normal' })
+    const loc = world.locations[id]
+    expect(loc.board).toBe('root')
+    expect(world.boards.root.cells[loc.y][loc.x].type).toBe('floor')
+    expect(world.boards.root.cells[loc.y][loc.x].requirement).toBeUndefined()
+    positions.add(`${loc.x},${loc.y}`)
+  }
+  expect(positions.size).toBe(3)
+})
+
+test('filler box positions never collide with any group container/wall cell or the player start', () => {
+  const profile = singleBoxProfile({ fillerBoxCount: 3 })
+  const { world, groups, fillerBoxIds } = createSeedWorld(ALL_COMBOS_RNG(), profile)
+
+  const occupied = new Set<string>([`${world.locations.player.x},${world.locations.player.y}`])
+  for (const group of groups) {
+    occupied.add(`${group.originalPosition.x},${group.originalPosition.y}`)
+    for (const [dx, dy] of wallDeltasAround(group.originalPosition.x, group.originalPosition.y, world.boards.root.cells)) {
+      occupied.add(`${group.originalPosition.x + dx},${group.originalPosition.y + dy}`)
+    }
+  }
+  for (const id of fillerBoxIds) {
+    const loc = world.locations[id]
+    expect(occupied.has(`${loc.x},${loc.y}`)).toBe(false)
+  }
+})
+
+test('fillerBoxCount 0 places no filler boxes', () => {
+  const profile = singleBoxProfile({ fillerBoxCount: 0 })
+  const { fillerBoxIds } = createSeedWorld(ALL_COMBOS_RNG(), profile)
+  expect(fillerBoxIds).toEqual([])
 })
 
 test('the default GENERATOR_CONFIG.seedProfile is the implicit default', () => {

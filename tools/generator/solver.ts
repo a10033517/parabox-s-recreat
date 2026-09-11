@@ -155,3 +155,30 @@ export function countGroupsUsed(world: World, moves: Direction[], groups: SeedGr
   }
   return usedGroups.size
 }
+
+// Counts how many of the seed's filler boxes (see generatorConfig.ts's
+// SeedProfile.fillerBoxCount) actually move at some point during the
+// replayed solution. Filler boxes have no win condition of their own — a
+// solve is never required to touch them — so this is purely a diagnostic
+// measurement of how often they end up genuinely used (matching the user's
+// own stated criterion: "just needs to be usable on the optimal path"),
+// not a difficulty gate.
+export function countFillerBoxesUsed(world: World, moves: Direction[], fillerBoxIds: string[]): number {
+  const usedFillerBoxes = new Set<string>()
+  let current = world
+  for (const direction of moves) {
+    const next = applyMove(current, direction)
+    if (!next) throw new Error('countFillerBoxesUsed received an invalid move for this world')
+    for (const fillerId of fillerBoxIds) {
+      if (usedFillerBoxes.has(fillerId)) continue
+      const before = current.locations[fillerId]
+      const after = next.locations[fillerId]
+      if (!before || !after) continue
+      if (before.board !== after.board || before.x !== after.x || before.y !== after.y) {
+        usedFillerBoxes.add(fillerId)
+      }
+    }
+    current = next
+  }
+  return usedFillerBoxes.size
+}

@@ -42,11 +42,29 @@ export interface SeedProfile {
   // requirement cells instead of 1. Applies uniformly to every group draw
   // in both profiles, exactly like the two probabilities above.
   multiBoxProbability: number
+  // Per user feedback (session follow-up to the multi-box groups spec,
+  // which turned out to be geometrically broken — eating relocates the
+  // container, so a group can never actually need 2 eats): plain,
+  // goal-less pushable boxes seeded on root purely as extra material for
+  // the reverse walk to manipulate. They have no requirement cell and no
+  // pruning logic — whether the final solve actually needs to move one is
+  // an emergent, measured outcome (see solver.ts's countFillerBoxesUsed),
+  // not a generation guarantee, matching the user's own stated criterion
+  // ("only needs to be usable on the optimal path, not have its own
+  // goal"). Must be <= 16 (4 slots x 4 corners each — see seed.ts's
+  // placement scheme).
+  fillerBoxCount: number
 }
 
 export function assertProbability(value: number, name: string): void {
   if (!Number.isFinite(value) || value < 0 || value > 1) {
     throw new Error(`${name} must be a probability in [0, 1], got ${value}`)
+  }
+}
+
+export function assertFillerBoxCount(value: number, name: string): void {
+  if (!Number.isInteger(value) || value < 0 || value > 16) {
+    throw new Error(`${name} must be an integer in [0, 16] (4 slots x 4 corners each), got ${value}`)
   }
 }
 
@@ -110,12 +128,14 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
     largeInteriorProbability: 0.5,
     remoteStartProbability: 0,
     multiBoxProbability: 0.3,
+    fillerBoxCount: 3,
   },
   hardSeedProfile: {
     fourGroupProbability: 0.8,
     largeInteriorProbability: 0.8,
     remoteStartProbability: 0.25,
     multiBoxProbability: 0.5,
+    fillerBoxCount: 3,
   },
   scoring: {
     crossingMoveWeight: 3,
@@ -160,4 +180,5 @@ for (const [profileName, profile] of Object.entries({
   assertProbability(profile.largeInteriorProbability, `${profileName}.largeInteriorProbability`)
   assertProbability(profile.remoteStartProbability, `${profileName}.remoteStartProbability`)
   assertProbability(profile.multiBoxProbability, `${profileName}.multiBoxProbability`)
+  assertFillerBoxCount(profile.fillerBoxCount, `${profileName}.fillerBoxCount`)
 }
