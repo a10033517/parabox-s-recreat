@@ -1,6 +1,7 @@
 import { applyMove } from '../../src/game/engine/rules'
 import { Board, Direction, World, cloneWorld, inBounds } from '../../src/game/engine/types'
 import { GENERATOR_CONFIG } from './generatorConfig'
+import { solve } from './solver'
 
 const NEIGHBOR_DELTAS: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]]
 
@@ -100,40 +101,46 @@ export function trimUnusedCells(
   return trimmed
 }
 
-// Removes any filler box (see generatorConfig.ts's SeedProfile.fillerBoxCount)
-// that never moves at any point while replaying `moves`. Filler boxes have
-// no win condition of their own, so an untouched one contributes nothing to
-// the shipped puzzle except visual clutter — per user feedback ("很多箱子
-// 都用不到" — lots of boxes go unused), only the ones the solve actually
-// relies on are worth shipping. Unlike trimUnusedCells (which only ever
-// changes floor cells to walls), this deletes pieces outright — safe
-// because filler boxes carry no `requirement` and are never referenced by
-// any SeedGroup, so removing an unused one cannot affect checkWin or any
-// other group's solvability.
-export function removeUnusedFillerBoxes(world: World, moves: Direction[], fillerBoxIds: string[]): World {
+// Removes any filler/obstacle box (see generatorConfig.ts's
+// SeedProfile.fillerBoxCount/obstacleBoxProbability) that is not strictly
+// NECESSARY — i.e. some solution of the same optimal length exists that
+// never needs to move it. Per user feedback: checking only "did the ONE
+// solve() result happen to move it" is too weak — solve()'s BFS returns *a*
+// shortest solution, not *the* only one, so a box moved solely in that
+// particular tied-shortest path but skippable via an equally-short
+// alternate path would still read as unused to a player who finds the
+// other path. This tests necessity directly: freeze the box (delete the
+// piece, replace its cell with a wall) and re-solve with the same depth
+// budget. If an equally-short solution still exists, no shortest solution
+// truly depends on this box — remove it. If freezing makes the puzzle
+// strictly harder (or unsolvable within that budget), every shortest
+// solution needs it — keep it.
+//
+// Only called on already-accepted candidates (a handful per batch, not
+// per attempt), so the extra bounded-depth solve() per box is cheap in
+// aggregate despite re-solving from scratch for each one.
+export function removeUnnecessaryFillerBoxes(
+  world: World,
+  fillerBoxIds: string[],
+  optimalLength: number,
+): World {
   const trimmed = cloneWorld(world)
-  const usedFillerIds = new Set<string>()
-
-  let current = world
-  for (const direction of moves) {
-    const next = applyMove(current, direction)
-    if (!next) throw new Error('removeUnusedFillerBoxes received an invalid move for this world')
-    for (const id of fillerBoxIds) {
-      if (usedFillerIds.has(id)) continue
-      const before = current.locations[id]
-      const after = next.locations[id]
-      if (!before || !after) continue
-      if (before.board !== after.board || before.x !== after.x || before.y !== after.y) {
-        usedFillerIds.add(id)
-      }
-    }
-    current = next
-  }
 
   for (const id of fillerBoxIds) {
-    if (usedFillerIds.has(id)) continue
-    delete trimmed.pieces[id]
-    delete trimmed.locations[id]
+    const loc = world.locations[id]
+    if (!loc) continue
+
+    const frozen = cloneWorld(world)
+    delete frozen.pieces[id]
+    delete frozen.locations[id]
+    frozen.boards[loc.board].cells[loc.y][loc.x] = { type: 'wall' }
+
+    const result = solve(frozen, optimalLength, GENERATOR_CONFIG.maxSolverExpandedStates)
+    const stillOptimal = result !== null && result.moves.length <= optimalLength
+    if (stillOptimal) {
+      delete trimmed.pieces[id]
+      delete trimmed.locations[id]
+    }
   }
 
   return trimmed

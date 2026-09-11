@@ -12,7 +12,7 @@ import {
 } from './difficultyScorer'
 import { canonicalKey } from './canonical'
 import { getSurvivingGroups, isGroupUntouched, pruneUntouchedGoals } from './pruneUntouchedGoals'
-import { removeUnusedFillerBoxes, trimUnusedCells } from './trimUnusedCells'
+import { removeUnnecessaryFillerBoxes, trimUnusedCells } from './trimUnusedCells'
 import { GENERATOR_CONFIG } from './generatorConfig'
 
 export type Tier = 'easy' | 'medium' | 'hard'
@@ -212,12 +212,17 @@ export function generateLevelBatch(
 
     // Cosmetic-only pass (see trimUnusedCells.ts's own comment for the proof
     // this can't change any metric above): walls off floor cells the solved
-    // path never visits, and deletes any filler box the solve never touched
-    // (per user feedback — a level with 3 filler boxes but only ever using
-    // 1 shipped all 3, reading as mostly-unused clutter). Done after
-    // scoring so every metric is measured against the exact world solve()
-    // actually searched, not a pre-emptively trimmed one.
-    const shippedWorld = trimUnusedCells(removeUnusedFillerBoxes(world, solved.moves, fillerBoxIds), solved.moves)
+    // path never visits, and deletes any filler/obstacle box that is not
+    // strictly necessary — some equally-short solution exists that never
+    // needs to move it (per user feedback: checking only the one solve()
+    // result was too weak, since BFS returns *a* shortest solution, not
+    // *the* only one). Done after scoring so every metric is measured
+    // against the exact world solve() actually searched, not a
+    // pre-emptively trimmed one.
+    const shippedWorld = trimUnusedCells(
+      removeUnnecessaryFillerBoxes(world, fillerBoxIds, solved.moves.length),
+      solved.moves,
+    )
     // Trimming can (rarely) make two otherwise-distinct seeds converge to
     // the same playable puzzle once their unused decoration is stripped —
     // re-check uniqueness on the shipped (trimmed) board, not just the

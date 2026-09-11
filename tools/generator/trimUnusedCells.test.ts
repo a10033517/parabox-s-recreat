@@ -1,7 +1,8 @@
 import { applyMove, checkWin } from '../../src/game/engine/rules'
-import { Direction, World } from '../../src/game/engine/types'
+import { Cell, Direction, World } from '../../src/game/engine/types'
 import { parseLevel, serializeLevel } from '../../src/game/engine/levelSchema'
-import { removeUnusedFillerBoxes, trimUnusedCells } from './trimUnusedCells'
+import { removeUnnecessaryFillerBoxes, trimUnusedCells } from './trimUnusedCells'
+import { solve } from './solver'
 import { GENERATOR_CONFIG } from './generatorConfig'
 
 function makeOpenWorld(size: number): World {
@@ -149,36 +150,87 @@ function makeWorldWithFillers(): World {
   return world
 }
 
-test('removeUnusedFillerBoxes deletes a filler box that never moves, and keeps one that does', () => {
-  const world = makeWorldWithFillers()
-  const moves: Direction[] = ['right', 'right']
-  const result = removeUnusedFillerBoxes(world, moves, ['filler0', 'filler1'])
+test('removeUnnecessaryFillerBoxes keeps a box that genuinely blocks the only path (freezing it makes the puzzle unsolvable)', () => {
+  // A 1-wide corridor (row 2 isolated by walling rows 1 and 3 entirely):
+  // player(0,2) - obstacle(1,2) - open(2,2) - box1(3,2) - target(4,2).
+  // The only route requires chain-pushing the obstacle out of the way.
+  const size = 5
+  const cells: Cell[][] = Array.from({ length: size }, (_, y) =>
+    Array.from({ length: size }, () => ({ type: y === 1 || y === 3 ? 'wall' : 'floor' })),
+  )
+  cells[2][4] = { type: 'floor', requirement: 'box' }
+  const world: World = {
+    boards: { root: { id: 'root', size, cells } },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      obstacle0: { id: 'obstacle0', kind: 'normal' },
+      box1: { id: 'box1', kind: 'normal' },
+    },
+    locations: {
+      player: { board: 'root', x: 0, y: 2 },
+      obstacle0: { board: 'root', x: 1, y: 2 },
+      box1: { board: 'root', x: 3, y: 2 },
+    },
+  }
+  const solved = solve(world)!
+  expect(solved.moves).toEqual(['right', 'right'])
 
-  expect(result.pieces.filler0).toBeDefined() // pushed by the second 'right'
-  expect(result.locations.filler0).toBeDefined()
-  expect(result.pieces.filler1).toBeUndefined() // never touched
-  expect(result.locations.filler1).toBeUndefined()
+  const result = removeUnnecessaryFillerBoxes(world, ['obstacle0'], solved.moves.length)
+  expect(result.pieces.obstacle0).toBeDefined() // freezing it makes the corridor impassable
 })
 
-test('removeUnusedFillerBoxes does not throw on a filler id missing from the world (defensive guard)', () => {
-  const world = makeWorldWithFillers()
-  expect(() => removeUnusedFillerBoxes(world, ['right'], ['filler0', 'ghostFiller'])).not.toThrow()
+test('removeUnnecessaryFillerBoxes removes a box skippable via an equally-short alternate path (the tie-breaking case)', () => {
+  // Two length-4 routes from (0,0) to the pushing cell (2,2), then one more
+  // push down solves box1 -> target: one route runs through filler0 at
+  // (1,0) (chain-pushed harmlessly out of the way), the other (down first)
+  // never comes near it. Both total exactly 5 moves — solve() may return
+  // either tied path, but an equally-short solution exists that never
+  // needs filler0, so it must be removed regardless of which one solve()
+  // happened to find.
+  const size = 5
+  const cells: Cell[][] = Array.from({ length: size }, () => Array.from({ length: size }, () => ({ type: 'floor' })))
+  cells[4][2] = { type: 'floor', requirement: 'box' }
+  const world: World = {
+    boards: { root: { id: 'root', size, cells } },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      filler0: { id: 'filler0', kind: 'normal' },
+      box1: { id: 'box1', kind: 'normal' },
+    },
+    locations: {
+      player: { board: 'root', x: 0, y: 0 },
+      filler0: { board: 'root', x: 1, y: 0 },
+      box1: { board: 'root', x: 2, y: 3 },
+    },
+  }
+  const solved = solve(world)!
+  expect(solved.moves.length).toBe(5) // 4 to reach (2,2) + 1 push down
+
+  const result = removeUnnecessaryFillerBoxes(world, ['filler0'], solved.moves.length)
+  expect(result.pieces.filler0).toBeUndefined()
 })
 
-test('removeUnusedFillerBoxes returns a clone, leaving the original world untouched', () => {
+test('removeUnnecessaryFillerBoxes removes a box that is never touched by anything', () => {
   const world = makeWorldWithFillers()
-  removeUnusedFillerBoxes(world, ['right', 'right'], ['filler0', 'filler1'])
+  const solved = solve(world)!
+  const result = removeUnnecessaryFillerBoxes(world, ['filler1'], solved.moves.length)
+  expect(result.pieces.filler1).toBeUndefined()
+})
+
+test('removeUnnecessaryFillerBoxes does not throw on a filler id missing from the world (defensive guard)', () => {
+  const world = makeWorldWithFillers()
+  expect(() => removeUnnecessaryFillerBoxes(world, ['filler0', 'ghostFiller'], 2)).not.toThrow()
+})
+
+test('removeUnnecessaryFillerBoxes returns a clone, leaving the original world untouched', () => {
+  const world = makeWorldWithFillers()
+  removeUnnecessaryFillerBoxes(world, ['filler0', 'filler1'], 2)
   expect(world.pieces.filler1).toBeDefined()
 })
 
-test('removeUnusedFillerBoxes throws on a move that is invalid for this world', () => {
-  const world = makeWorldWithFillers()
-  expect(() => removeUnusedFillerBoxes(world, ['left'], ['filler0'])).toThrow(/invalid move/)
-})
-
-test('trimUnusedCells composed after removeUnusedFillerBoxes still solves identically (checkWin reached)', () => {
+test('trimUnusedCells composed after removeUnnecessaryFillerBoxes still solves identically (checkWin reached)', () => {
   // box1's own push path (row 2) stays completely clear; both filler boxes
-  // sit off that row and are never touched by these moves.
+  // sit off that row and are never touched by any shortest solution.
   const world = makeOpenWorld(5)
   world.pieces.filler0 = { id: 'filler0', kind: 'normal' }
   world.pieces.filler1 = { id: 'filler1', kind: 'normal' }
@@ -187,7 +239,7 @@ test('trimUnusedCells composed after removeUnusedFillerBoxes still solves identi
   world.boards.root.cells[2][3] = { type: 'floor', requirement: 'box' }
   const moves: Direction[] = ['right', 'right']
 
-  const withoutFillers = removeUnusedFillerBoxes(world, moves, ['filler0', 'filler1'])
+  const withoutFillers = removeUnnecessaryFillerBoxes(world, ['filler0', 'filler1'], moves.length)
   expect(withoutFillers.pieces.filler0).toBeUndefined()
   expect(withoutFillers.pieces.filler1).toBeUndefined()
 
