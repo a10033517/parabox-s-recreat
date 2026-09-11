@@ -12,7 +12,7 @@ import {
 } from './difficultyScorer'
 import { canonicalKey } from './canonical'
 import { getSurvivingGroups, isGroupUntouched, pruneUntouchedGoals } from './pruneUntouchedGoals'
-import { trimUnusedCells } from './trimUnusedCells'
+import { removeUnusedFillerBoxes, trimUnusedCells } from './trimUnusedCells'
 import { GENERATOR_CONFIG } from './generatorConfig'
 
 export type Tier = 'easy' | 'medium' | 'hard'
@@ -150,7 +150,7 @@ export function generateLevelBatch(
     // than a separate generation phase, is used).
     const useHardProfile = counts.easy >= targetPerTier && counts.medium >= targetPerTier
     const profile = useHardProfile ? GENERATOR_CONFIG.hardSeedProfile : GENERATOR_CONFIG.seedProfile
-    const { world: seed, groups } = createSeedWorld(rng, profile)
+    const { world: seed, groups, fillerBoxIds } = createSeedWorld(rng, profile)
     const steps =
       GENERATOR_CONFIG.minReverseSteps +
       Math.floor(rng() * (GENERATOR_CONFIG.maxReverseSteps - GENERATOR_CONFIG.minReverseSteps + 1))
@@ -212,10 +212,12 @@ export function generateLevelBatch(
 
     // Cosmetic-only pass (see trimUnusedCells.ts's own comment for the proof
     // this can't change any metric above): walls off floor cells the solved
-    // path never visits. Done after scoring so every metric is measured
-    // against the exact world solve() actually searched, not a
-    // pre-emptively trimmed one.
-    const shippedWorld = trimUnusedCells(world, solved.moves)
+    // path never visits, and deletes any filler box the solve never touched
+    // (per user feedback — a level with 3 filler boxes but only ever using
+    // 1 shipped all 3, reading as mostly-unused clutter). Done after
+    // scoring so every metric is measured against the exact world solve()
+    // actually searched, not a pre-emptively trimmed one.
+    const shippedWorld = trimUnusedCells(removeUnusedFillerBoxes(world, solved.moves, fillerBoxIds), solved.moves)
     // Trimming can (rarely) make two otherwise-distinct seeds converge to
     // the same playable puzzle once their unused decoration is stripped —
     // re-check uniqueness on the shipped (trimmed) board, not just the

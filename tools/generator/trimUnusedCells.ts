@@ -99,3 +99,42 @@ export function trimUnusedCells(
 
   return trimmed
 }
+
+// Removes any filler box (see generatorConfig.ts's SeedProfile.fillerBoxCount)
+// that never moves at any point while replaying `moves`. Filler boxes have
+// no win condition of their own, so an untouched one contributes nothing to
+// the shipped puzzle except visual clutter — per user feedback ("很多箱子
+// 都用不到" — lots of boxes go unused), only the ones the solve actually
+// relies on are worth shipping. Unlike trimUnusedCells (which only ever
+// changes floor cells to walls), this deletes pieces outright — safe
+// because filler boxes carry no `requirement` and are never referenced by
+// any SeedGroup, so removing an unused one cannot affect checkWin or any
+// other group's solvability.
+export function removeUnusedFillerBoxes(world: World, moves: Direction[], fillerBoxIds: string[]): World {
+  const trimmed = cloneWorld(world)
+  const usedFillerIds = new Set<string>()
+
+  let current = world
+  for (const direction of moves) {
+    const next = applyMove(current, direction)
+    if (!next) throw new Error('removeUnusedFillerBoxes received an invalid move for this world')
+    for (const id of fillerBoxIds) {
+      if (usedFillerIds.has(id)) continue
+      const before = current.locations[id]
+      const after = next.locations[id]
+      if (!before || !after) continue
+      if (before.board !== after.board || before.x !== after.x || before.y !== after.y) {
+        usedFillerIds.add(id)
+      }
+    }
+    current = next
+  }
+
+  for (const id of fillerBoxIds) {
+    if (usedFillerIds.has(id)) continue
+    delete trimmed.pieces[id]
+    delete trimmed.locations[id]
+  }
+
+  return trimmed
+}
