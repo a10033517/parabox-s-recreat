@@ -54,6 +54,21 @@ export interface SeedProfile {
   // goal"). Must be <= 16 (4 slots x 4 corners each — see seed.ts's
   // placement scheme).
   fillerBoxCount: number
+  // Per user feedback (further refining fillerBoxCount): a plain box
+  // "just being pushed" isn't real use — they want levels where an extra,
+  // target-less box genuinely has to be cleared out of the way before the
+  // real box can reach its target. Chance a given group's approach cell —
+  // step(containerPos, opposite(wallDir)), i.e. the exact cell the player
+  // must stand on to eat that group's box — gets an obstacle box instead
+  // of being left empty. Clearing it (one push, away from the container)
+  // is a real precondition for that group's own eat, not incidental: the
+  // player physically cannot occupy that cell to eat until the obstacle
+  // has moved. Reuses the same fillerBoxIds tracking/cleanup as
+  // fillerBoxCount (removeUnusedFillerBoxes/countFillerBoxesUsed) — an
+  // obstacle whose group ends up pruned/untouched, so the obstacle was
+  // never actually cleared, gets deleted from the shipped level exactly
+  // like an unused corner filler.
+  obstacleBoxProbability: number
 }
 
 export function assertProbability(value: number, name: string): void {
@@ -129,6 +144,7 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
     remoteStartProbability: 0,
     multiBoxProbability: 0.3,
     fillerBoxCount: 3,
+    obstacleBoxProbability: 0.4,
   },
   hardSeedProfile: {
     fourGroupProbability: 0.8,
@@ -136,6 +152,7 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
     remoteStartProbability: 0.25,
     multiBoxProbability: 0.5,
     fillerBoxCount: 3,
+    obstacleBoxProbability: 0.6,
   },
   scoring: {
     crossingMoveWeight: 3,
@@ -181,4 +198,5 @@ for (const [profileName, profile] of Object.entries({
   assertProbability(profile.remoteStartProbability, `${profileName}.remoteStartProbability`)
   assertProbability(profile.multiBoxProbability, `${profileName}.multiBoxProbability`)
   assertFillerBoxCount(profile.fillerBoxCount, `${profileName}.fillerBoxCount`)
+  assertProbability(profile.obstacleBoxProbability, `${profileName}.obstacleBoxProbability`)
 }

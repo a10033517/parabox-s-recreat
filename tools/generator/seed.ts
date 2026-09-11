@@ -121,9 +121,12 @@ function getSlotCorner(slotIndex: number, cornerIndex: number): { x: number; y: 
 export interface SeedResult {
   world: World
   groups: SeedGroup[]
-  // Plain, goal-less pushable boxes (see generatorConfig.ts's own comment
-  // on SeedProfile.fillerBoxCount) — extra reverse-walk material, not
-  // tied to any win condition. Never consulted by pruning.
+  // Plain, goal-less pushable boxes — corner fillers (SeedProfile.
+  // fillerBoxCount) and approach-blocking obstacles (SeedProfile.
+  // obstacleBoxProbability) merged into one list, since both get the same
+  // treatment: extra reverse-walk material, not tied to any win condition,
+  // never consulted by pruning, deleted if never used (trimUnusedCells.ts's
+  // removeUnusedFillerBoxes).
   fillerBoxIds: string[]
 }
 
@@ -145,20 +148,24 @@ export function createSeedWorld(
   const pieces: World['pieces'] = { [PLAYER_ID]: { id: PLAYER_ID, kind: 'player' } }
   const locations: World['locations'] = {}
   const groups: SeedGroup[] = []
+  const obstacleBoxIds: string[] = []
 
   for (let i = 0; i < groupCount; i++) {
     const { x: containerX, y: containerY } = getSlotCenter(i)
 
-    // RNG contract (multi-box groups spec §5.3), fixed per group:
-    // 1. isMultiBox  2. wall direction(s) — 1 call if single-box, 2 if
-    // multi-box  3. interior size. This is a breaking change from the
-    // single-box-only contract: even when multiBoxProbability is 0, the
-    // isMultiBox draw itself still consumes one rng() call every group,
-    // shifting every later draw — old hand-tuned RNG sequences do not
-    // survive this change and were rewritten in seed.test.ts accordingly.
+    // RNG contract (multi-box groups spec §5.3, extended by the obstacle-
+    // box feature), fixed per group: 1. isMultiBox  2. wall direction(s) —
+    // 1 call if single-box, 2 if multi-box  3. interior size  4.
+    // hasObstacle. This is a breaking change from the single-box-only
+    // contract: even when multiBoxProbability/obstacleBoxProbability are
+    // 0, both draws still consume one rng() call every group regardless of
+    // outcome, shifting every later draw — old hand-tuned RNG sequences do
+    // not survive this change and were rewritten in seed.test.ts
+    // accordingly.
     const isMultiBox = rng() < profile.multiBoxProbability
     const wallDirs = pickWallDirs(rng, isMultiBox ? 2 : 1)
     const interiorSize = rng() < profile.largeInteriorProbability ? 5 : 3
+    const hasObstacle = rng() < profile.obstacleBoxProbability
 
     for (const wallDir of wallDirs) {
       const wallPos = step(containerX, containerY, wallDir)
@@ -167,6 +174,21 @@ export function createSeedWorld(
     // No requirement on the container's own root cell — Approach A: the
     // container merely occupying its cell must never be sufficient to win.
     cells[containerY][containerX] = { type: 'floor' }
+
+    // Obstacle box: sits exactly on this group's approach cell — the cell
+    // the player must stand on to eat this group's box (opposite the wall
+    // direction, cardinal-adjacent to the container, never the diagonal
+    // player-candidate cell or any corner-filler position). The player
+    // physically cannot occupy that cell — and therefore cannot perform
+    // this group's eat — until the obstacle has been pushed away, making
+    // it a genuine precondition rather than incidental clutter.
+    if (hasObstacle) {
+      const obstacleId = `obstacle${i}`
+      const approachCell = step(containerX, containerY, opposite(wallDirs[0]))
+      pieces[obstacleId] = { id: obstacleId, kind: 'normal' }
+      locations[obstacleId] = { board: 'root', x: approachCell.x, y: approachCell.y }
+      obstacleBoxIds.push(obstacleId)
+    }
 
     const interiorId = `goal${i}Inside`
     const containerId = `goal${i}`
@@ -233,5 +255,5 @@ export function createSeedWorld(
     fillerBoxIds.push(fillerId)
   }
 
-  return { world: { boards, pieces, locations }, groups, fillerBoxIds }
+  return { world: { boards, pieces, locations }, groups, fillerBoxIds: [...fillerBoxIds, ...obstacleBoxIds] }
 }
