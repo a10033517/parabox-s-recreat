@@ -13,6 +13,7 @@ import {
 import { canonicalKey } from './canonical'
 import { getSurvivingGroups, isGroupUntouched, pruneUntouchedGoals } from './pruneUntouchedGoals'
 import { removeUnnecessaryFillerBoxes, trimUnusedCells } from './trimUnusedCells'
+import { tryInjectObstacle } from './injectObstacle'
 import { GENERATOR_CONFIG } from './generatorConfig'
 
 export type Tier = 'easy' | 'medium' | 'hard'
@@ -160,7 +161,7 @@ export function generateLevelBatch(
       continue
     }
 
-    const world = pruneUntouchedGoals(generated.world, groups)
+    let world = pruneUntouchedGoals(generated.world, groups)
     const survivingGroups = getSurvivingGroups(world, groups)
 
     // Approach-A invariant: every surviving group's box must actually be
@@ -192,10 +193,26 @@ export function generateLevelBatch(
       continue
     }
 
-    const solved = solve(world, 150, GENERATOR_CONFIG.maxSolverExpandedStates)
+    let solved = solve(world, 150, GENERATOR_CONFIG.maxSolverExpandedStates)
     if (!solved || solved.moves.length === 0) {
       stats.discardedUnsolvable++
       continue
+    }
+
+    // Post-hoc obstacle injection (see injectObstacle.ts for why this can't
+    // happen at seed time): a plain box dropped directly against this
+    // puzzle's own solved path, at a genuinely un-absorbable site, forcing
+    // a longer route if solve() confirms it. Gated by profile so easy/
+    // medium levels get it less often than hard ones. Run before metrics
+    // are computed so every metric below is measured against whichever
+    // world actually ships — same principle trimUnusedCells already
+    // follows a few lines down.
+    if (rng() < profile.obstacleBoxProbability) {
+      const injected = tryInjectObstacle(world, solved, rng)
+      if (injected) {
+        world = injected.world
+        solved = injected.solved
+      }
     }
 
     const metrics: DifficultyMetrics = {

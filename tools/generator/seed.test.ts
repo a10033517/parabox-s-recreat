@@ -51,18 +51,17 @@ function singleBoxProfile(overrides: Partial<SeedProfile> = {}): SeedProfile {
   }
 }
 
-// RNG contract per group (multi-box groups spec §5.3, extended by the
-// obstacle-box feature): isMultiBox (1 call), wall direction(s) (1 call
-// single-box / 2 calls multi-box), interior size (1 call), hasObstacle (1
-// call). This sequence forces groupCount=4 (single draw, low value),
+// RNG contract per group (multi-box groups spec §5.3): isMultiBox (1 call),
+// wall direction(s) (1 call single-box / 2 calls multi-box), interior size
+// (1 call). This sequence forces groupCount=4 (single draw, low value),
 // playerSlot=0 (single draw for groupCount>=4), and all 4 groups
 // single-box, covering all 4 wall directions and both interior sizes.
 const ALL_COMBOS_RNG = () => sequenceRng([
   0.1, 0.0, // groupCount=4, playerSlot=0
-  0.5, 0.0, 0.0, 0.5, // group0: isMultiBox=false, wallDir=up, interiorSize=5, hasObstacle=false
-  0.5, 0.26, 0.9, 0.5, // group1: isMultiBox=false, wallDir=down, interiorSize=3, hasObstacle=false
-  0.5, 0.51, 0.9, 0.5, // group2: isMultiBox=false, wallDir=left, interiorSize=3, hasObstacle=false
-  0.5, 0.76, 0.9, 0.5, // group3: isMultiBox=false, wallDir=right, interiorSize=3, hasObstacle=false
+  0.5, 0.0, 0.0, // group0: isMultiBox=false, wallDir=up, interiorSize=5
+  0.5, 0.26, 0.9, // group1: isMultiBox=false, wallDir=down, interiorSize=3
+  0.5, 0.51, 0.9, // group2: isMultiBox=false, wallDir=left, interiorSize=3
+  0.5, 0.76, 0.9, // group3: isMultiBox=false, wallDir=right, interiorSize=3
 ])
 const ALL_COMBOS_PROFILE = singleBoxProfile()
 
@@ -70,9 +69,9 @@ test('createSeedWorld produces 3 groups when the four-group draw fails', () => {
   const rng = sequenceRng([
     0.9, // groupCount draw >= 0.5 -> 3 groups
     0.9, 0.0, // playerSlot: remote-start check (false), active-slot pick
-    0.1, 0.1, 0.1, 0.1, // group0 (single-box, values irrelevant beyond count)
-    0.1, 0.1, 0.1, 0.1, // group1
-    0.1, 0.1, 0.1, 0.1, // group2
+    0.1, 0.1, 0.1, // group0 (single-box, values irrelevant beyond count)
+    0.1, 0.1, 0.1, // group1
+    0.1, 0.1, 0.1, // group2
   ])
   const { groups } = createSeedWorld(rng, singleBoxProfile())
   expect(groups.length).toBe(3)
@@ -181,10 +180,10 @@ test('player-start position is derived correctly for every active slot and never
   for (let slot = 0; slot < 4; slot++) {
     const rng = sequenceRng([
       0.1, slot / 4 + 0.01, // groupCount=4, playerSlot=slot
-      0.5, 0.0, 0.5, 0.5, // group0: isMultiBox=false, wallDir=up, interiorSize/hasObstacle fillers
-      0.5, 0.26, 0.5, 0.5, // group1: wallDir=down
-      0.5, 0.51, 0.5, 0.5, // group2: wallDir=left
-      0.5, 0.76, 0.5, 0.5, // group3: wallDir=right
+      0.5, 0.0, 0.5, // group0: isMultiBox=false, wallDir=up, interiorSize filler
+      0.5, 0.26, 0.5, // group1: wallDir=down
+      0.5, 0.51, 0.5, // group2: wallDir=left
+      0.5, 0.76, 0.5, // group3: wallDir=right
     ])
     const { world, groups } = createSeedWorld(rng, singleBoxProfile())
     const expected = slotCenter(slot)
@@ -206,7 +205,7 @@ test('a remote player start (inactive slot) lands on plain floor and never colli
   const rng = sequenceRng([
     0.9, // groupCount=3
     0.0, 0.0, // playerSlot: remote-start check (true), inactive-slot pick -> slot 3
-    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
   ])
   const { world, groups } = createSeedWorld(rng, remoteProfile)
   expect(groups.length).toBe(3)
@@ -224,11 +223,11 @@ test('a two-box group has two distinct walls and two distinct requirement cells 
     0.9, 0.1, // playerSlot: remote-check false (remoteStartProbability=0), pick
     // group0: isMultiBox=true (multiBoxProbability=1, draw irrelevant),
     // wallDir first=0(up), offset draw -> offset=1 -> second=1(down),
-    // interiorSize filler, hasObstacle filler (obstacleBoxProbability=0)
-    0.5, 0.0, 0.1, 0.9, 0.5,
+    // interiorSize filler
+    0.5, 0.0, 0.1, 0.9,
     // group1, group2: same shape, values irrelevant to this test
-    0.5, 0.0, 0.1, 0.9, 0.5,
-    0.5, 0.0, 0.1, 0.9, 0.5,
+    0.5, 0.0, 0.1, 0.9,
+    0.5, 0.0, 0.1, 0.9,
   ])
   const { world, groups } = createSeedWorld(rng, multiBoxProfile)
 
@@ -351,42 +350,9 @@ test('fillerBoxCount 0 places no filler boxes', () => {
   expect(fillerBoxIds).toEqual([])
 })
 
-test('an obstacle box sits exactly on the approach cell (opposite the wall direction), blocking it', () => {
-  const profile = singleBoxProfile({ obstacleBoxProbability: 1 })
-  const { world, groups, fillerBoxIds } = createSeedWorld(ALL_COMBOS_RNG(), profile)
-
-  for (const group of groups) {
-    const wallDeltas = wallDeltasAround(group.originalPosition.x, group.originalPosition.y, world.boards.root.cells)
-    expect(wallDeltas.length).toBe(1)
-    const [dx, dy] = wallDeltas[0]
-    // The approach cell is the opposite side from the wall.
-    const approachX = group.originalPosition.x - dx
-    const approachY = group.originalPosition.y - dy
-
-    const obstacleId = `obstacle${groups.indexOf(group)}`
-    expect(fillerBoxIds).toContain(obstacleId)
-    expect(world.locations[obstacleId]).toEqual({ board: 'root', x: approachX, y: approachY })
-    expect(world.pieces[obstacleId]).toEqual({ id: obstacleId, kind: 'normal' })
-  }
-})
-
-test('obstacleBoxProbability 0 places no obstacle boxes', () => {
-  const profile = singleBoxProfile({ obstacleBoxProbability: 0 })
-  const { fillerBoxIds } = createSeedWorld(ALL_COMBOS_RNG(), profile)
-  expect(fillerBoxIds.filter((id) => id.startsWith('obstacle'))).toEqual([])
-})
-
-test('obstacle boxes never collide with the player-candidate cell or corner fillers', () => {
-  const profile = singleBoxProfile({ obstacleBoxProbability: 1, fillerBoxCount: 4 })
-  const { world, fillerBoxIds } = createSeedWorld(ALL_COMBOS_RNG(), profile)
-  const positions = fillerBoxIds.map((id) => `${world.locations[id].x},${world.locations[id].y}`)
-  expect(new Set(positions).size).toBe(positions.length) // all distinct
-  expect(positions).not.toContain(`${world.locations.player.x},${world.locations.player.y}`)
-})
-
 test('the default GENERATOR_CONFIG.seedProfile is the implicit default', () => {
   // Generous filler: worst case is groupCount=4 (1 call) + playerSlot
-  // (1 call) + 4 groups all multi-box (4 calls each) = 18 calls. Extra
+  // (1 call) + 4 groups all multi-box (3 calls each) = 14 calls. Extra
   // unused values are harmless since both calls consume the same prefix.
   const values = [0.4, ...Array(30).fill(0.5)]
   const withDefaultProfile = createSeedWorld(sequenceRng(values))
