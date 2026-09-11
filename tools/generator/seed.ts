@@ -56,18 +56,51 @@ function pickPlayerSlot(rng: () => number, groupCount: number, profile: SeedProf
   return Math.floor(rng() * groupCount)
 }
 
-// A group's identity as constructed by the seed. `boxOriginalPosition` is
-// the box's position on its own interior board — this is both the group's
+// Picks 1 or 2 *distinct* wall directions. The 2-direction case uses a
+// nonzero offset instead of a reshuffle or rejection loop, specifically so
+// its RNG-call count is fixed (exactly 2 calls) and the single-direction
+// case's call count (exactly 1) never changes regardless of `count` — see
+// the multi-box groups spec §5.2-§5.3 for the exact RNG contract this
+// generator now depends on.
+export function pickWallDirs(rng: () => number, count: 1 | 2): Direction[] {
+  const first = Math.floor(rng() * DIRECTIONS.length)
+  if (count === 1) return [DIRECTIONS[first]]
+  const offset = 1 + Math.floor(rng() * (DIRECTIONS.length - 1))
+  const second = (first + offset) % DIRECTIONS.length
+  return [DIRECTIONS[first], DIRECTIONS[second]]
+}
+
+// A single box belonging to a group. `originalPosition` is the box's
+// position on its own interior board — this is both part of the group's
 // win condition and the one-way-door pruning check (see
 // pruneUntouchedGoals.ts): nothing but a real eat move ever changes it, in
-// either direction. `originalPosition` (the container's root position) is
-// kept for descriptive completeness but is no longer consulted by pruning.
+// either direction. See the multi-box groups spec
+// (2026-09-11-parabox-generator-multibox-groups.md) for the full design.
+export interface GroupBox {
+  boxId: string
+  originalPosition: { x: number; y: number }
+}
+
+// A group's identity as constructed by the seed. `boxes` has length 1
+// (ordinary group) or 2 (multi-box group, per the spec above) — never 0 or
+// more than 2. `originalPosition` (the container's root position) is kept
+// for descriptive completeness and is used by generateLevel.ts's
+// direction-seeking bias; it is not consulted by pruning.
 export interface SeedGroup {
   containerId: string
-  boxId: string
   interiorId: string
   originalPosition: { x: number; y: number }
-  boxOriginalPosition: { x: number; y: number }
+  boxes: GroupBox[]
+}
+
+export function assertValidSeedGroup(group: SeedGroup): void {
+  if (group.boxes.length !== 1 && group.boxes.length !== 2) {
+    throw new Error(`Invalid box count for group ${group.containerId}: ${group.boxes.length}`)
+  }
+  const ids = new Set(group.boxes.map((box) => box.boxId))
+  if (ids.size !== group.boxes.length) {
+    throw new Error(`Duplicate box id in group ${group.containerId}`)
+  }
 }
 
 export interface SeedResult {
@@ -97,44 +130,63 @@ export function createSeedWorld(
   for (let i = 0; i < groupCount; i++) {
     const { x: containerX, y: containerY } = getSlotCenter(i)
 
-    const wallDir = DIRECTIONS[Math.floor(rng() * DIRECTIONS.length)]
-    const wallPos = step(containerX, containerY, wallDir)
-    cells[wallPos.y][wallPos.x] = { type: 'wall' }
+    // RNG contract (multi-box groups spec §5.3), fixed per group:
+    // 1. isMultiBox  2. wall direction(s) — 1 call if single-box, 2 if
+    // multi-box  3. interior size. This is a breaking change from the
+    // single-box-only contract: even when multiBoxProbability is 0, the
+    // isMultiBox draw itself still consumes one rng() call every group,
+    // shifting every later draw — old hand-tuned RNG sequences do not
+    // survive this change and were rewritten in seed.test.ts accordingly.
+    const isMultiBox = rng() < profile.multiBoxProbability
+    const wallDirs = pickWallDirs(rng, isMultiBox ? 2 : 1)
+    const interiorSize = rng() < profile.largeInteriorProbability ? 5 : 3
+
+    for (const wallDir of wallDirs) {
+      const wallPos = step(containerX, containerY, wallDir)
+      cells[wallPos.y][wallPos.x] = { type: 'wall' }
+    }
     // No requirement on the container's own root cell — Approach A: the
     // container merely occupying its cell must never be sufficient to win.
     cells[containerY][containerX] = { type: 'floor' }
 
-    const interiorSize = rng() < profile.largeInteriorProbability ? 5 : 3
     const interiorId = `goal${i}Inside`
     const containerId = `goal${i}`
-    const boxId = `box${i}`
-
     const interior = { id: interiorId, size: interiorSize, cells: makeFloorCells(interiorSize) }
 
-    const { cell: eatenCell } = getEntryCell(interior, opposite(wallDir), HALF)
-    if (eatenCell === null) {
-      // Provably unreachable: HALF always maps to an in-bounds
-      // center-of-edge cell for any board size >= 1.
-      throw new Error(`createSeedWorld: getEntryCell unexpectedly returned null for interior size ${interiorSize}`)
+    const boxes: GroupBox[] = []
+    for (const [boxIndex, wallDir] of wallDirs.entries()) {
+      // Single-box groups keep the original id shape (`box0`) exactly.
+      const boxId = wallDirs.length === 1 ? `box${i}` : `box${i}_${boxIndex}`
+      const { cell: eatenCell } = getEntryCell(interior, opposite(wallDir), HALF)
+      if (eatenCell === null) {
+        // Provably unreachable: HALF always maps to an in-bounds
+        // center-of-edge cell for any board size >= 1, independently for
+        // each of the 4 directions (hand-verified in the multi-box groups
+        // spec's own pre-implementation check, §2.4/§12 step 1).
+        throw new Error(`createSeedWorld: getEntryCell unexpectedly returned null for interior size ${interiorSize}`)
+      }
+      // The win condition for this box: a non-player piece must occupy
+      // this cell. Only the pre-placed box starts here, and it can only
+      // leave via a real eat move (see the full design spec's one-way-door
+      // argument) — unaffected by whether the group has 1 or 2 boxes.
+      interior.cells[eatenCell.y][eatenCell.x] = { type: 'floor', requirement: 'box' }
+      pieces[boxId] = { id: boxId, kind: 'normal' }
+      locations[boxId] = { board: interiorId, x: eatenCell.x, y: eatenCell.y }
+      boxes.push({ boxId, originalPosition: { x: eatenCell.x, y: eatenCell.y } })
     }
-    // The win condition for this group: a non-player piece must occupy this
-    // cell. Only the pre-placed box starts here, and it can only leave via
-    // a real eat move (see the full design spec's one-way-door argument).
-    interior.cells[eatenCell.y][eatenCell.x] = { type: 'floor', requirement: 'box' }
     boards[interiorId] = interior
 
     pieces[containerId] = { id: containerId, kind: 'container', boardRef: interiorId }
-    pieces[boxId] = { id: boxId, kind: 'normal' }
     locations[containerId] = { board: 'root', x: containerX, y: containerY }
-    locations[boxId] = { board: interiorId, x: eatenCell.x, y: eatenCell.y }
 
-    groups.push({
+    const group: SeedGroup = {
       containerId,
-      boxId,
       interiorId,
       originalPosition: { x: containerX, y: containerY },
-      boxOriginalPosition: { x: eatenCell.x, y: eatenCell.y },
-    })
+      boxes,
+    }
+    assertValidSeedGroup(group)
+    groups.push(group)
   }
 
   boards.root = { id: 'root', size: ROOT_SIZE, cells }

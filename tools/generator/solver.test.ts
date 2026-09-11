@@ -198,12 +198,14 @@ test('countEatMoves counts a real eat interaction and 0 for a push-only solution
 test('countGroupsUsed counts a group whose container or box moved, and does not throw on a group missing from the world', () => {
   const eatWorld = makeEatWorld()
   const realGroup: SeedGroup = {
-    containerId: 'container1', boxId: 'box1', interiorId: 'inside',
-    originalPosition: { x: 2, y: 2 }, boxOriginalPosition: { x: 1, y: 1 },
+    containerId: 'container1', interiorId: 'inside',
+    originalPosition: { x: 2, y: 2 },
+    boxes: [{ boxId: 'box1', originalPosition: { x: 1, y: 1 } }],
   }
   const missingGroup: SeedGroup = {
-    containerId: 'ghost', boxId: 'ghostBox', interiorId: 'ghostInside',
-    originalPosition: { x: 0, y: 0 }, boxOriginalPosition: { x: 0, y: 0 },
+    containerId: 'ghost', interiorId: 'ghostInside',
+    originalPosition: { x: 0, y: 0 },
+    boxes: [{ boxId: 'ghostBox', originalPosition: { x: 0, y: 0 } }],
   }
 
   // Filtered to survivors only — the intended usage.
@@ -213,6 +215,19 @@ test('countGroupsUsed counts a group whose container or box moved, and does not 
   // the defensive-guard regression test for the crash the review caught.
   expect(() => countGroupsUsed(eatWorld, ['right'], [realGroup, missingGroup])).not.toThrow()
   expect(countGroupsUsed(eatWorld, ['right'], [realGroup, missingGroup])).toBe(1)
+})
+
+test('countGroupsUsed counts a two-box group as used when only the second box moves, and only once when both move', () => {
+  const eatWorld = makeEatWorld()
+  const twoBoxGroup: SeedGroup = {
+    containerId: 'container1', interiorId: 'inside',
+    originalPosition: { x: 2, y: 2 },
+    boxes: [
+      { boxId: 'someOtherBox', originalPosition: { x: 0, y: 0 } }, // never moves in this scenario
+      { boxId: 'box1', originalPosition: { x: 1, y: 1 } }, // this one is eaten by 'right'
+    ],
+  }
+  expect(countGroupsUsed(eatWorld, ['right'], [twoBoxGroup])).toBe(1)
 })
 
 test('every builtin level is solvable', () => {

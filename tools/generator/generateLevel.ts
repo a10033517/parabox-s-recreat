@@ -34,14 +34,32 @@ function movedPieceIds(before: World, after: World): string[] {
   return ids
 }
 
-// `recentTouches` holds the containerId of every group touched by the last
-// OSCILLATION_RECENT_WINDOW accepted events (see generatorConfig.ts's own
-// comment on OSCILLATION_RECENT_WINDOW for why this exists): a group
-// touched repeatedly within this short lookback gets its per-step weight
-// contribution shrunk by `1 / (1 + recentTouchCount)`, discouraging the walk
-// from immediately wandering a just-touched group's box back toward its
-// seed position — without ever hard-blocking legitimate repeat use of one
-// group (the penalty only ever shrinks a positive weight, never zeroes it).
+// Every piece id that participates in a group's win condition: the
+// container plus every one of its boxes. Touch tracking (touchCounts/
+// recentTouches) is keyed by these piece ids individually, not by
+// containerId alone — see the multi-box groups spec's §6/§7.1 for why:
+// diagnostics on the original containerId-keyed tracking found the
+// both-boxes-displaced rate for two-box groups was 0% (nowhere near the
+// spec's own 10% acceptance threshold), because touching box[0] marked the
+// *whole group* as "already touched", making box[1] look like a
+// discouraged repeat even though it had never moved. Per-piece tracking
+// also incidentally fixes a latent single-box-group issue: previously,
+// merely pushing a container around (without ever eating its box) already
+// marked that group "touched", discouraging the walk from later going for
+// the actual win-relevant eat.
+function groupPieceIds(group: SeedGroup): string[] {
+  return [group.containerId, ...group.boxes.map((box) => box.boxId)]
+}
+
+// `recentTouches` holds the piece id of every group-relevant piece touched
+// by the last OSCILLATION_RECENT_WINDOW accepted events (see
+// generatorConfig.ts's own comment on OSCILLATION_RECENT_WINDOW for why
+// this exists): a piece touched repeatedly within this short lookback gets
+// its per-step weight contribution shrunk by `1 / (1 + recentTouchCount)`,
+// discouraging the walk from immediately wandering a just-touched piece
+// back toward its seed position — without ever hard-blocking legitimate
+// repeat use of one piece (the penalty only ever shrinks a positive
+// weight, never zeroes it).
 function candidateWeight(
   kind: GenerationEventKind,
   moved: string[],
@@ -59,11 +77,13 @@ function candidateWeight(
   // generation toward genuine Sokoban-style box manipulation instead.
   if (kind === 'push' && moved.length > 1) weight += weights.boxPushBonus
   for (const group of groups) {
-    if (!moved.includes(group.containerId) && !moved.includes(group.boxId)) continue
-    const touches = touchCounts.get(group.containerId) ?? 0
-    const recentCount = recentTouches.filter((id) => id === group.containerId).length
-    const repeatPenalty = 1 / (1 + recentCount)
-    weight += (touches === 0 ? weights.newGroupBonus : weights.repeatedGroupWeight / touches) * repeatPenalty
+    for (const pieceId of groupPieceIds(group)) {
+      if (!moved.includes(pieceId)) continue
+      const touches = touchCounts.get(pieceId) ?? 0
+      const recentCount = recentTouches.filter((id) => id === pieceId).length
+      const repeatPenalty = 1 / (1 + recentCount)
+      weight += (touches === 0 ? weights.newGroupBonus : weights.repeatedGroupWeight / touches) * repeatPenalty
+    }
   }
   return weight
 }
@@ -115,12 +135,17 @@ export function directionSeekWeights(
   })
 }
 
+// A group still counts as a direction-seeking target as long as *any* of
+// its relevant pieces (container or a box) hasn't been touched yet — this
+// keeps a partially-touched multi-box group (e.g. box[0] eaten, box[1]
+// still fresh) attractive to seek toward, instead of only distinguishing
+// "fully fresh" vs "touched at all" the way group-level tracking did.
 function untouchedGroupPositions(
   groups: SeedGroup[],
   touchCounts: Map<string, number>,
 ): { x: number; y: number }[] {
   return groups
-    .filter((group) => (touchCounts.get(group.containerId) ?? 0) === 0)
+    .filter((group) => groupPieceIds(group).some((pieceId) => (touchCounts.get(pieceId) ?? 0) === 0))
     .map((group) => group.originalPosition)
 }
 
@@ -134,7 +159,7 @@ export function generateLevel(
   let world = cloneWorld(seed)
   const events: GenerationEvent[] = []
   const seen = new Set<string>([canonicalKey(world)])
-  const touchCounts = new Map<string, number>(groups.map((group) => [group.containerId, 0]))
+  const touchCounts = new Map<string, number>(groups.flatMap((group) => groupPieceIds(group).map((id) => [id, 0] as const)))
   const recentTouches: string[] = []
   let attempts = 0
   const maxAttempts = Math.max(steps, 1) * 20
@@ -167,9 +192,10 @@ export function generateLevel(
     const accepted = weightedPick(weighted, rng)
 
     for (const group of groups) {
-      if (accepted.moved.includes(group.containerId) || accepted.moved.includes(group.boxId)) {
-        touchCounts.set(group.containerId, (touchCounts.get(group.containerId) ?? 0) + 1)
-        recentTouches.push(group.containerId)
+      for (const pieceId of groupPieceIds(group)) {
+        if (!accepted.moved.includes(pieceId)) continue
+        touchCounts.set(pieceId, (touchCounts.get(pieceId) ?? 0) + 1)
+        recentTouches.push(pieceId)
         if (recentTouches.length > OSCILLATION_RECENT_WINDOW) recentTouches.shift()
       }
     }

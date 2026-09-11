@@ -141,7 +141,7 @@ export function countGroupsUsed(world: World, moves: Direction[], groups: SeedGr
     if (!next) throw new Error('countGroupsUsed received an invalid move for this world')
     for (const group of groups) {
       if (usedGroups.has(group.containerId)) continue
-      for (const pieceId of [group.containerId, group.boxId]) {
+      for (const pieceId of [group.containerId, ...group.boxes.map((box) => box.boxId)]) {
         const before = current.locations[pieceId]
         const after = next.locations[pieceId]
         if (!before || !after) continue

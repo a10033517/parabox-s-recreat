@@ -37,6 +37,17 @@ export interface SeedProfile {
   fourGroupProbability: number
   largeInteriorProbability: number
   remoteStartProbability: number
+  // See the multi-box groups spec (2026-09-11-parabox-generator-multibox-
+  // groups.md): chance a given group's container gets 2 walls / 2
+  // requirement cells instead of 1. Applies uniformly to every group draw
+  // in both profiles, exactly like the two probabilities above.
+  multiBoxProbability: number
+}
+
+export function assertProbability(value: number, name: string): void {
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`${name} must be a probability in [0, 1], got ${value}`)
+  }
 }
 
 export interface GeneratorConfig {
@@ -98,11 +109,13 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
     fourGroupProbability: 0.5,
     largeInteriorProbability: 0.5,
     remoteStartProbability: 0,
+    multiBoxProbability: 0.3,
   },
   hardSeedProfile: {
     fourGroupProbability: 0.8,
     largeInteriorProbability: 0.8,
     remoteStartProbability: 0.25,
+    multiBoxProbability: 0.5,
   },
   scoring: {
     crossingMoveWeight: 3,
@@ -134,4 +147,17 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
   diversityWeight: 10,
   maxSolverExpandedStates: 5000,
   trimBufferRadius: 2,
+}
+
+// Validate the shipped defaults at module load — cheap, and catches a typo
+// (e.g. multiBoxProbability: 5 instead of 0.5) immediately on import rather
+// than as a silent generation-time misbehavior.
+for (const [profileName, profile] of Object.entries({
+  seedProfile: GENERATOR_CONFIG.seedProfile,
+  hardSeedProfile: GENERATOR_CONFIG.hardSeedProfile,
+})) {
+  assertProbability(profile.fourGroupProbability, `${profileName}.fourGroupProbability`)
+  assertProbability(profile.largeInteriorProbability, `${profileName}.largeInteriorProbability`)
+  assertProbability(profile.remoteStartProbability, `${profileName}.remoteStartProbability`)
+  assertProbability(profile.multiBoxProbability, `${profileName}.multiBoxProbability`)
 }

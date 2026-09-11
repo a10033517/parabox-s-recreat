@@ -81,6 +81,30 @@ test('a push event is recorded with the direction that produced it', () => {
   expect(event.direction).toBe('up')
 })
 
+test('generateLevel handles a multi-box group end-to-end: reverse replay is unique and reaches the seed', () => {
+  const multiBoxProfile = {
+    fourGroupProbability: 0, largeInteriorProbability: 0.5, remoteStartProbability: 0, multiBoxProbability: 1,
+  }
+  const { world: seed, groups } = createSeedWorld(seededRng(7), multiBoxProfile)
+  expect(groups.every((g) => g.boxes.length === 2)).toBe(true)
+
+  const result = generateLevel(seed, groups, 5, seededRng(11))
+  expect(result).not.toBeNull()
+  expect(result!.events.length).toBe(5)
+
+  let replayed = result!.world
+  const seenKeys = new Set<string>([canonicalKey(replayed)])
+  for (const event of [...result!.events].reverse()) {
+    const next = applyMove(replayed, event.direction)
+    expect(next).not.toBeNull()
+    const key = canonicalKey(next!)
+    expect(seenKeys.has(key)).toBe(false)
+    seenKeys.add(key)
+    replayed = next!
+  }
+  expect(replayed).toEqual(seed)
+})
+
 test('directionSeekWeights returns uniform weights when there is no untouched-group target', () => {
   const weights = directionSeekWeights({ x: 3, y: 3 }, [], 4.0)
   expect(weights.every((w) => w.weight === 1)).toBe(true)
