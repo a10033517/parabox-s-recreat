@@ -102,6 +102,45 @@ export function countPushMoves(world: World, moves: Direction[]): number {
   return count
 }
 
+// "Box lines" metric (Taylor & Parberry, "Procedural Generation of Sokoban
+// Levels", LARC-2011-01, §3.3): any number of consecutive pushes of the
+// SAME box in the SAME direction count as a single line; pushing a
+// different box, or the same box in a new direction, starts a new line.
+// The paper's own observation is that this correlates with perceived
+// difficulty better than raw move count or push count (a long straight
+// shove down one corridor is tedious, not hard). "Consecutive" here means
+// consecutive PUSHES of that box specifically — an intervening move that
+// pushes a different box (or no box at all) does not by itself break a
+// line, only a direction change (or first push) does; this matches the
+// paper's stated rationale (lines measure direction changes) rather than
+// literal move-adjacency, and gives a well-defined, order-independent-per-box
+// count. A single move can push more than one piece at once via chain-push
+// (rules.ts's resolveBlocked resolves the whole chain in one top-level
+// move) — every piece in that chain moves in the move's own direction, so
+// each contributes to its own line independently.
+export function countBoxLines(world: World, moves: Direction[]): number {
+  let current = world
+  let lines = 0
+  const lastDirection = new Map<string, Direction>()
+  for (const direction of moves) {
+    const next = applyMove(current, direction)
+    if (!next) throw new Error('countBoxLines received an invalid move for this world')
+    for (const pieceId of Object.keys(current.locations)) {
+      if (pieceId === PLAYER_ID) continue
+      const before = current.locations[pieceId]
+      const after = next.locations[pieceId]
+      if (before.board !== after.board) continue // crossing/eat, not a plain push
+      if (before.x === after.x && before.y === after.y) continue // not pushed this move
+      if (lastDirection.get(pieceId) !== direction) {
+        lines++
+        lastDirection.set(pieceId, direction)
+      }
+    }
+    current = next
+  }
+  return lines
+}
+
 export function countEatMoves(world: World, moves: Direction[]): number {
   const interiorIds = new Set(
     Object.values(world.pieces)

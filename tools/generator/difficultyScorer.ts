@@ -16,6 +16,18 @@ export interface DifficultyMetrics {
   // minimum makes the pool sharply harder to fill, so this only influences
   // scoreDifficulty/ranking, not pass/fail.
   pushMoveCount: number
+  // "Box lines" (solver.ts's countBoxLines) — Taylor & Parberry's metric
+  // (LARC-2011-01 §3.3): consecutive same-direction pushes of the same box
+  // count as one line; a direction change or switching to a different box
+  // starts a new one. Their own observation is that this correlates with
+  // perceived difficulty better than raw push/move counts, since it
+  // measures how often the solution's shape actually changes rather than
+  // how long it drags on. NOT yet wired into scoreDifficulty or
+  // checkHardRequirements below — carried purely as a measured field until
+  // a diagnostic pass against this project's own generated candidates
+  // confirms it's worth scoring on (see this project's own standing rule:
+  // measure before shipping any new "obviously good" metric).
+  boxLineCount: number
 }
 
 export function scoreDifficulty(metrics: DifficultyMetrics): number {

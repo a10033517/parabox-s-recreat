@@ -1,6 +1,6 @@
 import { Cell, World } from '../../src/game/engine/types'
 import { BUILTIN_LEVELS } from '../../src/levels'
-import { countCrossingMoves, countEatMoves, countFillerBoxesUsed, countGroupsUsed, countPushMoves, solve } from './solver'
+import { countBoxLines, countCrossingMoves, countEatMoves, countFillerBoxesUsed, countGroupsUsed, countPushMoves, solve } from './solver'
 import { SeedGroup } from './seed'
 
 function makeSquareCells(size: number, fill: () => { type: 'floor' | 'wall'; requirement?: 'box' | 'player' }) {
@@ -181,6 +181,71 @@ test('countPushMoves counts the container advancing during an eat, separately fr
   // countEatMoves/countCrossingMoves, not this function). Both are true at
   // once for this one move, since they're different pieces.
   expect(countPushMoves(world, ['right'])).toBe(1)
+})
+
+test('countBoxLines counts one line for any run of same-box same-direction pushes', () => {
+  const root = { id: 'root', size: 6, cells: makeSquareCells(6, () => ({ type: 'floor' as const })) }
+  const world: World = {
+    boards: { root },
+    pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
+    locations: { player: { board: 'root', x: 0, y: 2 }, box1: { board: 'root', x: 1, y: 2 } },
+  }
+  // Three consecutive rightward pushes of the same box: still one line.
+  expect(countBoxLines(world, ['right', 'right', 'right'])).toBe(1)
+})
+
+test('countBoxLines counts a new line when the same box changes direction', () => {
+  const root = { id: 'root', size: 6, cells: makeSquareCells(6, () => ({ type: 'floor' as const })) }
+  const world: World = {
+    boards: { root },
+    pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
+    locations: { player: { board: 'root', x: 2, y: 3 }, box1: { board: 'root', x: 2, y: 2 } },
+  }
+  // Push box1 up twice (one line: box1 ends at (2,0), player at (2,1)),
+  // walk around to its left side, then push it right once (a second line —
+  // new direction for the same box).
+  const moves = ['up', 'up', 'left', 'up', 'right'] as const
+  expect(countBoxLines(world, [...moves])).toBe(2)
+})
+
+test('countBoxLines counts pushing two different boxes as two lines even in the same direction', () => {
+  const root = { id: 'root', size: 7, cells: makeSquareCells(7, () => ({ type: 'floor' as const })) }
+  const world: World = {
+    boards: { root },
+    pieces: {
+      player: { id: 'player', kind: 'player' },
+      box1: { id: 'box1', kind: 'normal' },
+      box2: { id: 'box2', kind: 'normal' },
+    },
+    locations: {
+      player: { board: 'root', x: 0, y: 1 },
+      box1: { board: 'root', x: 1, y: 1 },
+      box2: { board: 'root', x: 1, y: 3 },
+    },
+  }
+  // Push box1 right once, walk around to box2's left side, push box2 right
+  // once — same direction, but a different box each time, so two separate
+  // lines (box lines track direction-changes-per-box, not per-direction).
+  const moves = ['right', 'left', 'down', 'down', 'right'] as const
+  expect(countBoxLines(world, [...moves])).toBe(2)
+})
+
+test('countBoxLines is 0 for plain player movement with nothing pushed', () => {
+  const root = { id: 'root', size: 5, cells: makeSquareCells(5, () => ({ type: 'floor' as const })) }
+  const world: World = {
+    boards: { root },
+    pieces: { player: { id: 'player', kind: 'player' } },
+    locations: { player: { board: 'root', x: 0, y: 2 } },
+  }
+  expect(countBoxLines(world, ['right', 'right'])).toBe(0)
+})
+
+test('countBoxLines counts the container advancing during an eat as its own line, same as any other push', () => {
+  const eatWorld = makeEatWorld()
+  // container1 advances one cell during the eat (see countPushMoves's own
+  // eat test above) — that's a genuine push of the container, so it counts
+  // as one line, same as any other pushed piece.
+  expect(countBoxLines(eatWorld, ['right'])).toBe(1)
 })
 
 test('countEatMoves counts a real eat interaction and 0 for a push-only solution', () => {

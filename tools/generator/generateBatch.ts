@@ -6,7 +6,7 @@ import { checkWin } from '../../src/game/engine/rules'
 import { serializeLevel } from '../../src/game/engine/levelSchema'
 import { createSeedWorld } from './seed'
 import { generateLevel } from './generateLevel'
-import { countCrossingMoves, countEatMoves, countGroupsUsed, countPushMoves, solve } from './solver'
+import { countBoxLines, countCrossingMoves, countEatMoves, countGroupsUsed, countPushMoves, solve } from './solver'
 import {
   DifficultyMetrics, checkHardRequirements, difficultyTier, scoreDifficulty,
 } from './difficultyScorer'
@@ -224,6 +224,7 @@ export function generateLevelBatch(
       expandedStates: solved.expandedStates,
       maxFrontierSize: solved.maxFrontierSize,
       pushMoveCount: countPushMoves(world, solved.moves),
+      boxLineCount: countBoxLines(world, solved.moves),
     }
     const tier = difficultyTier(metrics)
 

@@ -10,6 +10,7 @@ function baseMetrics(overrides: Partial<DifficultyMetrics> = {}): DifficultyMetr
     expandedStates: 0,
     maxFrontierSize: 0,
     pushMoveCount: 0,
+    boxLineCount: 0,
     ...overrides,
   }
 }
