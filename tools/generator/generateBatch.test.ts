@@ -15,7 +15,7 @@ function seededRng(startSeed: number): () => number {
 }
 
 test('generateLevelBatch reports whether it actually met its tier quotas', () => {
-  const result = generateLevelBatch(1, seededRng(42), 20)
+  const result = generateLevelBatch(1, seededRng(42), 200)
   if (result.complete) {
     expect(result.counts.easy).toBeGreaterThanOrEqual(1)
     expect(result.counts.medium).toBeGreaterThanOrEqual(1)
@@ -26,7 +26,7 @@ test('generateLevelBatch reports whether it actually met its tier quotas', () =>
 })
 
 test('every accepted level is unsolved and parses back through parseLevel', () => {
-  const result = generateLevelBatch(1, seededRng(42), 20)
+  const result = generateLevelBatch(1, seededRng(42), 200)
   expect(result.levels.length).toBeGreaterThan(0)
   for (const entry of result.levels) {
     const parsed = parseLevel(JSON.parse(entry.json))
@@ -35,13 +35,13 @@ test('every accepted level is unsolved and parses back through parseLevel', () =
 })
 
 test('no two accepted levels in one batch share a canonical state', () => {
-  const result = generateLevelBatch(2, seededRng(7), 20)
+  const result = generateLevelBatch(2, seededRng(7), 200)
   const keys = result.levels.map((entry) => canonicalKey(entry.world))
   expect(new Set(keys).size).toBe(keys.length)
 })
 
 test('batch stats account for every attempt', () => {
-  const result = generateLevelBatch(1, seededRng(99), 20)
+  const result = generateLevelBatch(1, seededRng(99), 200)
   const accountedFor =
     result.levels.length +
     result.stats.discardedGenerationFailed +
@@ -57,7 +57,7 @@ test('batch stats account for every attempt', () => {
 })
 
 test('hardCandidatesFound reflects the pool size independent of how many were finally selected', () => {
-  const result = generateLevelBatch(1, seededRng(7), 20)
+  const result = generateLevelBatch(1, seededRng(7), 200)
   expect(result.hardCandidatesFound).toBeGreaterThanOrEqual(result.counts.hard)
 })
 

@@ -127,7 +127,28 @@ export interface GeneratorConfig {
 }
 
 export const GENERATOR_CONFIG: GeneratorConfig = {
-  minReverseSteps: 12,
+  // Raised from 12 per a user request to raise difficulty while keeping
+  // the board small. Tried raising seed-material probabilities first
+  // (SeedProfile's own comment block above has the full story) — that
+  // measurably did nothing (moveCount/hard-tier yield unchanged within
+  // noise), because the necessity-pruning stage strips unused material
+  // regardless of how much was offered. This is a genuinely different
+  // lever: raising the FLOOR of the reverse walk's own length forces every
+  // walk to be long, rather than merely allowing it. A head-to-head
+  // diagnostic (200 solved candidates per value, minReverseSteps = 12
+  // baseline / 25 / 35, maxReverseSteps fixed at 50) found a real, growing
+  // effect: hard-tier yield 3/200 (1.5%) -> 5/200 (2.5%) -> 11/200 (5.5%),
+  // moveCount p90 12 -> 12 -> 14, max 18 -> 19 -> 20 — and the solved rate
+  // held up (200 solved found within 1699/1702/2007 attempts respectively,
+  // no collapse). This is NOT the same experiment as the previously-
+  // rejected "wider reverse-step range" (which raised the ceiling and
+  // suffered survivorship bias — a longer max is more likely to wander
+  // into a dead end/cycle and simply fail, so only accidentally-short
+  // walks survived); raising the floor instead forces every surviving
+  // walk to actually be long. Board size (ROOT_SIZE/SLOT_SIZE in seed.ts)
+  // is untouched, so this doesn't grow the level's footprint at all — it
+  // only makes the fixed-size board's optimal solution genuinely longer.
+  minReverseSteps: 35,
   maxReverseSteps: 50,
   weights: {
     push: 1.0,
@@ -138,6 +159,23 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
     groupSeekBias: 4.0,
     boxPushBonus: 2.0,
   },
+  // Tried raising every one of these (fourGroupProbability 0.5->0.7,
+  // largeInteriorProbability 0.5->0.65, remoteStartProbability 0->0.15,
+  // multiBoxProbability 0.3->0.45, fillerBoxCount 3->5, obstacleBoxProbability
+  // 0.4->0.55, and the hardSeedProfile equivalents) per a user request to
+  // raise complexity while keeping the board small. Reverted after a
+  // head-to-head diagnostic (200 solved candidates each, same methodology)
+  // found NO real effect: moveCount p50 7 vs 7, p90 13 vs 12, max 16 vs 15;
+  // hard-tier yield 7/200 vs 6/200 — within noise, not an improvement. Root
+  // cause: these probabilities only control how much EXTRA material a seed
+  // *offers* (more groups, bigger interiors, more filler/obstacle boxes);
+  // the necessity-pruning stage (pruneUntouchedGoals, removeUnnecessaryFiller
+  // Boxes) strips out whatever the shortest solution doesn't actually need,
+  // regardless of how much was offered at seed time. Raising "how much is
+  // available" doesn't raise "how much is necessary" — that's governed by
+  // the reverse walk's own length/weights, not the seed profile. This joins
+  // this project's other rejected "obviously good" ideas (SLOT_SIZE 5->7,
+  // wider reverse-step range) — see this file's own history for those.
   seedProfile: {
     fourGroupProbability: 0.5,
     largeInteriorProbability: 0.5,
