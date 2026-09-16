@@ -35,6 +35,13 @@ anticipate it beyond not making it structurally harder.
   once the editor compiles and works (confirm via the existing `App.test.tsx` coverage
   of the error-boundary path — that test is removed/replaced, not left describing dead
   code)
+- Un-stub `loadCustomLevels()` in `src/levels/index.ts` so levels saved by the rebuilt
+  editor actually show up in Level Select and are playable — otherwise the editor's save
+  button has no observable effect. Per that function's own existing comment, restore a
+  per-entry `try`/`catch` around `parseLevel` so one corrupt saved level can't white-
+  screen the whole app (mirroring `storage/progress.ts`'s `readJson` pattern), and give
+  each entry an id of `${CUSTOM_LEVEL_ID_PREFIX}${entry.id}` (the constant already
+  exists for exactly this)
 
 **Explicitly out of scope:**
 - Self-referencing / loop container boxes (separate future spec)
