@@ -163,6 +163,25 @@ test('deleting a container box recursively deletes its interior board and everyt
   expect(screen.getByTestId('piece-ids')).not.toHaveTextContent('box-1')
 })
 
+test('clicking two different cells in quick succession with container-box tool places boxes on both, not just the second', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('容器箱'))
+  const canvas = screen.getByTestId('editor-canvas')
+  // Click cell (0,0), then click cell (1,0) rapidly, before the timer fires.
+  // A stale-closure implementation would compute both placements against the
+  // initial world, then commit them in order, silently dropping the first one
+  // as the second overwrites it.
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 }) // cell (0,0)
+  fireEvent.click(canvas, { clientX: 32 + 5, clientY: 5 }) // cell (1,0)
+  await waitPastClickWindow()
+  expect(screen.getByTestId('box-at-0-0')).toHaveTextContent('container')
+  expect(screen.getByTestId('box-at-1-0')).toHaveTextContent('container')
+  // Both should exist as separate boxes with different ids
+  expect(screen.getByTestId('box-id-at-0-0')).toHaveTextContent('box-0')
+  expect(screen.getByTestId('box-id-at-1-0')).toHaveTextContent('box-1')
+})
+
 test('clicking save stores the level in localStorage', async () => {
   localStorage.clear()
   render(<EditorScreen onBack={() => {}} />)

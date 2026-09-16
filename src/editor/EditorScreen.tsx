@@ -88,16 +88,26 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
     const existingId = occupantAt(world, { board: activeBoardId, x, y })
     if (existingId && world.pieces[existingId].kind === desiredKind) return
 
-    // The id is allocated here, in the plain event-handler body, rather than
-    // inside a setState updater: React 18 StrictMode double-invokes updater
-    // functions in dev to surface impurity, which would burn two ids per click.
-    const result =
-      tool === 'container-box'
-        ? placeContainerBox(world, activeBoardId, x, y, idsRef.current, DEFAULT_INTERIOR_SIZE)
-        : placeNormalBox(world, activeBoardId, x, y, idsRef.current)
-    if (!result) return
-    idsRef.current = result.ids
-    setWorld(result.world)
+    // Allocate ids here in the plain event-handler body (not inside a setState
+    // updater) to avoid React 18 StrictMode double-invoking the updater and
+    // burning two ids per click. Pass the ids to the setState updater via
+    // closure so it uses the same ids computed here, ensuring consistency.
+    const oldIds = idsRef.current
+    const newIds = {
+      nextBoxId: oldIds.nextBoxId + 1,
+      nextBoardId: tool === 'container-box' ? oldIds.nextBoardId + 1 : oldIds.nextBoardId,
+    }
+
+    setWorld((w) => {
+      const result =
+        tool === 'container-box'
+          ? placeContainerBox(w, activeBoardId, x, y, oldIds, DEFAULT_INTERIOR_SIZE)
+          : placeNormalBox(w, activeBoardId, x, y, oldIds)
+      if (!result) return w
+      return result.world
+    })
+
+    idsRef.current = newIds
   }
 
   const cellFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
