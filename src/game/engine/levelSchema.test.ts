@@ -139,7 +139,14 @@ describe('parseLevel board-ownership validation', () => {
     expect(() => parseLevel(data)).toThrow(/owner/i)
   })
 
-  it('rejects a container whose interior is the board it is itself located on (self-referential cycle)', () => {
+  it('rejects a self-referencing container on a non-root board with no external owner', () => {
+    // cx self-references board x (its own interior is the very board it
+    // sits on), and nothing else references x at all — self-references are
+    // excluded from the owner tally (see levelSchema.ts), so x has zero
+    // owners, same as root. Two boards with zero owners is exactly as
+    // invalid as it always was; only the specific error changed (caught by
+    // the "exactly one owner-less board" ownership check now, before
+    // reachability is even walked).
     const root = makeFloorBoard('root', 2)
     const x = makeFloorBoard('x', 2)
     const world = makeWorld(
@@ -154,7 +161,44 @@ describe('parseLevel board-ownership validation', () => {
       },
     )
     const data = serializeLevel(world)
-    expect(() => parseLevel(data)).toThrow(/reachable/i)
+    expect(() => parseLevel(data)).toThrow(/owner/i)
+  })
+
+  it('accepts a self-referencing container on the root board', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'loopBox', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        loopBox: { board: 'root', x: 1, y: 0 },
+      },
+    )
+    const data = serializeLevel(world)
+    expect(parseLevel(data)).toEqual(world)
+  })
+
+  it('accepts a self-referencing container on a non-root board that also has a real external owner', () => {
+    const root = makeFloorBoard('root', 2)
+    const y = makeFloorBoard('y', 2)
+    const world = makeWorld(
+      [root, y],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'd', kind: 'container', boardRef: 'y' }, // external owner, sits on root
+        { id: 'loopBox', kind: 'container', boardRef: 'y' }, // self-reference, sits on y itself
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        d: { board: 'root', x: 1, y: 0 },
+        loopBox: { board: 'y', x: 0, y: 0 },
+      },
+    )
+    const data = serializeLevel(world)
+    expect(parseLevel(data)).toEqual(world)
   })
 
   it('rejects a mutual two-board containment cycle', () => {

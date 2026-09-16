@@ -83,7 +83,16 @@ export function parseLevel(data: unknown): World {
   )
   for (const piece of Object.values(pieces)) {
     if (piece.kind === 'container' && piece.boardRef !== undefined) {
-      ownerCount[piece.boardRef] = (ownerCount[piece.boardRef] ?? 0) + 1
+      // A container located on the very board it owns (a self-loop box) is
+      // not a real external owner — it provides no path INTO this board
+      // from anywhere else, so it must not count toward "this board has an
+      // owner." Without this exclusion, a self-loop on the root board would
+      // make ownerCount[root] === 1 and break the "exactly one owner-less
+      // board is the root" invariant checked just below.
+      const isSelfReferencing = locations[piece.id]?.board === piece.boardRef
+      if (!isSelfReferencing) {
+        ownerCount[piece.boardRef] = (ownerCount[piece.boardRef] ?? 0) + 1
+      }
     }
   }
   const orphanBoards = Object.entries(ownerCount).filter(([, count]) => count === 0)
