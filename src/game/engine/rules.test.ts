@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece, checkWin } from './rules'
+import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece, resolveBlocked, checkWin, checkLose } from './rules'
 import { HALF, makeFraction, ZERO, ONE } from './fraction'
 import { makeFloorBoard, makeWorld, setWall, setRequirement } from './testFixtures'
-import { PLAYER_ID } from './types'
+import { PLAYER_ID, removePiece } from './types'
 
 describe('computeTarget', () => {
   it('returns the adjacent cell unchanged when it stays within the board', () => {
     const world = makeWorld([makeFloorBoard('root', 3)], [], {})
     const result = computeTarget(world, { board: 'root', x: 1, y: 1 }, 'right', HALF)
-    expect(result).toEqual({ location: { board: 'root', x: 2, y: 1 }, relativeCoord: HALF })
+    expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 2, y: 1 }, relativeCoord: HALF })
   })
 
   it('exits into the parent board through the container piece that owns this board', () => {
@@ -18,7 +18,7 @@ describe('computeTarget', () => {
       { boxA: { board: 'root', x: 1, y: 1 } },
     )
     const result = computeTarget(world, { board: 'boardA', x: 1, y: 0 }, 'up', HALF)
-    expect(result).toEqual({ location: { board: 'root', x: 1, y: 0 }, relativeCoord: HALF })
+    expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 1, y: 0 }, relativeCoord: HALF })
   })
 
   it('produces a non-center fraction when exiting from an off-center column', () => {
@@ -28,7 +28,11 @@ describe('computeTarget', () => {
       { boxA: { board: 'root', x: 1, y: 1 } },
     )
     const result = computeTarget(world, { board: 'boardA', x: 0, y: 0 }, 'up', HALF)
-    expect(result).toEqual({ location: { board: 'root', x: 1, y: 0 }, relativeCoord: makeFraction(1, 6) })
+    expect(result).toEqual({
+      kind: 'location',
+      location: { board: 'root', x: 1, y: 0 },
+      relativeCoord: makeFraction(1, 6),
+    })
   })
 
   it('fails to exit a board nothing else contains (e.g. the root board)', () => {
@@ -58,7 +62,33 @@ describe('computeTarget', () => {
       },
     )
     const result = computeTarget(world, { board: 'boardC', x: 0, y: 1 }, 'left', HALF)
-    expect(result).toEqual({ location: { board: 'root', x: 0, y: 1 }, relativeCoord: HALF })
+    expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 0, y: 1 }, relativeCoord: HALF })
+  })
+
+  it('classifies as infinite when the recursive exit repeats the same out-of-bounds board', () => {
+    const root = makeFloorBoard('root', 3)
+    const world = makeWorld(
+      [root],
+      [{ id: 'loopBox', kind: 'container', boardRef: 'root' }],
+      { loopBox: { board: 'root', x: 0, y: 1 } }, // flush against the left edge
+    )
+    const result = computeTarget(world, { board: 'root', x: 0, y: 0 }, 'left', HALF)
+    expect(result).toEqual({ kind: 'infinite' })
+  })
+
+  it('resolves as a normal wrap when the recursive owner position lands in bounds', () => {
+    const root = makeFloorBoard('root', 3)
+    const world = makeWorld(
+      [root],
+      [{ id: 'loopBox', kind: 'container', boardRef: 'root' }],
+      { loopBox: { board: 'root', x: 0, y: 1 } }, // flush left, but not flush top/bottom
+    )
+    const result = computeTarget(world, { board: 'root', x: 0, y: 0 }, 'up', HALF)
+    expect(result).toEqual({
+      kind: 'location',
+      location: { board: 'root', x: 0, y: 0 },
+      relativeCoord: makeFraction(1, 6),
+    })
   })
 })
 
@@ -245,29 +275,23 @@ describe('applyMove — enter', () => {
 
   it('tryEnter refuses to enter a container already marked as being entered, without recursing', () => {
     // This is a direct unit test of the beingEntered guard's own
-    // short-circuit line, not a black-box test through applyMove. An
-    // earlier version of this test tried to trigger the guard indirectly
-    // by constructing a container whose boardRef equals the board it sits
-    // on (a "self-containing box"). That construction doesn't actually
-    // exercise this guard at all: findContainerFor(world, 'root') would
-    // return that very container as root's "owner", so computeTarget's
-    // board-exit recursion (a separate function with no cycle detection of
-    // its own) loops forever on identical arguments before beingEntered is
-    // ever consulted. That's a known, deliberately out-of-scope limitation
-    // of computeTarget (self-recursive boards are explicitly deferred past
-    // this sub-project), not a gap in this guard — and it can never arise
-    // from a real level: parseLevel (Task 11) rejects any board that isn't
-    // referenced by exactly one container (or, for the one true root,
-    // zero), which this shape violates. parseLevel also performs a full
-    // reachability walk from the root board (not just an ownership count),
-    // which is what would actually catch this specific self-referential
-    // shape — a board owned by a container located on itself trivially
-    // satisfies the ownership count but can never be reached by walking
-    // down from the root. So instead: call tryEnter directly
-    // with a beingEntered set that already contains the target container's
-    // id, and assert the guard's own `if (beingEntered.has(intoId)) return
-    // null` line fires immediately — no push, no board traversal, no
-    // reliance on any other function's cycle behavior.
+    // short-circuit line, not a black-box test through applyMove — nothing
+    // that calls tryEnter naturally re-enters the same container within one
+    // move today, so there's no organic way to reach this line through
+    // applyMove alone. Call tryEnter directly with a beingEntered set that
+    // already contains the target container's id, and assert the guard's
+    // own `if (beingEntered.has(intoId)) return null` line fires
+    // immediately — no push, no board traversal.
+    //
+    // This guard is unrelated to computeTarget's own cycle detection (its
+    // `visited` set, added for self-referencing "loop" boxes — see the
+    // computeTarget tests above): that detects a board-EXIT climb repeating
+    // a board it already left, not a re-entry. A self-referencing
+    // container's own board-exit climb is now handled correctly (it
+    // resolves to `{ kind: 'infinite' }` rather than hanging), so the
+    // original reason this test avoided that construction no longer
+    // applies — but calling the guard directly is still the more precise
+    // test of this specific line, so the approach is unchanged.
     const root = makeFloorBoard('root', 3)
     const inside = makeFloorBoard('inside', 3)
     const world = makeWorld(
@@ -495,5 +519,106 @@ describe('checkWin', () => {
       },
     )
     expect(checkWin(world)).toBe(true)
+  })
+})
+
+describe('tryMovePiece / applyMove — infinite regress', () => {
+  it('removes the player directly when its own move resolves to infinite', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'loopBox', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+        loopBox: { board: 'root', x: 0, y: 0 }, // flush corner
+      },
+    )
+    const next = applyMove(world, 'left')
+    expect(next).not.toBeNull()
+    expect(next?.locations[PLAYER_ID]).toBeUndefined()
+    expect(next?.pieces[PLAYER_ID]).toBeUndefined()
+  })
+
+  it('walking through a self-loop box via a non-flush edge wraps to a different cell of the same board, without crashing', () => {
+    const root = makeFloorBoard('root', 3)
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'loopBox', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        loopBox: { board: 'root', x: 1, y: 1 }, // center — not flush against any edge
+      },
+    )
+    const next = applyMove(world, 'up')
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 0 })
+    expect(next?.locations.loopBox).toEqual({ board: 'root', x: 1, y: 1 })
+  })
+
+  it('removes a self-loop box pushed flush against the board it owns, letting the pusher complete its move', () => {
+    const root = makeFloorBoard('root', 3)
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'loopBox', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 1, y: 1 },
+        loopBox: { board: 'root', x: 2, y: 1 }, // already flush against the right edge
+      },
+    )
+    const next = applyMove(world, 'right')
+    expect(next).not.toBeNull()
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'root', x: 2, y: 1 })
+    expect(next?.locations.loopBox).toBeUndefined()
+    expect(next?.pieces.loopBox).toBeUndefined()
+  })
+
+  it('resolveBlocked removes the player when pushing it resolves to infinite, treating it the same as any other piece', () => {
+    // Constructing an organic applyMove scenario where the player ends up as
+    // a *pushed* occupant (rather than the move's own top-level mover) needs
+    // a multi-board container-entry setup elaborate enough to obscure the
+    // actual thing being tested. Call resolveBlocked directly instead, with
+    // the player as the occupant being pushed into a self-loop trap.
+    const root = makeFloorBoard('root', 3)
+    const world = makeWorld(
+      [root],
+      [
+        { id: 'pusher', kind: 'normal' },
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'loopBox', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        pusher: { board: 'root', x: 1, y: 0 },
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 }, // flush against the left edge
+        loopBox: { board: 'root', x: 0, y: 1 },     // also flush left — same climb, same result
+      },
+    )
+    const target = computeTarget(world, world.locations.pusher, 'left', HALF)
+    if (target === null || target.kind !== 'location') throw new Error('test setup: pusher must have a valid target')
+    const result = resolveBlocked(world, 'pusher', PLAYER_ID, target, 'left', new Map(), new Set())
+    expect(result?.locations.pusher).toEqual({ board: 'root', x: 0, y: 0 })
+    expect(result?.locations[PLAYER_ID]).toBeUndefined()
+    expect(result?.pieces[PLAYER_ID]).toBeUndefined()
+    expect(result?.locations.loopBox).toEqual({ board: 'root', x: 0, y: 1 })
+  })
+})
+
+describe('checkLose', () => {
+  it('is true only when the player has no location', () => {
+    const world = makeWorld(
+      [makeFloorBoard('root', 2)],
+      [{ id: PLAYER_ID, kind: 'player' }],
+      { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } },
+    )
+    expect(checkLose(world)).toBe(false)
+    const next = removePiece(world, PLAYER_ID)
+    expect(checkLose(next)).toBe(true)
   })
 })

@@ -1,21 +1,34 @@
 import { Fraction, addInt, divideByInt, multiplyByInt, isZero, fractionDivMod, makeFraction, HALF } from './fraction'
 import {
-  World, Location, Direction, Board, Piece, PieceId,
-  inBounds, step, findContainerFor, occupantAt, moveTo, opposite, PLAYER_ID,
+  World, Location, Direction, Board, BoardId, Piece, PieceId,
+  inBounds, step, findContainerFor, occupantAt, moveTo, removePiece, opposite, PLAYER_ID,
 } from './types'
+
+export type MoveTarget =
+  | { kind: 'location'; location: Location; relativeCoord: Fraction }
+  | { kind: 'infinite' }
+  | null // blocked: no owner to climb through (e.g. the true root boundary)
 
 export function computeTarget(
   world: World,
   loc: Location,
   dir: Direction,
   relativeCoord: Fraction,
-): { location: Location; relativeCoord: Fraction } | null {
+  visited: Set<BoardId> = new Set(),
+): MoveTarget {
   const board = world.boards[loc.board]
   const { x, y } = step(loc.x, loc.y, dir)
 
+  // inBounds MUST be checked before visited — a legitimate "wrap" (the
+  // recursive owner position happens to be in bounds) is not a cycle, even
+  // if loc.board has been visited before in this climb. Checking visited
+  // first would misclassify every ordinary self-loop wrap as infinite.
   if (inBounds(board, x, y)) {
-    return { location: { board: loc.board, x, y }, relativeCoord }
+    return { kind: 'location', location: { board: loc.board, x, y }, relativeCoord }
   }
+
+  if (visited.has(loc.board)) return { kind: 'infinite' }
+  visited.add(loc.board)
 
   const containerId = findContainerFor(world, loc.board)
   if (containerId === undefined) return null
@@ -24,7 +37,7 @@ export function computeTarget(
   const newRelativeCoord = divideByInt(addInt(relativeCoord, offset), board.size)
 
   const containerLoc = world.locations[containerId]
-  return computeTarget(world, containerLoc, dir, newRelativeCoord)
+  return computeTarget(world, containerLoc, dir, newRelativeCoord, visited)
 }
 
 export function getEntryCell(
@@ -80,6 +93,15 @@ export function tryMovePiece(
   const loc = world.locations[pieceId]
   const target = computeTarget(world, loc, dir, HALF)
   if (target === null) return null
+  // The transition can never resolve to a real location — the piece
+  // attempting it is removed instead. If pieceId is PLAYER_ID, this is how
+  // a loss actually happens (checkLose reads the resulting world). If it's
+  // any other piece, resolveBlocked's existing "pushed succeeded" path
+  // (moveTo(pushed, pieceId, target.location)) already treats a non-null
+  // return as a completed push, so the pusher still ends up at its own
+  // target cell while the pushed piece simply vanishes — no change needed
+  // there.
+  if (target.kind === 'infinite') return removePiece(world, pieceId)
 
   const targetBoard = world.boards[target.location.board]
   if (targetBoard.cells[target.location.y][target.location.x].type === 'wall') return null
@@ -166,4 +188,8 @@ export function checkWin(world: World): boolean {
     }
   }
   return true
+}
+
+export function checkLose(world: World): boolean {
+  return world.locations[PLAYER_ID] === undefined
 }
