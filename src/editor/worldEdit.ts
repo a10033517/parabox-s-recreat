@@ -64,7 +64,13 @@ export function deletePieceRecursively(world: World, pieceId: PieceId): World {
     const id = stack.pop() as PieceId
     const piece = next.pieces[id]
     if (!piece) continue
-    if (piece.kind === 'container' && piece.boardRef !== undefined) {
+    // A self-referencing (self-loop) container's own board is not solely
+    // "owned" by it — that board is the very one it's standing on, which
+    // may still be legitimately owned by a separate external container (or,
+    // on root, own itself). Deleting a self-loop piece must only delete
+    // that one piece, never cascade into the board it also sits inside.
+    const isSelfReferencing = next.locations[id]?.board === piece.boardRef
+    if (piece.kind === 'container' && piece.boardRef !== undefined && !isSelfReferencing) {
       const boardId = piece.boardRef
       for (const [otherId, loc] of Object.entries(next.locations)) {
         if (loc.board === boardId) stack.push(otherId)
@@ -154,6 +160,19 @@ export function placeContainerBox(
   if (!placed) return null
   placed.boards[interiorId] = createEmptyBoard(interiorId, interiorSize)
   return { world: placed, ids: { nextBoxId: ids.nextBoxId + 1, nextBoardId: ids.nextBoardId + 1 } }
+}
+
+export function placeSelfLoopBox(
+  world: World,
+  boardId: BoardId,
+  x: number,
+  y: number,
+  ids: EditorIds,
+): { world: World; ids: EditorIds } | null {
+  const id = `box-${ids.nextBoxId}`
+  const placed = placePiece(world, boardId, x, y, { id, kind: 'container', boardRef: boardId })
+  if (!placed) return null
+  return { world: placed, ids: { ...ids, nextBoxId: ids.nextBoxId + 1 } }
 }
 
 export function movePlayer(world: World, boardId: BoardId, x: number, y: number): World {

@@ -7,6 +7,7 @@ import {
   movePlayer,
   placeContainerBox,
   placeNormalBox,
+  placeSelfLoopBox,
   setCellType,
   setRequirement,
 } from './worldEdit'
@@ -203,4 +204,51 @@ test('canPlacePieceAt is false for a container whose subtree contains the player
   world = outer.world
   world = movePlayer(world, 'board-0', 0, 0)
   expect(canPlacePieceAt(world, 'root', 1, 1)).toBe(false)
+})
+
+test('placeSelfLoopBox places a piece whose interior is the board it is placed on, allocating no new board', () => {
+  const world = createEmptyWorld(6)
+  const result = placeSelfLoopBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 })!
+  expect(result.world.pieces['box-0']).toEqual({ id: 'box-0', kind: 'container', boardRef: 'root' })
+  expect(result.world.locations['box-0']).toEqual({ board: 'root', x: 1, y: 1 })
+  expect(result.ids).toEqual({ nextBoxId: 1, nextBoardId: 0 })
+  expect(Object.keys(result.world.boards)).toEqual(['root'])
+})
+
+test('placeSelfLoopBox works on the root board', () => {
+  const world = createEmptyWorld(6)
+  const result = placeSelfLoopBox(world, 'root', 0, 0, { nextBoxId: 0, nextBoardId: 0 })
+  expect(result).not.toBeNull()
+})
+
+test('placeSelfLoopBox is blocked when the target cell holds the player', () => {
+  const world = createEmptyWorld(6)
+  const result = placeSelfLoopBox(world, 'root', 5, 5, { nextBoxId: 0, nextBoardId: 0 })
+  expect(result).toBeNull()
+})
+
+test('deletePieceRecursively deleting a self-referencing piece leaves its board and everything else on it intact', () => {
+  const world = createEmptyWorld(6) // player defaults to (5, 5)
+  const withBox = placeNormalBox(world, 'root', 2, 2, { nextBoxId: 0, nextBoardId: 0 })!
+  const withLoop = placeSelfLoopBox(withBox.world, 'root', 1, 1, withBox.ids)!
+
+  const next = deletePieceRecursively(withLoop.world, 'box-1') // box-1 is the self-loop piece
+
+  expect(next.pieces['box-1']).toBeUndefined()
+  expect(next.locations['box-1']).toBeUndefined()
+  expect(next.pieces['box-0']).toEqual({ id: 'box-0', kind: 'normal' }) // ordinary box survives
+  expect(next.locations[PLAYER_ID]).toEqual({ board: 'root', x: 5, y: 5 }) // player survives
+  expect(next.boards.root).toBeDefined() // the board itself survives
+})
+
+test("deletePieceRecursively deleting a board's external owner still cascades through a self-referencing piece inside it", () => {
+  const world = createEmptyWorld(6)
+  const outer = placeContainerBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 }, 3)!
+  const withLoop = placeSelfLoopBox(outer.world, 'board-0', 0, 0, outer.ids)! // self-loop inside board-0
+
+  const next = deletePieceRecursively(withLoop.world, 'box-0') // box-0 is the external owner of board-0
+
+  expect(next.pieces['box-0']).toBeUndefined()
+  expect(next.pieces['box-1']).toBeUndefined() // the self-loop piece inside is swept up too
+  expect(next.boards['board-0']).toBeUndefined()
 })
