@@ -41,11 +41,8 @@ test('a corrupt completed-levels value does not white-screen level select', asyn
   expect(screen.getByText('第一次推动')).toBeInTheDocument()
 })
 
-test('the broken editor screen fails gracefully instead of crashing the whole app', async () => {
-  vi.spyOn(console, 'error').mockImplementation(() => {})
+test('the level editor screen loads and shows its tool palette', async () => {
   render(<App />)
   await userEvent.setup().click(screen.getByText('关卡编辑器'))
-  expect(await screen.findByText('关卡编辑器暂时无法使用')).toBeInTheDocument()
-  await userEvent.setup().click(screen.getByText('返回'))
-  expect(screen.getByText('Parabox Tribute')).toBeInTheDocument()
+  expect(await screen.findByLabelText('墙')).toBeInTheDocument()
 })
