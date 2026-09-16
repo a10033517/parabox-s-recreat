@@ -85,7 +85,33 @@ describe('loadGeneratedLevels', () => {
 })
 
 describe('loadCustomLevels', () => {
-  it('returns an empty array (sub-project 3 rebuilds the editor against the new format)', () => {
+  it('parses saved custom levels, prefixing the id and keeping the saved name', async () => {
+    localStorage.clear()
+    const { saveCustomLevel } = await import('../storage/progress')
+    const json = JSON.stringify({
+      boards: { root: { id: 'root', size: 2, cells: [[{ type: 'floor' }, { type: 'floor', requirement: 'box' }], [{ type: 'floor' }, { type: 'floor' }]] } },
+      pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
+      locations: { player: { board: 'root', x: 0, y: 0 }, box1: { board: 'root', x: 0, y: 1 } },
+    })
+    saveCustomLevel('my-level', json)
+
+    const levels = loadCustomLevels()
+    expect(levels).toHaveLength(1)
+    expect(levels[0].id).toBe(`${CUSTOM_LEVEL_ID_PREFIX}my-level`)
+    expect(levels[0].name).toBe('my-level')
+    expect(checkWin(levels[0].world)).toBe(false)
+  })
+
+  it('skips a corrupt saved level instead of throwing', async () => {
+    localStorage.clear()
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { saveCustomLevel } = await import('../storage/progress')
+    saveCustomLevel('broken', 'not valid json')
+    expect(loadCustomLevels()).toEqual([])
+  })
+
+  it('returns an empty array when nothing has been saved', () => {
+    localStorage.clear()
     expect(loadCustomLevels()).toEqual([])
   })
 })

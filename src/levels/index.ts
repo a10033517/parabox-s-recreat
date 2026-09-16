@@ -1,5 +1,6 @@
 import { parseLevel } from '../game/engine/levelSchema'
 import { World } from '../game/engine/types'
+import { listCustomLevels } from '../storage/progress'
 import level01 from './builtin/01-first-push.json?raw'
 import level02 from './builtin/02-enter-container.json?raw'
 import level03 from './builtin/03-chain-push.json?raw'
@@ -42,12 +43,19 @@ export function loadGeneratedLevels(): LevelMeta[] {
 // the display name; only the LevelMeta id carries the prefix.
 export const CUSTOM_LEVEL_ID_PREFIX = 'custom:'
 
-// Sub-project 3 rebuilds the editor against the new World format; any levels
-// saved by the old editor are in the old, incompatible format. When this is
-// un-stubbed: parseLevel throws on invalid input, and this function runs
-// during App's render — restore a per-entry try/catch (the old
-// implementation had one) so one corrupt saved level can't white-screen the
-// whole app.
+// Sub-project 3's editor now produces valid World-format saves, so this can
+// load them for real. One corrupt entry (hand-edited localStorage, a save
+// from an even older format) must not white-screen the app, which calls
+// this during render — mirrors storage/progress.ts's readJson guard.
 export function loadCustomLevels(): LevelMeta[] {
-  return []
+  const levels: LevelMeta[] = []
+  for (const entry of listCustomLevels()) {
+    try {
+      const world = parseLevel(JSON.parse(entry.json))
+      levels.push({ id: `${CUSTOM_LEVEL_ID_PREFIX}${entry.id}`, name: entry.id, world })
+    } catch (error) {
+      console.warn(`Ignoring corrupt custom level "${entry.id}":`, error)
+    }
+  }
+  return levels
 }

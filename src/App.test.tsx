@@ -20,12 +20,17 @@ test('navigating from menu to level select shows builtin levels', async () => {
   expect(screen.getByText('第一次推动')).toBeInTheDocument()
 })
 
-test('a saved custom level does not appear yet (loading is deferred to a future sub-project)', async () => {
+test('a saved custom level appears in level select', async () => {
   const { saveCustomLevel } = await import('./storage/progress')
-  saveCustomLevel('我的关卡', 'irrelevant in the new format')
+  const json = JSON.stringify({
+    boards: { root: { id: 'root', size: 1, cells: [[{ type: 'floor' }]] } },
+    pieces: { player: { id: 'player', kind: 'player' } },
+    locations: { player: { board: 'root', x: 0, y: 0 } },
+  })
+  saveCustomLevel('我的关卡', json)
   render(<App />)
   await userEvent.setup().click(screen.getByText('开始游戏'))
-  expect(screen.queryByText('我的关卡')).not.toBeInTheDocument()
+  expect(screen.getByText('我的关卡')).toBeInTheDocument()
 })
 
 test('a corrupt completed-levels value does not white-screen level select', async () => {
