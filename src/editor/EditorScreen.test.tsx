@@ -182,6 +182,52 @@ test('clicking two different cells in quick succession with container-box tool p
   expect(screen.getByTestId('box-id-at-1-0')).toHaveTextContent('box-1')
 })
 
+test('the goal-player tool paints a player requirement on the cell', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('目标(玩家)'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.getByTestId('cell-requirement-0-0')).toHaveTextContent('player')
+})
+
+test('a goal tool clicked on a walled cell does not place a requirement', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('墙'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.getByTestId('cell-type-0-0')).toHaveTextContent('wall')
+
+  await user.click(screen.getByLabelText('目标(箱)'))
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.getByTestId('cell-requirement-0-0')).toHaveTextContent('none')
+})
+
+test('painting a wall over a goal cell clears the requirement so saving succeeds', async () => {
+  localStorage.clear()
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('目标(箱)'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.getByTestId('cell-requirement-0-0')).toHaveTextContent('box')
+
+  await user.click(screen.getByLabelText('墙'))
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.getByTestId('cell-type-0-0')).toHaveTextContent('wall')
+  expect(screen.getByTestId('cell-requirement-0-0')).toHaveTextContent('none')
+
+  await user.type(screen.getByLabelText('关卡名称'), 'wall-over-goal')
+  await user.click(screen.getByText('储存'))
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
 test('clicking save stores the level in localStorage', async () => {
   localStorage.clear()
   render(<EditorScreen onBack={() => {}} />)

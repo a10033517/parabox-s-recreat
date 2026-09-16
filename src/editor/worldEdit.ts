@@ -30,15 +30,23 @@ export function createEmptyWorld(rootSize: number): World {
 
 // Checks if a piece's subtree (including the piece itself and all pieces
 // on its owned board, recursively) contains the player piece.
+//
+// Guarded with a `seen` set even though nothing in this codebase can
+// currently create a cyclic containment graph: a future "loop box" feature
+// (self-referencing containers) is already planned, and without this guard
+// a cycle would make this traversal loop forever.
 function subtreeContainsPlayer(world: World, pieceId: PieceId): boolean {
   const stack: PieceId[] = [pieceId]
+  const seen = new Set<PieceId>()
   while (stack.length > 0) {
     const id = stack.pop() as PieceId
+    if (seen.has(id)) continue
+    seen.add(id)
     if (id === PLAYER_ID) return true
     const piece = world.pieces[id]
     if (piece?.kind === 'container' && piece.boardRef !== undefined) {
       for (const [otherId, loc] of Object.entries(world.locations)) {
-        if (loc.board === piece.boardRef) stack.push(otherId)
+        if (loc.board === piece.boardRef && !seen.has(otherId)) stack.push(otherId)
       }
     }
   }
@@ -71,7 +79,12 @@ export function deletePieceRecursively(world: World, pieceId: PieceId): World {
 
 export function setCellType(world: World, boardId: BoardId, x: number, y: number, type: CellType): World {
   const next = cloneWorld(world)
-  next.boards[boardId].cells[y][x].type = type
+  const cell = next.boards[boardId].cells[y][x]
+  cell.type = type
+  // A wall cell can never satisfy a requirement (levelSchema.ts's parseLevel
+  // rejects a world where one does), so painting a wall over a goal cell must
+  // clear any requirement that was there.
+  if (type === 'wall') cell.requirement = undefined
   const occupantId = occupantAt(next, { board: boardId, x, y })
   if (occupantId && !subtreeContainsPlayer(next, occupantId)) return deletePieceRecursively(next, occupantId)
   return next
@@ -93,6 +106,16 @@ export function setRequirement(
 export interface EditorIds {
   nextBoxId: number
   nextBoardId: number
+}
+
+// Predicts whether placeNormalBox/placeContainerBox would succeed at this
+// cell, without actually placing anything. Lets callers (EditorScreen) decide
+// whether to advance their id counter *before* calling setWorld, instead of
+// either hand-duplicating this same occupant/subtree check or unconditionally
+// burning an id on a placement that setWorld's updater will end up rejecting.
+export function canPlacePieceAt(world: World, boardId: BoardId, x: number, y: number): boolean {
+  const occupantId = occupantAt(world, { board: boardId, x, y })
+  return !(occupantId && subtreeContainsPlayer(world, occupantId))
 }
 
 function placePiece(world: World, boardId: BoardId, x: number, y: number, piece: Piece): World | null {
@@ -135,7 +158,7 @@ export function placeContainerBox(
 
 export function movePlayer(world: World, boardId: BoardId, x: number, y: number): World {
   const occupantId = occupantAt(world, { board: boardId, x, y })
-  if (occupantId && subtreeContainsPlayer(world, occupantId)) return cloneWorld(world)
+  if (occupantId && subtreeContainsPlayer(world, occupantId)) return world
   const next = occupantId && occupantId !== PLAYER_ID ? deletePieceRecursively(world, occupantId) : cloneWorld(world)
   next.locations[PLAYER_ID] = { board: boardId, x, y }
   return next

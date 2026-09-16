@@ -1,5 +1,6 @@
 import { PLAYER_ID } from '../game/engine/types'
 import {
+  canPlacePieceAt,
   createEmptyBoard,
   createEmptyWorld,
   deletePieceRecursively,
@@ -160,4 +161,46 @@ test('placeNormalBox is blocked when the target cell contains a container with t
 
   // Placement should be blocked
   expect(result).toBeNull()
+})
+
+test('setCellType clears a requirement when painting a wall over a goal cell', () => {
+  const world = createEmptyWorld(6)
+  const withGoal = setRequirement(world, 'root', 2, 2, 'box')
+  expect(withGoal.boards.root.cells[2][2].requirement).toBe('box')
+
+  const walled = setCellType(withGoal, 'root', 2, 2, 'wall')
+  expect(walled.boards.root.cells[2][2].requirement).toBeUndefined()
+  expect(walled.boards.root.cells[2][2].type).toBe('wall')
+})
+
+test('setCellType to floor leaves an existing requirement untouched', () => {
+  const world = createEmptyWorld(6)
+  const withGoal = setRequirement(world, 'root', 2, 2, 'player')
+  const stillFloor = setCellType(withGoal, 'root', 2, 2, 'floor')
+  expect(stillFloor.boards.root.cells[2][2].requirement).toBe('player')
+})
+
+test('canPlacePieceAt is true for an empty cell', () => {
+  const world = createEmptyWorld(6)
+  expect(canPlacePieceAt(world, 'root', 1, 1)).toBe(true)
+})
+
+test('canPlacePieceAt is true for a cell holding an occupant whose subtree does not contain the player', () => {
+  let world = createEmptyWorld(6)
+  const placed = placeNormalBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 })!
+  world = placed.world
+  expect(canPlacePieceAt(world, 'root', 1, 1)).toBe(true)
+})
+
+test('canPlacePieceAt is false for the cell the player occupies', () => {
+  const world = createEmptyWorld(6)
+  expect(canPlacePieceAt(world, 'root', 5, 5)).toBe(false)
+})
+
+test('canPlacePieceAt is false for a container whose subtree contains the player', () => {
+  let world = createEmptyWorld(6)
+  const outer = placeContainerBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 }, 3)!
+  world = outer.world
+  world = movePlayer(world, 'board-0', 0, 0)
+  expect(canPlacePieceAt(world, 'root', 1, 1)).toBe(false)
 })

@@ -5,6 +5,7 @@ import { renderBoard } from '../game/render/CanvasRenderer'
 import { saveCustomLevel } from '../storage/progress'
 import {
   EditorIds,
+  canPlacePieceAt,
   createEmptyWorld,
   movePlayer,
   placeContainerBox,
@@ -49,8 +50,12 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
   const idsRef = useRef<EditorIds>({ nextBoxId: 0, nextBoardId: 0 })
   const pendingPlaceRef = useRef<{ x: number; y: number; timer: number } | null>(null)
 
+  // Deletion only ever walks downward from the current board, so path should
+  // never reference a piece the user has been removed out from under — but if
+  // that invariant is ever violated, falling back to 'root' fails contained
+  // instead of white-screening the whole app (there's no error boundary here).
   const activeBoardId: BoardId =
-    path.length === 0 ? 'root' : (world.pieces[path[path.length - 1]].boardRef as BoardId)
+    path.length === 0 ? 'root' : ((world.pieces[path[path.length - 1]]?.boardRef as BoardId) ?? 'root')
   const activeBoard = world.boards[activeBoardId]
 
   useEffect(() => {
@@ -87,27 +92,30 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
     const desiredKind: PieceKind = tool === 'container-box' ? 'container' : 'normal'
     const existingId = occupantAt(world, { board: activeBoardId, x, y })
     if (existingId && world.pieces[existingId].kind === desiredKind) return
+    // Predict whether the placement will be blocked (target cell's subtree
+    // contains the player) before touching idsRef.current at all, so a
+    // blocked placement never burns an id.
+    if (!canPlacePieceAt(world, activeBoardId, x, y)) return
 
-    // Allocate ids here in the plain event-handler body (not inside a setState
-    // updater) to avoid React 18 StrictMode double-invoking the updater and
-    // burning two ids per click. Pass the ids to the setState updater via
-    // closure so it uses the same ids computed here, ensuring consistency.
+    // Capture the ids to use in a plain variable (not read back from
+    // idsRef.current inside the updater) to avoid React 18 StrictMode
+    // double-invoking the updater and burning two ids per click: calling
+    // placeNormalBox/placeContainerBox twice with the same `oldIds` is
+    // idempotent and yields the same result.ids both times.
     const oldIds = idsRef.current
-    const newIds = {
-      nextBoxId: oldIds.nextBoxId + 1,
-      nextBoardId: tool === 'container-box' ? oldIds.nextBoardId + 1 : oldIds.nextBoardId,
-    }
 
     setWorld((w) => {
+      // worldEdit.ts owns id-allocation arithmetic; idsRef.current is always
+      // set from a placement function's own returned ids, never hand-computed
+      // here, so there is exactly one place that knows how ids increment.
       const result =
         tool === 'container-box'
           ? placeContainerBox(w, activeBoardId, x, y, oldIds, DEFAULT_INTERIOR_SIZE)
           : placeNormalBox(w, activeBoardId, x, y, oldIds)
       if (!result) return w
+      idsRef.current = result.ids
       return result.world
     })
-
-    idsRef.current = newIds
   }
 
   const cellFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -178,7 +186,16 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
       <button onClick={onBack}>返回</button>
       <div className="breadcrumb">
         {breadcrumb.map((_, i) => (
-          <button key={i} onClick={() => setPath(path.slice(0, i))}>
+          <button
+            key={i}
+            onClick={() => {
+              if (pendingPlaceRef.current) {
+                window.clearTimeout(pendingPlaceRef.current.timer)
+                pendingPlaceRef.current = null
+              }
+              setPath(path.slice(0, i))
+            }}
+          >
             {breadcrumb.slice(0, i + 1).join(' > ')}
           </button>
         ))}
