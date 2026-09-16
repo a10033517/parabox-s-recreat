@@ -85,3 +85,10 @@ export function moveTo(world: World, pieceId: PieceId, location: Location): Worl
   next.locations[pieceId] = location
   return next
 }
+
+export function removePiece(world: World, pieceId: PieceId): World {
+  const next = cloneWorld(world)
+  delete next.pieces[pieceId]
+  delete next.locations[pieceId]
+  return next
+}

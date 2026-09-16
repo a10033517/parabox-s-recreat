@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { inBounds, opposite, step, occupantAt, findContainerFor, moveTo, PLAYER_ID, World } from './types'
+import { inBounds, opposite, step, occupantAt, findContainerFor, moveTo, removePiece, PLAYER_ID, World } from './types'
 import { makeFloorBoard, makeWorld } from './testFixtures'
 
 describe('inBounds', () => {
@@ -70,6 +70,28 @@ describe('moveTo', () => {
     )
     const next = moveTo(world, PLAYER_ID, { board: 'root', x: 1, y: 0 })
     expect(next.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 0 })
+    expect(world.locations[PLAYER_ID]).toEqual({ board: 'root', x: 0, y: 0 })
+  })
+})
+
+describe('removePiece', () => {
+  it('deletes the piece and its location, leaving other pieces and the original world untouched', () => {
+    const world: World = makeWorld(
+      [makeFloorBoard('root', 3)],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'box1', kind: 'normal' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        box1: { board: 'root', x: 1, y: 0 },
+      },
+    )
+    const next = removePiece(world, PLAYER_ID)
+    expect(next.pieces[PLAYER_ID]).toBeUndefined()
+    expect(next.locations[PLAYER_ID]).toBeUndefined()
+    expect(next.pieces.box1).toEqual({ id: 'box1', kind: 'normal' })
+    expect(next.locations.box1).toEqual({ board: 'root', x: 1, y: 0 })
     expect(world.locations[PLAYER_ID]).toEqual({ board: 'root', x: 0, y: 0 })
   })
 })
