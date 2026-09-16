@@ -28,6 +28,23 @@ export function createEmptyWorld(rootSize: number): World {
   }
 }
 
+// Checks if a piece's subtree (including the piece itself and all pieces
+// on its owned board, recursively) contains the player piece.
+function subtreeContainsPlayer(world: World, pieceId: PieceId): boolean {
+  const stack: PieceId[] = [pieceId]
+  while (stack.length > 0) {
+    const id = stack.pop() as PieceId
+    if (id === PLAYER_ID) return true
+    const piece = world.pieces[id]
+    if (piece?.kind === 'container' && piece.boardRef !== undefined) {
+      for (const [otherId, loc] of Object.entries(world.locations)) {
+        if (loc.board === piece.boardRef) stack.push(otherId)
+      }
+    }
+  }
+  return false
+}
+
 // Deletes a piece and, if it's a container, recursively deletes its owned
 // board and every piece located on that board (and so on down). Without
 // this, deleting a container that owns non-empty interiors would leave
@@ -56,7 +73,7 @@ export function setCellType(world: World, boardId: BoardId, x: number, y: number
   const next = cloneWorld(world)
   next.boards[boardId].cells[y][x].type = type
   const occupantId = occupantAt(next, { board: boardId, x, y })
-  if (occupantId && occupantId !== PLAYER_ID) return deletePieceRecursively(next, occupantId)
+  if (occupantId && !subtreeContainsPlayer(next, occupantId)) return deletePieceRecursively(next, occupantId)
   return next
 }
 
@@ -80,7 +97,7 @@ export interface EditorIds {
 
 function placePiece(world: World, boardId: BoardId, x: number, y: number, piece: Piece): World | null {
   const occupantId = occupantAt(world, { board: boardId, x, y })
-  if (occupantId === PLAYER_ID) return null
+  if (occupantId && subtreeContainsPlayer(world, occupantId)) return null
   const next = occupantId ? deletePieceRecursively(world, occupantId) : cloneWorld(world)
   next.pieces[piece.id] = piece
   next.locations[piece.id] = { board: boardId, x, y }
@@ -118,6 +135,7 @@ export function placeContainerBox(
 
 export function movePlayer(world: World, boardId: BoardId, x: number, y: number): World {
   const occupantId = occupantAt(world, { board: boardId, x, y })
+  if (occupantId && subtreeContainsPlayer(world, occupantId)) return cloneWorld(world)
   const next = occupantId && occupantId !== PLAYER_ID ? deletePieceRecursively(world, occupantId) : cloneWorld(world)
   next.locations[PLAYER_ID] = { board: boardId, x, y }
   return next

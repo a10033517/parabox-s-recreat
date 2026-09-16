@@ -114,3 +114,50 @@ test('movePlayer relocates the player and clears whatever piece was there, recur
   expect(next.pieces['box-1']).toBeUndefined()
   expect(next.boards['board-0']).toBeUndefined()
 })
+
+test('setCellType preserves a container whose interior contains the player', () => {
+  let world = createEmptyWorld(6)
+  const outer = placeContainerBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 }, 3)!
+  world = outer.world
+  // Move player inside the container
+  world = movePlayer(world, 'board-0', 0, 0)
+
+  // Try to delete the container by changing the cell type
+  const next = setCellType(world, 'root', 1, 1, 'wall')
+
+  // Player and container should both survive
+  expect(next.pieces[PLAYER_ID]).toBeDefined()
+  expect(next.locations[PLAYER_ID]).toEqual({ board: 'board-0', x: 0, y: 0 })
+  expect(next.pieces['box-0']).toBeDefined()
+  expect(next.boards['board-0']).toBeDefined()
+})
+
+test('movePlayer onto a container is a no-op when the player is already inside it', () => {
+  let world = createEmptyWorld(6)
+  const outer = placeContainerBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 }, 3)!
+  world = outer.world
+  // Move player inside the container
+  world = movePlayer(world, 'board-0', 0, 0)
+
+  const originalLocation = world.locations[PLAYER_ID]
+
+  // Try to move player onto the container
+  const next = movePlayer(world, 'root', 1, 1)
+
+  // Player location should be unchanged (no-op)
+  expect(next.locations[PLAYER_ID]).toEqual(originalLocation)
+})
+
+test('placeNormalBox is blocked when the target cell contains a container with the player inside', () => {
+  let world = createEmptyWorld(6)
+  const outer = placeContainerBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 }, 3)!
+  world = outer.world
+  // Move player inside the container
+  world = movePlayer(world, 'board-0', 0, 0)
+
+  // Try to place a box at the container location
+  const result = placeNormalBox(world, 'root', 1, 1, { nextBoxId: 1, nextBoardId: 1 })
+
+  // Placement should be blocked
+  expect(result).toBeNull()
+})
