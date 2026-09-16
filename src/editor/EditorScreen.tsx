@@ -1,69 +1,62 @@
 import { useEffect, useRef, useState } from 'react'
-import { Box, cloneGrid, createEmptyGrid, Grid } from '../game/engine/types'
-import { renderGrid } from '../game/render/CanvasRenderer'
+import { BoardId, PieceId, PieceKind, World, occupantAt } from '../game/engine/types'
+import { parseLevel, serializeLevel } from '../game/engine/levelSchema'
+import { renderBoard } from '../game/render/CanvasRenderer'
 import { saveCustomLevel } from '../storage/progress'
-import { serializeLevel } from '../game/engine/levelSchema'
+import {
+  EditorIds,
+  createEmptyWorld,
+  movePlayer,
+  placeContainerBox,
+  placeNormalBox,
+  setCellType,
+  setRequirement,
+} from './worldEdit'
 
 const CELL_SIZE = 32
 // A double-click always dispatches `click`, `click`, `dblclick` in that order. To
 // tell a genuine single click apart from the first click of a double-click, every
 // click's placement is delayed behind a short timer; the double-click handler
 // cancels that pending timer before it ever fires, so placeAt runs at most once
-// per gesture and never runs at all for a double-click. This doesn't depend on the
-// timing of any earlier, unrelated click — unlike a same-cell-within-N-ms debounce.
+// per gesture and never runs at all for a double-click.
 const DOUBLE_CLICK_WINDOW_MS = 250
-type Tool = 'wall' | 'target' | 'empty' | 'normal-box' | 'container-box' | 'player' | 'toggle-goal'
+const DEFAULT_ROOT_SIZE = 6
+const DEFAULT_INTERIOR_SIZE = 3
+
+type Tool = 'wall' | 'empty' | 'normal-box' | 'container-box' | 'player' | 'goal-box' | 'goal-player'
 
 const TOOLS: { tool: Tool; label: string }[] = [
   { tool: 'empty', label: '空地' },
   { tool: 'wall', label: '墙' },
-  { tool: 'target', label: '目标点' },
   { tool: 'normal-box', label: '普通箱' },
   { tool: 'container-box', label: '容器箱' },
-  { tool: 'toggle-goal', label: '目标箱' },
+  { tool: 'goal-box', label: '目标(箱)' },
+  { tool: 'goal-player', label: '目标(玩家)' },
   { tool: 'player', label: '玩家起点' },
 ]
 
-interface PathEntry {
-  boxId: string
-}
-
-function getGridAtPath(root: Grid, path: PathEntry[]): Grid {
-  let current = root
-  for (const entry of path) {
-    const box = current.boxes.find((b) => b.id === entry.boxId)!
-    current = box.interior
-  }
-  return current
-}
-
-function setGridAtPath(root: Grid, path: PathEntry[], updater: (g: Grid) => Grid): Grid {
-  if (path.length === 0) return updater(root)
-  const next = cloneGrid(root)
-  let current = next
-  for (let i = 0; i < path.length - 1; i++) {
-    current = current.boxes.find((b) => b.id === path[i].boxId)!.interior
-  }
-  const box = current.boxes.find((b) => b.id === path[path.length - 1].boxId)!
-  box.interior = updater(cloneGrid(box.interior))
-  return next
-}
-
 export function EditorScreen({ onBack }: { onBack: () => void }) {
-  const [root, setRoot] = useState<Grid>(() => createEmptyGrid(6, 6))
-  const [path, setPath] = useState<PathEntry[]>([])
+  const [world, setWorld] = useState<World>(() => createEmptyWorld(DEFAULT_ROOT_SIZE))
+  // Path of container piece ids entered via double-click; the active board is
+  // derived from the last entry's boardRef (or 'root' if empty), so there is
+  // only one source of truth for "where am I" instead of tracking board ids
+  // separately from the pieces that own them.
+  const [path, setPath] = useState<PieceId[]>([])
   const [tool, setTool] = useState<Tool>('wall')
   const [levelName, setLevelName] = useState('')
+  const [saveError, setSaveError] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const boxIdCounter = useRef(0)
+  const idsRef = useRef<EditorIds>({ nextBoxId: 0, nextBoardId: 0 })
   const pendingPlaceRef = useRef<{ x: number; y: number; timer: number } | null>(null)
 
-  const activeGrid = getGridAtPath(root, path)
+  const activeBoardId: BoardId =
+    path.length === 0 ? 'root' : (world.pieces[path[path.length - 1]].boardRef as BoardId)
+  const activeBoard = world.boards[activeBoardId]
 
   useEffect(() => {
     const ctx = canvasRef.current?.getContext('2d')
-    if (ctx) renderGrid(ctx, activeGrid, 0, 0, CELL_SIZE)
-  }, [activeGrid])
+    if (ctx) renderBoard(ctx, activeBoard, world, CELL_SIZE)
+  }, [world, activeBoard])
 
   useEffect(() => {
     return () => {
@@ -72,78 +65,56 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
   }, [])
 
   const placeAt = (x: number, y: number) => {
-    // The id is allocated here rather than inside the updater below: React 18
-    // StrictMode double-invokes updaters to surface impurity, so incrementing the
-    // counter in there made the first box placed in dev become "box-1".
-    const newBoxId = tool === 'normal-box' || tool === 'container-box' ? `box-${boxIdCounter.current++}` : ''
-    setRoot((r) =>
-      setGridAtPath(r, path, (g) => {
-        if (tool === 'toggle-goal') {
-          // Unlike every other tool this one edits the box already at the cell
-          // instead of replacing it, so its interior, id and type all survive.
-          if (!g.boxes.some((b) => b.x === x && b.y === y)) return g
-          const nextGrid = cloneGrid(g)
-          const target = nextGrid.boxes.find((b) => b.x === x && b.y === y)!
-          target.isGoalBox = !target.isGoalBox
-          return nextGrid
-        }
-        if (tool === 'normal-box' || tool === 'container-box') {
-          // A double-click delivers its two constituent `click` events (plus the
-          // final `dblclick`) to this same handler. Without this guard, the second
-          // click of a double-click on an already-placed box of the same type would
-          // delete and recreate it (new id, freshly emptied interior) right before
-          // the double-click handler enters it — silently wiping any edited interior.
-          const desiredType = tool === 'container-box' ? 'container' : 'normal'
-          const existing = g.boxes.find((b) => b.x === x && b.y === y)
-          if (existing && existing.boxType === desiredType) return g
-        }
-        const next = cloneGrid(g)
-        next.boxes = next.boxes.filter((b) => !(b.x === x && b.y === y))
-        if (tool === 'wall' || tool === 'target' || tool === 'empty') {
-          next.cells[y][x] = tool === 'empty' ? 'empty' : tool
-        } else if (tool === 'player') {
-          next.player = { x, y }
-        } else {
-          const box: Box = {
-            id: newBoxId,
-            x,
-            y,
-            boxType: tool === 'container-box' ? 'container' : 'normal',
-            interior: createEmptyGrid(3, 3),
-          }
-          next.boxes.push(box)
-        }
-        return next
-      }),
-    )
+    if (tool === 'wall' || tool === 'empty') {
+      setWorld((w) => setCellType(w, activeBoardId, x, y, tool === 'wall' ? 'wall' : 'floor'))
+      return
+    }
+    if (tool === 'goal-box' || tool === 'goal-player') {
+      setWorld((w) => {
+        if (w.boards[activeBoardId].cells[y][x].type === 'wall') return w
+        return setRequirement(w, activeBoardId, x, y, tool === 'goal-box' ? 'box' : 'player')
+      })
+      return
+    }
+    if (tool === 'player') {
+      setWorld((w) => movePlayer(w, activeBoardId, x, y))
+      return
+    }
+    // normal-box / container-box: re-placing the same kind on a cell that
+    // already holds it is a no-op, so a double-click's first click can't
+    // destroy-and-recreate a box right before the double-click handler
+    // enters it.
+    const desiredKind: PieceKind = tool === 'container-box' ? 'container' : 'normal'
+    const existingId = occupantAt(world, { board: activeBoardId, x, y })
+    if (existingId && world.pieces[existingId].kind === desiredKind) return
+
+    // The id is allocated here, in the plain event-handler body, rather than
+    // inside a setState updater: React 18 StrictMode double-invokes updater
+    // functions in dev to surface impurity, which would burn two ids per click.
+    const result =
+      tool === 'container-box'
+        ? placeContainerBox(world, activeBoardId, x, y, idsRef.current, DEFAULT_INTERIOR_SIZE)
+        : placeNormalBox(world, activeBoardId, x, y, idsRef.current)
+    if (!result) return
+    idsRef.current = result.ids
+    setWorld(result.world)
   }
 
   const cellFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    const x = Math.floor((e.clientX - rect.left) / CELL_SIZE)
-    const y = Math.floor((e.clientY - rect.top) / CELL_SIZE)
-    return { x, y }
+    return {
+      x: Math.floor((e.clientX - rect.left) / CELL_SIZE),
+      y: Math.floor((e.clientY - rect.top) / CELL_SIZE),
+    }
   }
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = cellFromEvent(e)
-    if (x < 0 || y < 0 || x >= activeGrid.width || y >= activeGrid.height) return
-    // Delay placement behind a short timer instead of placing immediately. A genuine
-    // single click's timer simply fires after DOUBLE_CLICK_WINDOW_MS. Both clicks of
-    // a double-click land on the SAME cell and reschedule that cell's timer, and
-    // handleCanvasDoubleClick cancels it outright once `dblclick` fires — so placeAt
-    // never runs for either click of a double-click, regardless of which tool is
-    // selected or how long it has been since any earlier, unrelated click. A click on
-    // a DIFFERENT cell than the one currently pending is not part of that gesture, so
-    // its predecessor's placement is flushed immediately rather than dropped — this
-    // matters for rapid same-tool painting across multiple cells (e.g. quickly
-    // clicking several cells in a row to place walls).
+    if (x < 0 || y < 0 || x >= activeBoard.size || y >= activeBoard.size) return
     const pending = pendingPlaceRef.current
     if (pending) {
       window.clearTimeout(pending.timer)
-      if (pending.x !== x || pending.y !== y) {
-        placeAt(pending.x, pending.y)
-      }
+      if (pending.x !== x || pending.y !== y) placeAt(pending.x, pending.y)
     }
     pendingPlaceRef.current = {
       x,
@@ -161,21 +132,42 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
       pendingPlaceRef.current = null
     }
     const { x, y } = cellFromEvent(e)
-    const box = activeGrid.boxes.find((b) => b.x === x && b.y === y && b.boxType === 'container')
-    if (box) setPath((p) => [...p, { boxId: box.id }])
+    const pieceId = occupantAt(world, { board: activeBoardId, x, y })
+    const piece = pieceId ? world.pieces[pieceId] : undefined
+    if (piece?.kind === 'container' && piece.boardRef !== undefined) {
+      setPath((p) => [...p, piece.id])
+    }
   }
 
-  const breadcrumb = ['外层', ...path.map((p) => p.boxId)]
+  const breadcrumb = ['外层', ...path]
+
+  const handleSave = () => {
+    if (!levelName) return
+    try {
+      const serialized = serializeLevel(world)
+      parseLevel(serialized) // defensive: catch an invalid world before it's persisted
+      saveCustomLevel(levelName, JSON.stringify(serialized))
+      setSaveError(null)
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(serializeLevel(world))], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${levelName || 'level'}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="editor-screen">
       <button onClick={onBack}>返回</button>
       <div className="breadcrumb">
         {breadcrumb.map((_, i) => (
-          // Each crumb shows the cumulative path label (e.g. "外层 > box-0") as a
-          // single text node rather than splitting labels/separators across nested
-          // elements — Testing Library's getByText only matches an element's own
-          // direct text-node children, not text concatenated across descendants.
           <button key={i} onClick={() => setPath(path.slice(0, i))}>
             {breadcrumb.slice(0, i + 1).join(' > ')}
           </button>
@@ -191,8 +183,8 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
       <canvas
         data-testid="editor-canvas"
         ref={canvasRef}
-        width={CELL_SIZE * activeGrid.width}
-        height={CELL_SIZE * activeGrid.height}
+        width={CELL_SIZE * activeBoard.size}
+        height={CELL_SIZE * activeBoard.size}
         onClick={handleCanvasClick}
         onDoubleClick={handleCanvasDoubleClick}
       />
@@ -200,50 +192,40 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
         关卡名称
         <input aria-label="关卡名称" value={levelName} onChange={(e) => setLevelName(e.target.value)} />
       </label>
-      <button
-        onClick={() => {
-          if (!levelName) return
-          saveCustomLevel(levelName, serializeLevel(root))
-        }}
-      >
-        储存
-      </button>
-      <button
-        onClick={() => {
-          const blob = new Blob([serializeLevel(root)], { type: 'application/json' })
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `${levelName || 'level'}.json`
-          a.click()
-          URL.revokeObjectURL(url)
-        }}
-      >
-        汇出 JSON
-      </button>
+      <button onClick={handleSave}>储存</button>
+      {saveError && <p role="alert">{saveError}</p>}
+      <button onClick={handleExport}>汇出 JSON</button>
       <div style={{ display: 'none' }}>
-        {activeGrid.cells.map((row, y) =>
+        {activeBoard.cells.map((row, y) =>
           row.map((cell, x) => (
-            <span key={`${x}-${y}`} data-testid={`cell-type-${x}-${y}`}>
-              {cell}
+            <span key={`type-${x}-${y}`} data-testid={`cell-type-${x}-${y}`}>
+              {cell.type}
             </span>
           )),
         )}
-        {activeGrid.boxes.map((box) => (
-          <span key={box.id} data-testid={`box-at-${box.x}-${box.y}`}>
-            {box.boxType}
-          </span>
-        ))}
-        {activeGrid.boxes.map((box) => (
-          <span key={`goal-${box.id}`} data-testid={`box-goal-at-${box.x}-${box.y}`}>
-            {box.isGoalBox ? 'goal' : 'not-goal'}
-          </span>
-        ))}
-        {activeGrid.boxes.map((box) => (
-          <span key={`id-${box.id}`} data-testid={`box-id-at-${box.x}-${box.y}`}>
-            {box.id}
-          </span>
-        ))}
+        {activeBoard.cells.map((row, y) =>
+          row.map((cell, x) => (
+            <span key={`req-${x}-${y}`} data-testid={`cell-requirement-${x}-${y}`}>
+              {cell.requirement ?? 'none'}
+            </span>
+          )),
+        )}
+        {Object.entries(world.locations)
+          .filter(([, loc]) => loc.board === activeBoardId)
+          .map(([pieceId, loc]) => (
+            <span key={`piece-${pieceId}`} data-testid={`box-at-${loc.x}-${loc.y}`}>
+              {world.pieces[pieceId].kind}
+            </span>
+          ))}
+        {Object.entries(world.locations)
+          .filter(([, loc]) => loc.board === activeBoardId)
+          .map(([pieceId, loc]) => (
+            <span key={`piece-id-${pieceId}`} data-testid={`box-id-at-${loc.x}-${loc.y}`}>
+              {pieceId}
+            </span>
+          ))}
+        <span data-testid="board-ids">{Object.keys(world.boards).sort().join(',')}</span>
+        <span data-testid="piece-ids">{Object.keys(world.pieces).sort().join(',')}</span>
       </div>
     </div>
   )
