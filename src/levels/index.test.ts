@@ -104,10 +104,11 @@ describe('loadCustomLevels', () => {
 
   it('skips a corrupt saved level instead of throwing', async () => {
     localStorage.clear()
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { saveCustomLevel } = await import('../storage/progress')
     saveCustomLevel('broken', 'not valid json')
     expect(loadCustomLevels()).toEqual([])
+    expect(warnSpy).toHaveBeenCalled()
   })
 
   it('returns an empty array when nothing has been saved', () => {
