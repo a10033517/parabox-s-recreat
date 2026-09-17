@@ -237,3 +237,16 @@ test('clicking save stores the level in localStorage', async () => {
   const { listCustomLevels } = await import('../storage/progress')
   expect(listCustomLevels().map((l) => l.id)).toEqual(['my-level'])
 })
+
+test('the self-loop-box tool places a container whose interior is its own board, even on root', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('自包箱'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.getByTestId('box-at-0-0')).toHaveTextContent('container')
+  // No new board is allocated — the piece's interior is 'root' itself.
+  expect(screen.getByTestId('board-ids')).toHaveTextContent('root')
+  expect(screen.getByTestId('board-ids')).not.toHaveTextContent('board-0')
+})

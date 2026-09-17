@@ -10,6 +10,7 @@ import {
   movePlayer,
   placeContainerBox,
   placeNormalBox,
+  placeSelfLoopBox,
   setCellType,
   setRequirement,
 } from './worldEdit'
@@ -24,13 +25,14 @@ const DOUBLE_CLICK_WINDOW_MS = 250
 const DEFAULT_ROOT_SIZE = 6
 const DEFAULT_INTERIOR_SIZE = 3
 
-type Tool = 'wall' | 'empty' | 'normal-box' | 'container-box' | 'player' | 'goal-box' | 'goal-player'
+type Tool = 'wall' | 'empty' | 'normal-box' | 'container-box' | 'self-loop-box' | 'player' | 'goal-box' | 'goal-player'
 
 const TOOLS: { tool: Tool; label: string }[] = [
   { tool: 'empty', label: '空地' },
   { tool: 'wall', label: '墙' },
   { tool: 'normal-box', label: '普通箱' },
   { tool: 'container-box', label: '容器箱' },
+  { tool: 'self-loop-box', label: '自包箱' },
   { tool: 'goal-box', label: '目标(箱)' },
   { tool: 'goal-player', label: '目标(玩家)' },
   { tool: 'player', label: '玩家起点' },
@@ -83,6 +85,19 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
     }
     if (tool === 'player') {
       setWorld((w) => movePlayer(w, activeBoardId, x, y))
+      return
+    }
+    if (tool === 'self-loop-box') {
+      const existingId = occupantAt(world, { board: activeBoardId, x, y })
+      if (existingId && world.pieces[existingId].kind === 'container') return
+      if (!canPlacePieceAt(world, activeBoardId, x, y)) return
+      const oldIds = idsRef.current
+      setWorld((w) => {
+        const result = placeSelfLoopBox(w, activeBoardId, x, y, oldIds)
+        if (!result) return w
+        idsRef.current = result.ids
+        return result.world
+      })
       return
     }
     // normal-box / container-box: re-placing the same kind on a cell that
