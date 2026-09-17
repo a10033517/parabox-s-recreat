@@ -1,0 +1,36 @@
+{
+  "boards": {
+    "root": {
+      "id": "root",
+      "size": 4,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor", "requirement": "player" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    },
+    "redInterior": {
+      "id": "redInterior",
+      "size": 4,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    }
+  },
+  "pieces": {
+    "player": { "id": "player", "kind": "player" },
+    "box1": { "id": "box1", "kind": "normal" },
+    "redPiece": { "id": "redPiece", "kind": "container", "boardRef": "redInterior" },
+    "yellowPiece": { "id": "yellowPiece", "kind": "container", "boardRef": "root" }
+  },
+  "locations": {
+    "player": { "board": "root", "x": 0, "y": 0 },
+    "box1": { "board": "root", "x": 1, "y": 0 },
+    "redPiece": { "board": "root", "x": 3, "y": 1 },
+    "yellowPiece": { "board": "redInterior", "x": 3, "y": 1 }
+  }
+}
