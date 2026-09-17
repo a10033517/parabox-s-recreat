@@ -1,155 +1,230 @@
-# Void Cycle Anchor — Design
+# Void Infinite Destination — Design
+
+## Review summary
+
+This revision replaces an earlier draft of the same feature after external review
+found two real problems, both fixed here and re-verified against a standalone
+reimplementation of the algorithm (not just reasoned about):
+
+1. **Naming/semantics**: the earlier draft called the synthesized Void piece an
+   "anchor" and modeled it as an incidental visual marker. It's better modeled as an
+   explicit **infinite destination** — a `Piece.infiniteFor` field naming the real
+   container it represents — because this also naturally covers a second case the
+   earlier draft never handled: an infinite destination that's already present
+   elsewhere (hand-authored in level JSON, or the real owner piece having separately
+   ended up in the Void through its own earlier infinite event) must be **preferred**
+   over synthesizing a new one, never duplicated.
+2. **Adjacency**: the earlier draft placed the ejected piece at "the next free cell in
+   the existing search order," which is not always actually *adjacent* to the
+   destination (e.g. the search order's second entry is diagonal from its first). This
+   revision uses a real 4-neighbor adjacency search for where the ejected piece lands,
+   separate from the search used to place the destination itself.
+
+**One thing NOT carried over from the external review that supplied these two fixes**:
+that review also assumed `Piece.locked` is a stored boolean flag, and worried a
+generated destination might be created without it set. That assumption is stale — this
+codebase already derives "locked" from physical Void residency (`isInVoid`, added in
+an earlier round), not a stored flag. `Piece.locked` doesn't exist in this codebase.
+Nothing below reintroduces it: any piece placed on `VOID_BOARD_ID` — destination or
+ejected piece alike — is automatically `isInVoid`, and every push-only/no-enter/ring
+rule already keyed off that continues to apply with zero additional code. Re-verified
+this is still true by re-reading `resolveBlocked`'s current guard, unchanged since an
+earlier round, before writing this sentence.
+
+Also **not** adopted from that review: making the real owner's mere Void presence
+insufficient to serve as a destination, requiring an explicit `infiniteFor` marker on
+it too. The user confirmed directly, across two separate rounds of this design's
+clarification, that once the real owner is independently in the Void, later arrivals
+through the same cycle should use it directly with no separate placeholder — this is
+preserved as `findInfiniteDestination`'s first check, verified below against exactly
+that scenario.
 
 ## Goal
 
-When a piece that's part of a genuine containment **cycle** gets pushed to infinity, the
-Void should visibly represent *why* it's infinite — not just relocate the piece as an
-inert locked box (which is what the currently-shipped Void mechanic does for every
-case, cyclic or not). Concretely: pushing a cycle-participant into the Void generates
-a permanent, reusable **anchor** in the Void — a non-enterable, themed placeholder
-representing "an infinite copy of whichever container owns the board the cycle actually
-broke on" — and the pushed piece lands next to it, as if pushed out from inside it.
+When a piece resolves to infinite recursion through a genuine containment cycle, the
+Void should represent *why* — not just relocate the piece as an inert locked box
+indistinguishable from any other Void resident (which is what the currently-shipped
+mechanic does for every case). Concretely: the engine identifies which container owns
+the board the cycle actually broke on, and represents an "infinite copy" of that
+container as a permanent, reusable, non-enterable **infinite destination** in the
+Void. The piece that triggered this exits adjacent to that destination, as if pushed
+out from inside it.
 
-This was worked out over several rounds of back-and-forth with concrete examples,
-because prose descriptions of a recursive mechanic kept talking past each other; every
-claim below was independently verified against the real engine (via `computeTarget`,
-not assumed) before being written down here.
-
-**Worked example, verified against the real engine (this is the ground truth the whole
-design below is built to reproduce exactly):**
+## Ground-truth example (verified against a standalone reimplementation of the
+algorithm below, matching the real `computeTarget`'s traced behavior from an earlier
+round — not just reasoned about)
 
 ```
 boards: root (4x4), redInterior (4x4)
 pieces:
   redPiece:    container, boardRef: redInterior, at root (3,1)      — flush right edge
   yellowPiece: container, boardRef: root,        at redInterior (3,1) — flush right edge
-  player: at root (2,1)
 
-Push redPiece right (e.g. via a pusher, or by resolveBlocked pushing it as an occupant).
+Push redPiece right.
 ```
 
-Confirmed by hand-tracing `computeTarget`'s actual recursion (not assumed): the climb
-visits `root` (redPiece's own board) → exits via `yellowPiece` → visits `redInterior`
-→ exits via `redPiece` (redPiece's own boardRef) → visits `root` **again** — `root` is
-the board `computeTarget` detects as revisited, which is what makes this infinite.
+The containment climb (traced against the real `computeTarget` in an earlier round):
+`root` → (via `yellowPiece`) → `redInterior` → (via `redPiece`) → `root` again — the
+repeat is on `root`, whose owner is `yellowPiece`.
 
-Confirmed step by step with the user, across several corrections to earlier drafts of
-this same example:
-1. `root`'s owner (`yellowPiece`) is **not itself already in the Void**.
-2. So: create a new **anchor** piece at the Void's first free cell (the center, on a
-   fresh Void). It has no `boardRef` (so it can never actually be entered — see
-   `tryEnter`'s existing `into.kind !== 'container'` check, which this satisfies by
-   giving the anchor `kind: 'normal'`), and it's themed with `yellowPiece`'s render
-   color (reusing `cycleColorFor`/`isCycleMember`, since `yellowPiece` itself hasn't
-   moved and is still structurally a cycle member).
-3. `redPiece` lands in the Void **next to this anchor** (the next free cell in the
-   existing `VOID_CELL_ORDER` search) — not at the anchor's own cell.
-4. The real `yellowPiece` does **not** move. It's still at `redInterior (3,1)`,
-   completely unaffected.
-5. If something else later goes infinite via the **same** cycle (same trigger board,
-   same owner), it reuses this same anchor rather than creating a second one.
-6. If the real `yellowPiece` itself is *later* independently pushed into the Void, it
-   becomes usable as the anchor directly — no separate anchor is created once the real
-   piece is already there.
-
-**The critical, independently-verified nuance that makes this non-trivial:** the board
-that triggers `{kind: 'infinite'}` is **not necessarily the pushed piece's own starting
-board** — it's whichever board `computeTarget`'s climb visits a *second* time. Verified
-with a deliberately constructed counter-example (`branchBoard` owned by `branchPiece`
-sitting on `root`, `root`↔`redInterior` a genuine cycle): a piece starting on
-`branchBoard`, pushed flush, climbs `branchBoard → root → redInterior → root` — the
-repeat happens on `root`, three hops away from where the piece actually started. The
-anchor must be keyed off `root`'s owner in this case, not off `branchBoard`'s owner —
-using the piece's own starting board would silently pick the wrong anchor (or, worse,
-one with no relation to the actual cycle at all) whenever the pushed piece isn't itself
-sitting directly on the cyclic board.
+Confirmed result, reproduced by the standalone reimplementation:
+- A new destination `void-infinite:yellowPiece` is created at the Void's first free
+  cell (the center, `(2,2)`, on a fresh Void), `infiniteFor: 'yellowPiece'`.
+- `redPiece` lands at `(2,1)` — genuinely adjacent (directly above) the destination,
+  not merely "the next slot in some list."
+- The real `yellowPiece` does not move; still at `redInterior (3,1)`.
+- A second, different piece pushed through the *same* cycle (same owner) reuses the
+  *same* destination and lands in the next free adjacent cell (`(3,2)`, since `(2,1)`
+  is now taken) — confirmed, not just asserted.
+- If the real `yellowPiece` is later independently found already in the Void (e.g. it
+  went through its own separate infinite event), a further arrival for that same owner
+  uses the *real* `yellowPiece` directly as the destination — confirmed by
+  constructing exactly that world state and checking the next arrival lands adjacent
+  to the real piece's Void location, not a new placeholder.
 
 ## Scope of this round
 
-- `computeTarget`'s `{kind: 'infinite'}` result now carries the triggering board id.
-- `sendToVoid` takes that triggering board, resolves (or reuses, or creates) the
-  correct anchor, and places the pushed piece next to it.
-- A new optional `Piece.anchorFor` field marks a synthesized anchor and names the real
-  piece it represents, for rendering.
-- `CanvasRenderer` colors an anchor using the piece it represents (`anchorFor`), not
-  its own (nonexistent) cycle membership.
-- Anchors are void-resident pieces like any other: `isInVoid` (unchanged), the existing
-  push-only guard in `resolveBlocked` (unchanged), and the locked ring (unchanged) all
-  already apply to them automatically, with zero special-casing — they're just a piece
-  whose `location.board === VOID_BOARD_ID`, exactly like anything else sent there.
-- Every existing Void-mechanic test that exercises the infinite path through
-  `applyMove`/`tryMovePiece` (rather than calling `sendToVoid` directly) needs its
-  expected landing cells re-derived, since an anchor now occupies a cell before the
-  pushed piece does in every case that involves a real cycle (which is every existing
-  test — the mechanic that was shipped has no "goes infinite via a non-cyclic path"
-  case, because `computeTarget` only ever returns `infinite` via a genuine board
-  revisit, which is definitionally a cycle).
+- `computeTarget`'s `{kind: 'infinite'}` result now carries both the repeated board
+  and that board's owning piece id (`ownerId`) — resolved once, at the point of
+  detection, rather than forcing every caller to re-derive it.
+- `sendToVoid` becomes destination-aware: it first checks whether a valid destination
+  for `ownerId` already exists (the real owner if it's already `isInVoid`, or an
+  existing piece with `infiniteFor === ownerId`) and reuses it; only synthesizes a new
+  one when neither exists.
+- A synthesized destination is `kind: 'normal'` (never enterable — `tryEnter` already
+  requires `kind === 'container'`), `infiniteFor: ownerId`, and is placed via the Void
+  board's normal 25-cell placement search (unchanged from the currently-shipped
+  mechanic — no artificial capacity carve-out for destinations specifically).
+- The piece that triggered the infinite result lands in a cell genuinely adjacent (one
+  of the 4 cardinal neighbors, bounds-checked) to whatever destination it resolved to
+  — not merely the next free cell in the board-wide placement search.
+- Hand-authored levels *may* place a piece with `infiniteFor` set, and it will be
+  found and reused exactly like a synthesized one — this falls out of
+  `findInfiniteDestination` reading the field generically, with no special-casing
+  needed between "authored" and "synthesized." No dedicated editor tooling or
+  `parseLevel` validation for this field is added this round (mirrors this project's
+  existing precedent: multi-node cycle levels are hand-authored JSON only, with no
+  editor support, until a later round adds it).
+- Rendering: a destination is colored using the real owner's identity (its cycle color
+  if the owner is a cycle member, else its plain kind color), gets the existing locked
+  ring (automatic — it's `isInVoid` like anything else in the Void), and additionally
+  renders a small "∞" marker distinguishing it from an ordinary locked piece that
+  merely happens to be sitting in the Void.
 
 **Explicitly out of scope:**
-- Directional placement of the ejected piece relative to the anchor (i.e., "pushed out
-  the same side it went in"). No such rule was ever specified with enough precision to
-  implement; the ejected piece lands at the next free cell in the existing
-  `VOID_CELL_ORDER` search, same as an anchor-less arrival would, which naturally
-  clusters it near the anchor without claiming any particular direction.
-- Reserving the `void-anchor:` piece-id prefix at `parseLevel` the way `VOID_BOARD_ID`
-  is reserved for board ids. An authored level using a piece id shaped like
-  `void-anchor:something` could theoretically collide with a synthesized anchor's id
-  later at runtime. This mirrors a real, deliberate choice already made for board ids
-  in the original Void spec, but doing the same for piece ids here is a larger
-  parser change than this round's scope justifies — flagged as a known, low-probability
-  risk for a future round, not fixed now.
-- What happens if the *anchor's own cell* becomes the target of some other push (e.g.
-  pushing a piece into the anchor). The anchor is `isInVoid`, so the existing guard
-  already makes it push-only/non-enterable like anything else in the Void — no new
-  behavior needed, but no bespoke test targets this interaction specifically beyond
-  what the existing "two locked pieces" coverage already proves generically.
+- Infinite *Enter* / epsilon-paradox behavior (entering a box positioned to
+  recursively contain its own entrance). This design is Infinite *Exit* only — the
+  case this whole feature has been built and verified around throughout.
+- Directional fidelity beyond "genuinely adjacent, deterministic 4-neighbor search."
+  No information about which side the piece was pushed from survives into this
+  resolution step, and nothing in this design's confirmation rounds asked for that
+  precision.
+- `parseLevel` validation or editor authoring support for hand-placed `infiniteFor`
+  pieces (see above — supported at the data-model level, not built out further this
+  round).
+- Reserving the `void-infinite:` piece-id prefix against authored collisions, for the
+  same reasons `void-anchor:` wasn't reserved in the design this replaces: a real but
+  low-probability risk, smaller in scope than this round justifies fixing.
 
 ## Design
 
-### `computeTarget` exposes the triggering board
+### 1. `computeTarget` returns the repeated board's owner directly
 
 ```ts
 // src/game/engine/rules.ts
 export type MoveTarget =
   | { kind: 'location'; location: Location; relativeCoord: Fraction }
-  | { kind: 'infinite'; board: BoardId }
+  | { kind: 'infinite'; board: BoardId; ownerId: PieceId }
   | null // blocked: no owner to climb through (e.g. the true root boundary)
 ```
 
 ```ts
-  if (visited.has(loc.board)) return { kind: 'infinite', board: loc.board }
+  if (visited.has(loc.board)) {
+    // loc.board can only be in `visited` because an earlier step in this same climb
+    // already called findContainerFor(world, loc.board) successfully (that's the only
+    // way the climb reaches a board at all) — so this can never be undefined here.
+    const ownerId = findContainerFor(world, loc.board) as PieceId
+    return { kind: 'infinite', board: loc.board, ownerId }
+  }
+  visited.add(loc.board)
 ```
 
-(The only change inside `computeTarget` itself — everything else about the climb is
-unchanged.)
+(Everything else about the climb — the `inBounds` check that must run before this, the
+recursive call shape — is unchanged.)
 
-### `sendToVoid` resolves an anchor before placing the piece
+### 2. `Piece.infiniteFor` marks a destination
 
 ```ts
 // src/game/engine/types.ts
 export interface Piece {
   id: PieceId
   kind: PieceKind
-  boardRef?: BoardId  // present only when kind === 'container'
-  anchorFor?: PieceId // present only on a synthesized Void anchor — see sendToVoid
+  boardRef?: BoardId   // present only when kind === 'container'
+  infiniteFor?: PieceId // present only on an infinite destination — see sendToVoid
 }
 ```
 
+A piece with `infiniteFor !== undefined` is a destination representing the named real
+piece. `kind` stays `'normal'` — the marker is what makes it special, not a new
+`PieceKind` (introducing one would ripple into every `kind`-keyed switch —
+`PIECE_COLORS`, `isCycleMember`'s `kind !== 'container'` check, `tryEnter`'s
+`kind !== 'container'` check — for no behavioral gain, since "never enterable" already
+falls out of `kind: 'normal'` for free).
+
+### 3. Resolving (or creating) a destination
+
 ```ts
-function anchorIdFor(realPieceId: PieceId): PieceId {
-  return `void-anchor:${realPieceId}`
+// src/game/engine/types.ts
+
+function infiniteDestinationIdFor(ownerId: PieceId): PieceId {
+  return `void-infinite:${ownerId}`
 }
 
+// A valid destination for ownerId is either the real ownerId piece itself, if it's
+// already sitting in the Void (confirmed with the user: once the real piece is there,
+// later arrivals through the same cycle use it directly, no separate placeholder), or
+// any piece — synthesized by sendToVoid below, or hand-authored in a level — whose
+// infiniteFor names ownerId.
+function findInfiniteDestination(world: World, ownerId: PieceId): PieceId | undefined {
+  if (isInVoid(world, ownerId)) return ownerId
+  for (const [pieceId, piece] of Object.entries(world.pieces)) {
+    if (piece.infiniteFor === ownerId && world.locations[pieceId] !== undefined) return pieceId
+  }
+  return undefined
+}
+
+const VOID_EXIT_OFFSETS: Array<{ dx: number; dy: number }> = [
+  { dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 },
+]
+
+// A genuinely adjacent free cell to a destination, bounds-checked against the Void's
+// own 5x5 extent — unlike reusing the board-wide placement search (VOID_CELL_ORDER),
+// whose later entries are not necessarily adjacent to its earlier ones.
+function findVoidExitCell(world: World, destination: { x: number; y: number }): { x: number; y: number } | undefined {
+  for (const { dx, dy } of VOID_EXIT_OFFSETS) {
+    const x = destination.x + dx
+    const y = destination.y + dy
+    if (x < 0 || y < 0 || x >= 5 || y >= 5) continue
+    if (occupantAt(world, { board: VOID_BOARD_ID, x, y }) === undefined) return { x, y }
+  }
+  return undefined
+}
+```
+
+### 4. `sendToVoid` becomes destination-aware
+
+```ts
+// src/game/engine/types.ts
+
 // A piece that resolves to infinite recursion is relocated into the shared Void
-// board. If the infinite regress came from a genuine containment cycle — which it
-// always does, since computeTarget only ever returns 'infinite' via a real board
-// revisit — the piece is placed next to an "anchor": a permanent, reusable Void
-// resident representing the container that owns the board the cycle broke on
-// (triggerBoard). The anchor is the REAL owning piece if it's already in the Void,
-// otherwise a synthesized placeholder (created once, reused by every later arrival
-// through the same cycle) themed with that owner's render identity but never itself
-// enterable (kind: 'normal', no boardRef).
-export function sendToVoid(world: World, pieceId: PieceId, triggerBoard: BoardId): World | null {
+// board, adjacent to the "infinite destination" representing whichever container
+// owns the board the cycle actually broke on (ownerId — see computeTarget). If a
+// valid destination for ownerId already exists (see findInfiniteDestination), it's
+// reused; otherwise one is synthesized at the board-wide placement search's next
+// free cell. Rejects (returns null, no mutation) an unknown pieceId, a piece already
+// in the Void, a full Void (no cell for a new destination), or a destination with no
+// free adjacent cell to exit into.
+export function sendToVoid(world: World, pieceId: PieceId, ownerId: PieceId): World | null {
   if (world.pieces[pieceId] === undefined || isInVoid(world, pieceId)) return null
 
   const next = cloneWorld(world)
@@ -157,127 +232,152 @@ export function sendToVoid(world: World, pieceId: PieceId, triggerBoard: BoardId
     next.boards[VOID_BOARD_ID] = makeVoidBoard()
   }
 
-  const owner = findContainerFor(next, triggerBoard)
-  if (owner !== undefined && !isInVoid(next, owner)) {
-    const anchorId = anchorIdFor(owner)
-    if (next.pieces[anchorId] === undefined) {
-      const anchorCell = VOID_CELL_ORDER.find(
-        ({ x, y }) => occupantAt(next, { board: VOID_BOARD_ID, x, y }) === undefined,
-      )
-      if (anchorCell === undefined) return null
-      next.pieces[anchorId] = { id: anchorId, kind: 'normal', anchorFor: owner }
-      next.locations[anchorId] = { board: VOID_BOARD_ID, x: anchorCell.x, y: anchorCell.y }
-    }
+  const existingDestinationId = findInfiniteDestination(next, ownerId)
+  let destinationLoc: Location
+  if (existingDestinationId !== undefined) {
+    destinationLoc = next.locations[existingDestinationId]
+  } else {
+    const destinationCell = VOID_CELL_ORDER.find(
+      ({ x, y }) => occupantAt(next, { board: VOID_BOARD_ID, x, y }) === undefined,
+    )
+    if (destinationCell === undefined) return null
+    const destinationId = infiniteDestinationIdFor(ownerId)
+    next.pieces[destinationId] = { id: destinationId, kind: 'normal', infiniteFor: ownerId }
+    next.locations[destinationId] = { board: VOID_BOARD_ID, x: destinationCell.x, y: destinationCell.y }
+    destinationLoc = next.locations[destinationId]
   }
 
-  const cell = VOID_CELL_ORDER.find(
-    ({ x, y }) => occupantAt(next, { board: VOID_BOARD_ID, x, y }) === undefined,
-  )
-  if (cell === undefined) return null
+  const exitCell = findVoidExitCell(next, destinationLoc)
+  if (exitCell === undefined) return null
 
-  next.locations[pieceId] = { board: VOID_BOARD_ID, x: cell.x, y: cell.y }
+  next.locations[pieceId] = { board: VOID_BOARD_ID, x: exitCell.x, y: exitCell.y }
   return next
 }
 ```
 
-Notes on this shape, since several things about it are easy to get subtly wrong:
+Atomicity is unchanged from the currently-shipped mechanic: every write happens on
+`next` (the clone); every failure path returns before `next` is ever assigned back to
+the caller, so the original `world` is never observably touched.
 
-- `owner` is resolved from `next` (the clone), not `world`, so if `pieceId` itself
-  happens to be `owner` (impossible in practice — see below — but worth being
-  deliberate about) the check stays internally consistent.
-- `owner` can never legitimately be `undefined` here in practice: `sendToVoid` is only
-  ever called with a `triggerBoard` that `computeTarget` just proved has an owner (the
-  climb only continues past a board when `findContainerFor` succeeds for it — an
-  `undefined` owner makes `computeTarget` return `null`, not `infinite`, so
-  `sendToVoid` is never reached that way). The `owner !== undefined` check exists only
-  as a defensive guard for callers other than `tryMovePiece`'s single call site (e.g.
-  a future direct unit test), not because this path is reachable through normal play.
-- The anchor-cell search and the final piece-cell search are two separate calls to the
-  same `VOID_CELL_ORDER.find` — deliberately, not merged into one loop — because the
-  anchor (if newly created) must actually occupy a cell (checked via `occupantAt`)
-  before the second search runs, or the piece could be placed on top of it.
-- If the owner is **already in the Void**, no anchor entry is created or looked up at
-  all — `pieceId` just lands at the next free cell, the same as before this feature
-  existed. This is what makes point 6 of the worked example correct for free: once the
-  real piece is in the Void, it needs no proxy.
-
-### `tryMovePiece` passes the triggering board through
+### 5. `tryMovePiece` passes `ownerId` through
 
 ```ts
 // src/game/engine/rules.ts
-if (target.kind === 'infinite') return sendToVoid(world, pieceId, target.board)
+if (target.kind === 'infinite') return sendToVoid(world, pieceId, target.ownerId)
 ```
 
-### Rendering: an anchor is colored as the piece it represents
+### 6. `resolveBlocked` is unchanged
+
+The currently-shipped two-sided `isInVoid(world, pieceId) || isInVoid(world, occupantId)`
+guard already correctly makes any Void resident — destination or ordinary ejected piece
+alike — push-only and never enterable/mergeable, on both sides of a blocked
+interaction. Nothing about destinations needs a new rule here: a destination is just
+another piece whose `location.board === VOID_BOARD_ID`.
+
+### 7. Rendering: destination color plus an infinity marker
 
 ```ts
 // src/game/render/CanvasRenderer.ts
-for (const [pieceId, location] of Object.entries(world.locations)) {
-  if (location.board !== board.id) continue
-  const piece = world.pieces[pieceId]
-  // An anchor (piece.anchorFor set) has no cycle membership or kind of its own worth
-  // rendering — it's colored as whichever real piece it represents instead.
-  const colorSource = piece.anchorFor !== undefined ? world.pieces[piece.anchorFor] : piece
-  const colorSourceId = piece.anchorFor ?? pieceId
-  ctx.fillStyle = isCycleMember(colorSourceId, world) ? cycleColorFor(colorSourceId) : PIECE_COLORS[colorSource.kind]
-  ctx.fillRect(location.x * cellSize, location.y * cellSize, cellSize, cellSize)
-  if (board.id === VOID_BOARD_ID) {
-    // ...unchanged ring-drawing block...
-  }
-}
+const INFINITY_MARKER_COLOR = '#0f172a' // dark, readable against LOCKED_RING_COLOR's pale fill
 ```
 
-`isCycleMember(colorSourceId, world)` reading the REAL owner's id (not the anchor's
-own synthesized id) works correctly with zero changes to `isCycleMember` itself: the
-real owner (e.g. `yellowPiece`) hasn't moved, so its own cycle-membership walk is
-completely unaffected by the anchor's existence elsewhere in the Void.
+```ts
+  for (const [pieceId, location] of Object.entries(world.locations)) {
+    if (location.board !== board.id) continue
+    const piece = world.pieces[pieceId]
+    // A destination (piece.infiniteFor set) has no cycle membership or kind of its
+    // own worth rendering — it's colored as whichever real piece it represents.
+    const colorSourceId = piece.infiniteFor ?? pieceId
+    const colorSource = piece.infiniteFor !== undefined ? world.pieces[piece.infiniteFor] : piece
+    ctx.fillStyle = isCycleMember(colorSourceId, world) ? cycleColorFor(colorSourceId) : PIECE_COLORS[colorSource.kind]
+    ctx.fillRect(location.x * cellSize, location.y * cellSize, cellSize, cellSize)
+    if (board.id === VOID_BOARD_ID) {
+      ctx.save()
+      ctx.strokeStyle = LOCKED_RING_COLOR
+      ctx.lineWidth = Math.max(2, cellSize / 8)
+      const inset = ctx.lineWidth / 2
+      ctx.strokeRect(
+        location.x * cellSize + inset, location.y * cellSize + inset,
+        cellSize - inset * 2, cellSize - inset * 2,
+      )
+      if (piece.infiniteFor !== undefined) {
+        ctx.fillStyle = INFINITY_MARKER_COLOR
+        ctx.font = `${Math.floor(cellSize / 2)}px sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('∞', location.x * cellSize + cellSize / 2, location.y * cellSize + cellSize / 2)
+      }
+      ctx.restore()
+    }
+  }
+```
 
 ## Testing
 
-- `rules.test.ts` (`computeTarget`): update every existing assertion checking
-  `result.kind === 'infinite'` to also check `result.board` matches the board actually
-  expected to trigger the repeat — including at least one case (mirroring the
-  `branchBoard` counter-example above) where the triggering board is **not** the
-  moved piece's own starting board, to pin down the nuance this whole design turns on.
-- `types.test.ts` (`sendToVoid`): every existing test's call site gains a
-  `triggerBoard` argument; re-derive expected landing cells for each (an anchor now
-  consumes the first free cell in every scenario that goes through a real cycle,
-  shifting the previously-expected piece cell by one slot). New tests:
-  - First arrival through a cycle creates an anchor themed on the correct owner, and
-    the arriving piece lands in the very next free cell after it.
-  - A second, different piece arriving through the **same** cycle reuses the existing
-    anchor (same id, same location) rather than creating a second one.
-  - A piece arriving through a **different** cycle (different trigger board, different
-    owner) creates its own, separate anchor.
-  - If the owner is already in the Void (arrange this via two sequential
-    `sendToVoid` calls), no anchor is created at all — the arriving piece just takes
-    the next free cell.
-  - Full-Void capacity tests account for the anchor also consuming a cell.
-- `CanvasRenderer.test.ts`: an anchor piece (`anchorFor` set) renders using the real
-  owner's color (cycle color if the owner is a cycle member, else the owner's plain
-  kind color) — not `PIECE_COLORS['normal']` (which its own `kind` would otherwise
-  imply) and not any color derived from the anchor's own (nonexistent) `boardRef`.
-- `src/levels/index.test.ts` / demo levels: `10-void-storage.json` (both `box1` and
-  `box2` are pushed off edges of `root`, owned by the self-loop `loopA`) now also
-  produces a `void-anchor:loopA` entry the first time either box arrives — re-verify
-  this level's known win sequence still wins (it does; the anchor doesn't occupy any
-  cell the win path depends on), and its exact final Void layout now additionally
-  contains one themed anchor piece alongside the two boxes.
+- `rules.test.ts` (`computeTarget`): every existing `infinite`-result assertion gains a
+  `board` and `ownerId` check. Add a case (reusing the `branchBoard`-hangs-off-a-cycle
+  shape from an earlier round) where the repeated board is *not* the moved piece's own
+  starting board, confirming `ownerId` still resolves to the correct (distant) owner.
+- `types.test.ts` (`sendToVoid`/`findInfiniteDestination`): every existing call site
+  gains an `ownerId` argument; re-derive every expected landing cell (a destination now
+  occupies a cell before the ejected piece does, in every scenario — this mechanic has
+  no more "goes infinite with no owner" case, since `computeTarget` only returns
+  `infinite` via a genuine cycle, which always has an owner). New coverage:
+  - First arrival for an owner with no existing destination: creates one at the Void's
+    first free cell, `infiniteFor` set correctly, ejected piece lands in a genuinely
+    adjacent free cell (assert the exact 4-neighbor relationship, not just "some cell
+    in the Void").
+  - Second arrival for the *same* owner: reuses the same destination id and location
+    exactly (no second destination created).
+  - A *different* owner gets its own, separate destination.
+  - If the real owner piece is already `isInVoid` (construct this directly), a further
+    arrival for that owner uses the real piece's own location as the destination — no
+    synthesized destination created at all.
+  - A hand-placed piece with `infiniteFor` already set (simulating an authored
+    destination) is found and reused by `findInfiniteDestination` exactly like a
+    synthesized one.
+  - If a destination's own 4 neighbors are all occupied, the whole move fails (`null`),
+    original world untouched.
+  - Full-Void capacity (no free cell for a brand-new destination) still fails cleanly.
+- `CanvasRenderer.test.ts`: a destination renders with the real owner's color (cycle
+  color when applicable) and the "∞" marker; an ordinary (non-destination) locked Void
+  piece gets the ring but *not* the marker.
+- `src/levels/index.test.ts` / `10-void-storage.json`: re-verify the known win sequence
+  still wins — `box1`/`box2` are both pushed off edges of `root`, owned by the
+  self-loop `loopA`; the first push now also creates a `void-infinite:loopA`
+  destination, the second reuses it, and both boxes land adjacent to it rather than at
+  their previously-expected coordinates — the win condition itself is unaffected
+  either way, since it never depended on Void internals.
 
 ## Acceptance criteria
 
-- Pushing a piece into infinity via a genuine cycle creates (or reuses) a themed,
-  non-enterable anchor in the Void representing the board-owning container the cycle
-  actually broke on — determined by the board `computeTarget` detects as revisited,
-  not necessarily the pushed piece's own starting board.
-- The anchor is created once per distinct owner and reused by every later arrival
-  through the same cycle.
-- If the real owner piece is itself already in the Void, it's used directly with no
-  separate anchor.
-- The real owner's own token never moves as a side effect of another piece in its
-  cycle going to the Void.
-- An anchor renders using the real owner's color identity (cycle color when
-  applicable), and — like every Void resident — is push-only, non-enterable, and
-  rendered with the locked ring, with no anchor-specific code needed for any of those
-  three (they fall out of the existing `isInVoid`-based rules for free).
+- Infinite-exit detection identifies both the repeated board and the piece that owns
+  it, in the same `computeTarget` result — no separate lookup needed downstream.
+- An existing infinite destination for that owner (the real owner already in the Void,
+  or any piece with a matching `infiniteFor`) is used in preference to synthesizing a
+  new one; a new one is synthesized only when neither exists.
+- A synthesized destination is placed via the Void's normal 25-cell placement search,
+  is never enterable, and is reused by every later arrival for the same owner.
+- The piece that triggered the infinite result lands in a cell genuinely adjacent (one
+  of 4 cardinal neighbors, bounds-checked) to whatever destination it resolved to.
+- The real owner piece never moves as a side effect of another piece in its cycle
+  going to the Void.
+- Void-residency-derived rules (`isInVoid`, the two-sided push-only guard, the locked
+  ring) apply to destinations automatically, with zero destination-specific code
+  needed for any of the three.
+- A destination renders distinctly from an ordinary locked Void piece (owner's color +
+  ring + "∞" marker, vs. just the piece's own color + ring).
+- Capacity/adjacency failures are atomic: `null` with the original `World` completely
+  unchanged.
 - Existing 06–10 demo levels still win exactly as before.
+
+## Reference
+
+This design's overall shape — an "infinite box" endpoint that a recursive exit resolves
+to, preferentially reusing one that already exists rather than always creating a new
+one in null/void space — is modeled after community-documented descriptions of Patrick's
+Parabox's own Infinite Exit behavior, not a claim to reproduce its exact implementation.
+The data model and algorithm above are this codebase's own implementation decisions,
+verified against this codebase's own engine (`computeTarget`'s traced recursion, and a
+standalone reimplementation of the algorithm checked against three concrete scenarios),
+not against the original game's source.
