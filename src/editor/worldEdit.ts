@@ -44,14 +44,21 @@ function subtreeContainsPlayer(world: World, pieceId: PieceId): boolean {
     seen.add(id)
     if (id === PLAYER_ID) return true
     const piece = world.pieces[id]
-    // A self-referencing (self-loop) container's own board is not solely
-    // "owned" by it — deleting it never touches that board (see
-    // deletePieceRecursively's matching guard), so descending into it here
-    // would be a stale false positive: it could find the player standing on
-    // that same board even though deleting this piece can't remove the
-    // player at all.
-    const isSelfReferencing = world.locations[id]?.board === piece?.boardRef
-    if (piece?.kind === 'container' && piece.boardRef !== undefined && !isSelfReferencing) {
+    // Deleting this piece never touches the board it "owns" when either (a)
+    // it's self-referencing (standing on the very board it owns — the
+    // classic self-loop), or (b) that board is 'root' (the level's
+    // foundational board closed back to by a longer cycle). This file is
+    // editor-only and createEmptyWorld always names the foundational board
+    // 'root'; there's currently no way to load an existing level back into
+    // the editor for further editing, so unlike levelSchema.ts (which must
+    // validate arbitrary externally-authored JSON), this file can safely
+    // assume 'root'. Descending into either case here would be a stale
+    // false positive: it could find the player standing on that same board
+    // even though deleting this piece can't remove the player at all.
+    const skipsCascade =
+      world.locations[id]?.board === piece?.boardRef ||
+      piece?.boardRef === 'root'
+    if (piece?.kind === 'container' && piece.boardRef !== undefined && !skipsCascade) {
       for (const [otherId, loc] of Object.entries(world.locations)) {
         if (loc.board === piece.boardRef && !seen.has(otherId)) stack.push(otherId)
       }
@@ -72,12 +79,21 @@ export function deletePieceRecursively(world: World, pieceId: PieceId): World {
     const piece = next.pieces[id]
     if (!piece) continue
     // A self-referencing (self-loop) container's own board is not solely
-    // "owned" by it — that board is the very one it's standing on, which
-    // may still be legitimately owned by a separate external container (or,
-    // on root, own itself). Deleting a self-loop piece must only delete
-    // that one piece, never cascade into the board it also sits inside.
-    const isSelfReferencing = next.locations[id]?.board === piece.boardRef
-    if (piece.kind === 'container' && piece.boardRef !== undefined && !isSelfReferencing) {
+    // "owned" by it, and neither is 'root' (the level's foundational board
+    // when a longer cycle closes back onto it through a non-self-referencing
+    // piece) — that board is the very foundation the level is built on, and
+    // may still be legitimately owned by a separate external container (or
+    // own itself). Deleting either kind of piece must only delete that one
+    // piece, never cascade into the board it points at. This file is
+    // editor-only and createEmptyWorld always names the foundational board
+    // 'root'; there's currently no way to load an existing level back into
+    // the editor for further editing, so unlike levelSchema.ts (which must
+    // validate arbitrary externally-authored JSON), this file can safely
+    // assume 'root'.
+    const skipsCascade =
+      next.locations[id]?.board === piece.boardRef ||
+      piece.boardRef === 'root'
+    if (piece.kind === 'container' && piece.boardRef !== undefined && !skipsCascade) {
       const boardId = piece.boardRef
       for (const [otherId, loc] of Object.entries(next.locations)) {
         if (loc.board === boardId) stack.push(otherId)

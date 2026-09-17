@@ -1,4 +1,4 @@
-import { PLAYER_ID } from '../game/engine/types'
+import { PLAYER_ID, World } from '../game/engine/types'
 import {
   canPlacePieceAt,
   createEmptyBoard,
@@ -292,4 +292,48 @@ test("deletePieceRecursively deleting a board's external owner still cascades th
   expect(next.pieces['box-0']).toBeUndefined()
   expect(next.pieces['box-1']).toBeUndefined() // the self-loop piece inside is swept up too
   expect(next.boards['board-0']).toBeUndefined()
+})
+
+test('deleting a piece that closes a cycle back to the starting board does not cascade-delete that board', () => {
+  const world: World = {
+    boards: {
+      root: createEmptyBoard('root', 2),
+      redInterior: createEmptyBoard('redInterior', 1),
+    },
+    pieces: {
+      [PLAYER_ID]: { id: PLAYER_ID, kind: 'player' },
+      redPiece: { id: 'redPiece', kind: 'container', boardRef: 'redInterior' },
+      yellowPiece: { id: 'yellowPiece', kind: 'container', boardRef: 'root' },
+    },
+    locations: {
+      [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+      redPiece: { board: 'root', x: 1, y: 0 },
+      yellowPiece: { board: 'redInterior', x: 0, y: 0 },
+    },
+  }
+  const next = deletePieceRecursively(world, 'yellowPiece')
+  expect(next.pieces.yellowPiece).toBeUndefined()
+  expect(next.boards.root).toBeDefined()
+  expect(next.pieces[PLAYER_ID]).toBeDefined()
+  expect(next.locations[PLAYER_ID]).toEqual({ board: 'root', x: 0, y: 0 })
+})
+
+test('canPlacePieceAt allows overwriting a piece that closes a cycle back to the starting board', () => {
+  const world: World = {
+    boards: {
+      root: createEmptyBoard('root', 2),
+      redInterior: createEmptyBoard('redInterior', 1),
+    },
+    pieces: {
+      [PLAYER_ID]: { id: PLAYER_ID, kind: 'player' },
+      redPiece: { id: 'redPiece', kind: 'container', boardRef: 'redInterior' },
+      yellowPiece: { id: 'yellowPiece', kind: 'container', boardRef: 'root' },
+    },
+    locations: {
+      [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+      redPiece: { board: 'root', x: 1, y: 0 },
+      yellowPiece: { board: 'redInterior', x: 0, y: 0 },
+    },
+  }
+  expect(canPlacePieceAt(world, 'redInterior', 0, 0)).toBe(true) // yellowPiece's own cell
 })
