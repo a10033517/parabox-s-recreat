@@ -22,6 +22,7 @@ export interface Piece {
   id: PieceId
   kind: PieceKind
   boardRef?: BoardId // present only when kind === 'container'
+  locked?: boolean    // runtime-only; true only after sendToVoid — see below
 }
 
 export interface Location {
@@ -86,9 +87,51 @@ export function moveTo(world: World, pieceId: PieceId, location: Location): Worl
   return next
 }
 
-export function removePiece(world: World, pieceId: PieceId): World {
+export const VOID_BOARD_ID: BoardId = 'void'
+
+function makeVoidBoard(): Board {
+  const size = 5
+  const cells: Cell[][] = Array.from({ length: size }, (_, y) =>
+    Array.from({ length: size }, (_, x) => ({
+      type: (x === 0 || y === 0 || x === size - 1 || y === size - 1 ? 'wall' : 'floor') as CellType,
+    })),
+  )
+  return { id: VOID_BOARD_ID, size, cells }
+}
+
+// Fixed search order for a free interior cell in the Void: center first (the
+// natural first landing spot), then the remaining 8 interior cells in a fixed,
+// deterministic order. Deterministic so tests can predict exactly where any
+// given piece lands without needing to special-case "first vs. second piece."
+const VOID_CELL_ORDER: Array<{ x: number; y: number }> = [
+  { x: 2, y: 2 },
+  { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 },
+  { x: 1, y: 2 },                 { x: 3, y: 2 },
+  { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 },
+]
+
+// A piece that resolves to infinite recursion is relocated into the shared Void
+// board instead of being deleted from the world (see removePiece, now gone — this
+// replaces its only caller). It's marked `locked`, which resolveBlocked reads to
+// keep it pushable but never enterable/mergeable again. Rejects (returns null, no
+// mutation) an unknown pieceId, an already-locked piece (a piece is only ever sent
+// to the Void once), or a full Void — the caller always gets back either the
+// original world untouched, or a new world with exactly one piece relocated and
+// locked.
+export function sendToVoid(world: World, pieceId: PieceId): World | null {
+  const piece = world.pieces[pieceId]
+  if (piece === undefined || piece.locked) return null
+
   const next = cloneWorld(world)
-  delete next.pieces[pieceId]
-  delete next.locations[pieceId]
+  if (next.boards[VOID_BOARD_ID] === undefined) {
+    next.boards[VOID_BOARD_ID] = makeVoidBoard()
+  }
+  const cell = VOID_CELL_ORDER.find(
+    ({ x, y }) => occupantAt(next, { board: VOID_BOARD_ID, x, y }) === undefined,
+  )
+  if (cell === undefined) return null
+
+  next.locations[pieceId] = { board: VOID_BOARD_ID, x: cell.x, y: cell.y }
+  next.pieces[pieceId] = { ...next.pieces[pieceId], locked: true }
   return next
 }
