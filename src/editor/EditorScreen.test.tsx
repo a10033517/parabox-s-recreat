@@ -250,3 +250,19 @@ test('the self-loop-box tool places a container whose interior is its own board,
   expect(screen.getByTestId('board-ids')).toHaveTextContent('root')
   expect(screen.getByTestId('board-ids')).not.toHaveTextContent('board-0')
 })
+
+test('the self-loop-box tool is a no-op when the active board is not root', async () => {
+  render(<EditorScreen onBack={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('容器箱'))
+  const canvas = screen.getByTestId('editor-canvas')
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  fireEvent.dblClick(canvas, { clientX: 5, clientY: 5 })
+  expect(screen.getByText('外层 > box-0')).toBeInTheDocument() // confirm we navigated in
+
+  await user.click(screen.getByLabelText('自包箱'))
+  fireEvent.click(canvas, { clientX: 5, clientY: 5 })
+  await waitPastClickWindow()
+  expect(screen.queryByTestId('box-at-0-0')).not.toBeInTheDocument()
+})

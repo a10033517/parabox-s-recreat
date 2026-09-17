@@ -88,6 +88,7 @@ export function EditorScreen({ onBack }: { onBack: () => void }) {
       return
     }
     if (tool === 'self-loop-box') {
+      if (activeBoardId !== 'root') return
       const existingId = occupantAt(world, { board: activeBoardId, x, y })
       if (existingId && world.pieces[existingId].kind === 'container') return
       if (!canPlacePieceAt(world, activeBoardId, x, y)) return
