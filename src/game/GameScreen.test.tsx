@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { GameScreen } from './GameScreen'
 import { makeFloorBoard, makeWorld, setRequirement, setWall } from './engine/testFixtures'
@@ -87,4 +87,27 @@ test('undoing out of a won state allows onWin to fire again on re-winning', asyn
   await user.click(screen.getByText('复位上一步')) // undo out of the win
   await user.click(screen.getByLabelText('右')) // re-win
   expect(onWin).toHaveBeenCalledTimes(2)
+})
+
+test('a move that removes the player shows a lost notice, and its button recovers via undo', async () => {
+  const root = makeFloorBoard('root', 2)
+  const world = makeWorld(
+    [root],
+    [
+      { id: PLAYER_ID, kind: 'player' },
+      { id: 'loopBox', kind: 'container', boardRef: 'root' },
+    ],
+    {
+      [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+      loopBox: { board: 'root', x: 0, y: 0 },
+    },
+  )
+  render(<GameScreen initialWorld={world} onExit={() => {}} onWin={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('左'))
+  const notice = screen.getByTestId('lose-notice')
+  expect(within(notice).getByText('玩家迷失在无限递归中')).toBeInTheDocument()
+
+  await user.click(within(notice).getByText('复位上一步'))
+  expect(screen.queryByTestId('lose-notice')).not.toBeInTheDocument()
 })
