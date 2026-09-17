@@ -1,7 +1,7 @@
 import { Fraction, addInt, divideByInt, multiplyByInt, isZero, fractionDivMod, makeFraction, HALF } from './fraction'
 import {
   World, Location, Direction, Board, BoardId, Piece, PieceId,
-  inBounds, step, findContainerFor, occupantAt, moveTo, removePiece, opposite, PLAYER_ID,
+  inBounds, step, findContainerFor, occupantAt, moveTo, sendToVoid, opposite, PLAYER_ID,
 } from './types'
 
 export type MoveTarget =
@@ -94,15 +94,16 @@ export function tryMovePiece(
   if (loc === undefined) return null // the piece is no longer in the world
   const target = computeTarget(world, loc, dir, HALF)
   if (target === null) return null
-  // The transition can never resolve to a real location — the piece
-  // attempting it is removed instead. If pieceId is PLAYER_ID, this is how
-  // a loss actually happens (checkLose reads the resulting world). If it's
-  // any other piece, resolveBlocked's existing "pushed succeeded" path
-  // (moveTo(pushed, pieceId, target.location)) already treats a non-null
-  // return as a completed push, so the pusher still ends up at its own
-  // target cell while the pushed piece simply vanishes — no change needed
-  // there.
-  if (target.kind === 'infinite') return removePiece(world, pieceId)
+  // The transition can never resolve to a real location — the piece attempting
+  // it is relocated into the Void instead (see sendToVoid), locked so nothing
+  // can enter or merge into it again. If pieceId is PLAYER_ID, the player simply
+  // ends up standing in the Void — this is no longer a loss (there is no loss
+  // state anymore; see checkLose's removal). If it's any other piece,
+  // resolveBlocked's existing "pushed succeeded" path (moveTo(pushed, pieceId,
+  // target.location)) already treats a non-null return as a completed push, so
+  // the pusher still ends up at its own target cell while the pushed piece ends
+  // up in the Void — no change needed there.
+  if (target.kind === 'infinite') return sendToVoid(world, pieceId)
 
   const targetBoard = world.boards[target.location.board]
   if (targetBoard.cells[target.location.y][target.location.x].type === 'wall') return null
@@ -156,8 +157,15 @@ export function resolveBlocked(
 ): World | null {
   const nextInMotion = new Map(inMotion).set(pieceId, dir)
 
+  // The normal push path is the only legal way a locked piece — on either side —
+  // may participate in a blocked move.
   const pushed = tryMovePiece(world, occupantId, dir, nextInMotion, new Set())
   if (pushed) return moveTo(pushed, pieceId, target.location)
+
+  // No push was possible. If either side of this interaction is locked, it may
+  // never be entered, eaten, or itself enter/eat the other — skip straight to
+  // failure instead of trying either tryEnter direction below.
+  if (world.pieces[pieceId]?.locked || world.pieces[occupantId]?.locked) return null
 
   const entered = tryEnter(
     world, pieceId, occupantId, dir, target.relativeCoord,
@@ -189,8 +197,4 @@ export function checkWin(world: World): boolean {
     }
   }
   return true
-}
-
-export function checkLose(world: World): boolean {
-  return world.locations[PLAYER_ID] === undefined
 }
