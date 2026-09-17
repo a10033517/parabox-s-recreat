@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece, resolveBlocked, resolveInfiniteExit, checkWin } from './rules'
+import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece, resolveBlocked, resolveInfiniteExit, resolveCloneTeleport, checkWin } from './rules'
 import { HALF, makeFraction, ZERO, ONE } from './fraction'
 import { makeFloorBoard, makeWorld, setWall, setRequirement } from './testFixtures'
 import { PLAYER_ID } from './types'
@@ -876,6 +876,107 @@ describe('resolveBlocked — locked pieces push only, never enter or eat, on eit
     if (target === null || target.kind !== 'location') throw new Error('test setup')
     const result = resolveBlocked(world, 'pusher', 'container1', target, 'right', new Map(), new Set())
     expect(result).not.toBeNull() // entry succeeded — not blocked the way a locked occupant would be
+  })
+})
+
+describe('resolveCloneTeleport — entering a clone redirects to its main body\'s current location', () => {
+  it('teleports the entrant directly there when the main body\'s cell is free', () => {
+    const world = makeWorld(
+      [makeFloorBoard('root', 4)],
+      [{ id: 'A', kind: 'normal' }, { id: 'entrant', kind: 'normal' }],
+      { A: { board: 'somewhereElse', x: 0, y: 0 }, entrant: { board: 'root', x: 2, y: 0 } },
+    )
+    // A is on a board this fixture never declares in `boards` — deliberately: its
+    // own board never needs to be walked, only its Location is read.
+    const result = resolveCloneTeleport(world, 'entrant', 'A', 'right', new Map())
+    expect(result?.locations.entrant).toEqual({ board: 'somewhereElse', x: 0, y: 0 })
+  })
+
+  it('pushes the main body one step further in the entrant\'s direction when its own cell is occupied (the common case — reproduces the confirmed worked example)', () => {
+    const root = makeFloorBoard('root', 4)
+    const world = makeWorld(
+      [root],
+      [
+        { id: 'A', kind: 'container', boardRef: 'root' }, // self-loop main body
+        { id: 'B', kind: 'container', cloneOf: 'A', boardRef: 'root' },
+        { id: 'entrant', kind: 'normal' },
+      ],
+      {
+        A: { board: 'root', x: 0, y: 0 },
+        B: { board: 'root', x: 3, y: 0 },
+        entrant: { board: 'root', x: 2, y: 0 },
+      },
+    )
+    const result = resolveCloneTeleport(world, 'entrant', 'A', 'right', new Map())!
+    expect(result.locations.A).toEqual({ board: 'root', x: 1, y: 0 }) // pushed one step right
+    expect(result.locations.entrant).toEqual({ board: 'root', x: 0, y: 0 }) // takes A's old cell
+  })
+
+  it('fails the whole move when the main body cannot be pushed further', () => {
+    const root = makeFloorBoard('root', 4)
+    const world = makeWorld(
+      [root],
+      [{ id: 'A', kind: 'normal' }, { id: 'entrant', kind: 'normal' }],
+      { A: { board: 'root', x: 0, y: 0 }, entrant: { board: 'root', x: 2, y: 0 } }, // A flush against the left edge
+    )
+    const result = resolveCloneTeleport(world, 'entrant', 'A', 'left', new Map())
+    expect(result).toBeNull()
+    expect(world.locations.A).toEqual({ board: 'root', x: 0, y: 0 }) // untouched
+    expect(world.locations.entrant).toEqual({ board: 'root', x: 2, y: 0 }) // untouched
+  })
+
+  it('fails cleanly (does not throw) when cloneOf names a piece with no location', () => {
+    const world = makeWorld(
+      [makeFloorBoard('root', 2)],
+      [{ id: 'entrant', kind: 'normal' }],
+      { entrant: { board: 'root', x: 0, y: 0 } },
+    )
+    expect(resolveCloneTeleport(world, 'entrant', 'nonexistent', 'right', new Map())).toBeNull()
+  })
+})
+
+describe('tryEnter — a clone redirects before normal container entry', () => {
+  it('an ordinary box (not the player) pushed into a clone triggers the same redirect', () => {
+    // A sits well away from pusher's own row so the push-chain that follows (pusher
+    // -> tries to enter B -> redirects to A -> pushes A) can't loop back onto pusher
+    // itself — hand-traced against the exact resolveBlocked/resolveCloneTeleport
+    // logic before writing this down: pusher ends up at A's OLD location (A's cell,
+    // vacated), A ends up pushed one step further right.
+    const root = makeFloorBoard('root', 4)
+    setWall(root, 3, 1) // directly behind B — push fails, forcing tryEnter
+    const world = makeWorld(
+      [root],
+      [
+        { id: 'A', kind: 'container', boardRef: 'root' },
+        { id: 'B', kind: 'container', cloneOf: 'A' }, // no boardRef needed (Task 1)
+        { id: 'pusher', kind: 'normal' },
+      ],
+      {
+        A: { board: 'root', x: 0, y: 3 },
+        B: { board: 'root', x: 2, y: 1 },
+        pusher: { board: 'root', x: 1, y: 1 },
+      },
+    )
+    const direct = tryMovePiece(world, 'pusher', 'right', new Map(), new Set())!
+    expect(direct.locations.pusher).toEqual({ board: 'root', x: 0, y: 3 }) // A's old cell
+    expect(direct.locations.A).toEqual({ board: 'root', x: 1, y: 3 }) // pushed one step right
+    expect(direct.locations.B).toEqual({ board: 'root', x: 2, y: 1 }) // B itself never moves
+  })
+
+  it('control: entering an ordinary (non-clone) container is unaffected', () => {
+    const root = makeFloorBoard('root', 3)
+    setWall(root, 2, 1)
+    const inside = makeFloorBoard('inside', 3)
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'C', kind: 'container', boardRef: 'inside' },
+      ],
+      { [PLAYER_ID]: { board: 'root', x: 0, y: 1 }, C: { board: 'root', x: 1, y: 1 } },
+    )
+    const next = applyMove(world, 'right')
+    expect(next?.locations[PLAYER_ID].board).toBe('inside') // entered normally, unaffected by Clone
   })
 })
 

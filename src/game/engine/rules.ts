@@ -157,6 +157,40 @@ export function resolveInfiniteExit(
   return moveTo(pushed, pieceId, exitLoc)
 }
 
+// A clone has no real interior in practice: entering it (from either tryEnter call
+// site — the "entered" or "eaten" direction inside resolveBlocked, so this applies to
+// any piece, not just the player) redirects to wherever mainBodyId is CURRENTLY
+// standing, rather than descending into the clone's own boardRef. In practice that
+// cell is occupied by the main body itself, so the common case is displacing it one
+// step further in the same direction (an ordinary push, reusing tryMovePiece exactly
+// like resolveInfiniteExit's Void-exit chain-push); if that push isn't possible, the
+// whole move fails, same as any other blocked move.
+export function resolveCloneTeleport(
+  world: World,
+  pieceId: PieceId,
+  mainBodyId: PieceId,
+  dir: Direction,
+  inMotion: Map<PieceId, Direction>,
+): World | null {
+  const targetLoc = world.locations[mainBodyId]
+  if (targetLoc === undefined) return null
+
+  const occupant = occupantAt(world, targetLoc)
+  // occupantAt(world, targetLoc) always finds mainBodyId itself here (it's
+  // tautologically standing at its own reported location), UNLESS mainBodyId's
+  // own board isn't even present in this world — a structurally odd but not
+  // unsafe shape (see the missing-mainBodyId case above), in which case there's
+  // nothing to push against or walk: the entrant just teleports directly there.
+  if (occupant === undefined || world.boards[targetLoc.board] === undefined) {
+    return moveTo(world, pieceId, targetLoc)
+  }
+  if (occupant === pieceId) return null // degenerate: pieceId IS the main body
+
+  const pushed = tryMovePiece(world, occupant, dir, new Map(inMotion).set(pieceId, dir), new Set())
+  if (pushed === null) return null
+  return moveTo(pushed, pieceId, targetLoc)
+}
+
 export function tryEnter(
   world: World,
   pieceId: PieceId,
@@ -169,6 +203,9 @@ export function tryEnter(
   if (beingEntered.has(intoId)) return null
 
   const into: Piece = world.pieces[intoId]
+  if (into.cloneOf !== undefined) {
+    return resolveCloneTeleport(world, pieceId, into.cloneOf, dir, inMotion)
+  }
   if (into.kind !== 'container') return null
 
   const board = world.boards[into.boardRef as string]
