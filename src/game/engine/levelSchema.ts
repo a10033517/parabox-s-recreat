@@ -71,7 +71,7 @@ export function parseLevel(data: unknown): World {
       throw new Error(`Piece "${pieceId}" has an invalid kind "${piece.kind}"`)
     }
     if (piece.kind === 'container') {
-      if (piece.boardRef === undefined || boards[piece.boardRef] === undefined) {
+      if (piece.cloneOf === undefined && (piece.boardRef === undefined || boards[piece.boardRef] === undefined)) {
         throw new Error(`Container piece "${pieceId}" has a boardRef that does not exist`)
       }
     } else if (piece.boardRef !== undefined) {

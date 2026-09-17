@@ -21,8 +21,11 @@ export type PieceKind = 'player' | 'normal' | 'container'
 export interface Piece {
   id: PieceId
   kind: PieceKind
-  boardRef?: BoardId    // present only when kind === 'container'
-  infiniteFor?: PieceId // present only on an infinite destination — see sendToVoid
+  boardRef?: BoardId    // present when kind === 'container' AND cloneOf is unset — see parseLevel
+  infiniteFor?: PieceId // present only on an infinite destination
+  cloneOf?: PieceId     // present only on a clone — names its main body
+  fliph?: boolean       // persistent horizontal-flip property
+  linkedTo?: PieceId    // present only on a container linked directly to another
 }
 
 export interface Location {
