@@ -503,9 +503,7 @@ everything else in this block is unchanged.)
 - [ ] **Step 4: Run and confirm they pass**
 
 Run: `npx vitest run src/game/engine/rules.test.ts`
-Expected: PASS, every test in the file. If the up/down entry test's asserted value
-needed correcting per Step 1's note, confirm the corrected value is what's actually
-committed.
+Expected: PASS, every test in the file.
 
 Run: `npx tsc --noEmit -p tsconfig.json`
 Expected: zero errors.
