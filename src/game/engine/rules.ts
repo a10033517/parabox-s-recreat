@@ -4,6 +4,12 @@ import {
   inBounds, step, findContainerFor, occupantAt, moveTo, ensureInfiniteDestination, isInVoid, opposite, PLAYER_ID, VOID_BOARD_ID,
 } from './types'
 
+function mirrorHorizontal(dir: Direction): Direction {
+  if (dir === 'left') return 'right'
+  if (dir === 'right') return 'left'
+  return dir
+}
+
 export type MoveTarget =
   | { kind: 'location'; location: Location; relativeCoord: Fraction }
   | { kind: 'infinite'; board: BoardId; ownerId: PieceId }
@@ -39,12 +45,14 @@ export function computeTarget(
 
   const containerId = findContainerFor(world, loc.board)
   if (containerId === undefined) return null
+  const container = world.pieces[containerId]
 
-  const offset = dir === 'up' || dir === 'down' ? loc.x : loc.y
+  const climbDir = container.fliph ? mirrorHorizontal(dir) : dir
+  const offset = climbDir === 'up' || climbDir === 'down' ? loc.x : loc.y
   const newRelativeCoord = divideByInt(addInt(relativeCoord, offset), board.size)
 
   const containerLoc = world.locations[containerId]
-  return computeTarget(world, containerLoc, dir, newRelativeCoord, visited)
+  return computeTarget(world, containerLoc, climbDir, newRelativeCoord, visited)
 }
 
 export function getEntryCell(
@@ -209,7 +217,8 @@ export function tryEnter(
   if (into.kind !== 'container') return null
 
   const board = world.boards[into.boardRef as string]
-  const { cell, newRelativeCoord } = getEntryCell(board, dir, relativeCoord)
+  const entryDir = into.fliph ? mirrorHorizontal(dir) : dir
+  const { cell, newRelativeCoord } = getEntryCell(board, entryDir, relativeCoord)
   if (cell === null) return null
   if (board.cells[cell.y][cell.x].type === 'wall') return null
 

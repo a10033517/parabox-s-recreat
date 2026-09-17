@@ -1020,3 +1020,84 @@ describe('tryMovePiece — infinite resolution when the Void is full', () => {
     expect(next).toBeNull()
   })
 })
+
+describe('fliph — entry direction is horizontally mirrored', () => {
+  it('entering a fliph container pushing right computes the same cell as pushing left into an identical non-flipped container', () => {
+    const root = makeFloorBoard('root', 3)
+    // no wall needed: the container sits at the board's edge (x=2 on a size-3
+    // board), so pushing it further right is already out of bounds — the push
+    // fails naturally, forcing entry
+    const insideFlipped = makeFloorBoard('insideFlipped', 4)
+    const insidePlain = makeFloorBoard('insidePlain', 4)
+    const world = makeWorld(
+      [root, insideFlipped, insidePlain],
+      [
+        { id: 'pusher', kind: 'normal' },
+        { id: 'flipped', kind: 'container', boardRef: 'insideFlipped', fliph: true },
+      ],
+      { pusher: { board: 'root', x: 1, y: 1 }, flipped: { board: 'root', x: 2, y: 1 } },
+    )
+    const next = tryMovePiece(world, 'pusher', 'right', new Map(), new Set())
+    expect(next?.locations.pusher).toEqual({ board: 'insideFlipped', x: 3, y: 1 }) // mirrored entry cell — verified: getEntryCell(board,'left',HALF) = (3,1)
+  })
+
+  it('up/down entries are unaffected by fliph', () => {
+    const root = makeFloorBoard('root', 3)
+    setWall(root, 1, 0) // directly behind the container in the push direction (pushing up)
+    const insideFlipped = makeFloorBoard('insideFlipped', 4)
+    const world = makeWorld(
+      [root, insideFlipped],
+      [
+        { id: 'pusher', kind: 'normal' },
+        { id: 'flipped', kind: 'container', boardRef: 'insideFlipped', fliph: true },
+      ],
+      { pusher: { board: 'root', x: 1, y: 2 }, flipped: { board: 'root', x: 1, y: 1 } },
+    )
+    const next = tryMovePiece(world, 'pusher', 'up', new Map(), new Set())
+    expect(next?.locations.pusher).toEqual({ board: 'insideFlipped', x: 2, y: 3 }) // same as a non-flipped 'up' entry — verified: getEntryCell(board,'up',HALF) = (2,3)
+  })
+
+  it('control: entering a non-fliph container is unaffected', () => {
+    const root = makeFloorBoard('root', 3)
+    // no wall needed: the container sits at the board's edge (x=2 on a size-3
+    // board), so pushing it further right is already out of bounds — the push
+    // fails naturally, forcing entry
+    const inside = makeFloorBoard('inside', 4)
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: 'pusher', kind: 'normal' },
+        { id: 'plain', kind: 'container', boardRef: 'inside' },
+      ],
+      { pusher: { board: 'root', x: 1, y: 1 }, plain: { board: 'root', x: 2, y: 1 } },
+    )
+    const next = tryMovePiece(world, 'pusher', 'right', new Map(), new Set())
+    expect(next?.locations.pusher).toEqual({ board: 'inside', x: 0, y: 1 }) // the ORIGINAL (non-mirrored) entry cell
+  })
+})
+
+describe('fliph — exit direction is horizontally mirrored', () => {
+  it('exiting a fliph container continues the climb in the mirrored direction (reproduces the derived example from the spec)', () => {
+    const root = makeFloorBoard('root', 4)
+    const xInterior = makeFloorBoard('Xinterior', 2)
+    const world = makeWorld(
+      [root, xInterior],
+      [{ id: 'X', kind: 'container', boardRef: 'Xinterior', fliph: true }],
+      { X: { board: 'root', x: 1, y: 1 } },
+    )
+    const result = computeTarget(world, { board: 'Xinterior', x: 1, y: 0 }, 'right', HALF)
+    expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 0, y: 1 }, relativeCoord: expect.anything() })
+  })
+
+  it('control: exiting a non-fliph container is unaffected (same fixture, no fliph)', () => {
+    const root = makeFloorBoard('root', 4)
+    const xInterior = makeFloorBoard('Xinterior', 2)
+    const world = makeWorld(
+      [root, xInterior],
+      [{ id: 'X', kind: 'container', boardRef: 'Xinterior' }],
+      { X: { board: 'root', x: 1, y: 1 } },
+    )
+    const result = computeTarget(world, { board: 'Xinterior', x: 1, y: 0 }, 'right', HALF)
+    expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 2, y: 1 }, relativeCoord: expect.anything() })
+  })
+})
