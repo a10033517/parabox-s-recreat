@@ -83,4 +83,58 @@ describe('renderBoard', () => {
     // cells are visited row-major: (0,0) floor, (1,0) wall, (0,1) floor, (1,1) floor
     expect(stylesAtFillTime[0]).not.toBe(stylesAtFillTime[1])
   })
+
+  it('renders two members of a multi-node cycle in different colors from each other', () => {
+    const root = makeFloorBoard('root', 2)
+    const redInterior = makeFloorBoard('redInterior', 1)
+    const world = makeWorld(
+      [root, redInterior],
+      [
+        { id: 'redPiece', kind: 'container', boardRef: 'redInterior' },
+        { id: 'yellowPiece', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        redPiece: { board: 'root', x: 0, y: 0 },
+        yellowPiece: { board: 'redInterior', x: 0, y: 0 },
+      },
+    )
+    const ctx = mockContext()
+
+    const rootStyles: string[] = []
+    ctx.fillRect = () => { rootStyles.push(ctx.fillStyle as string) }
+    renderBoard(ctx, root, world, 32)
+    const redPieceColor = rootStyles[4] // 4 cell draws (2x2), then redPiece (the only piece on root)
+
+    const insideStyles: string[] = []
+    ctx.fillRect = () => { insideStyles.push(ctx.fillStyle as string) }
+    renderBoard(ctx, redInterior, world, 32)
+    const yellowPieceColor = insideStyles[1] // 1 cell draw (size 1), then yellowPiece
+
+    expect(redPieceColor).not.toBe(yellowPieceColor)
+    expect(redPieceColor).not.toBe('#38bdf8') // neither is the plain container color
+    expect(yellowPieceColor).not.toBe('#38bdf8')
+  })
+
+  it('does not color an ordinary container that merely owns an unrelated board, even when a real cycle exists on the same board', () => {
+    const root = makeFloorBoard('root', 3)
+    const obstacleInside = makeFloorBoard('obstacleInside', 1)
+    const world = makeWorld(
+      [root, obstacleInside],
+      [
+        { id: 'loopBox', kind: 'container', boardRef: 'root' }, // genuine self-loop
+        { id: 'obstacleContainer', kind: 'container', boardRef: 'obstacleInside' }, // ordinary, unrelated
+      ],
+      {
+        loopBox: { board: 'root', x: 0, y: 0 },
+        obstacleContainer: { board: 'root', x: 1, y: 0 },
+      },
+    )
+    const ctx = mockContext()
+    const styles: string[] = []
+    ctx.fillRect = () => { styles.push(ctx.fillStyle as string) }
+    renderBoard(ctx, root, world, 32)
+    // 9 cell draws (3x3), then loopBox, then obstacleContainer
+    expect(styles[10]).toBe('#38bdf8') // obstacleContainer: plain container color
+    expect(styles[9]).not.toBe('#38bdf8') // loopBox: cycle color
+  })
 })

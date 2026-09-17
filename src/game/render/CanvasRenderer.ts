@@ -1,4 +1,4 @@
-import { Board, PieceKind, World } from '../engine/types'
+import { Board, BoardId, PieceId, PieceKind, World, findContainerFor } from '../engine/types'
 
 const FLOOR_COLOR = '#1e293b'
 const WALL_COLOR = '#0f172a'
@@ -11,23 +11,40 @@ const PIECE_COLORS: Record<PieceKind, string> = {
   container: '#38bdf8',
   player: '#f472b6',
 }
-// A self-loop box isn't a distinct PieceKind (it's an ordinary 'container'
-// whose boardRef happens to equal the board it's standing on) — see
-// worldEdit.ts's placeSelfLoopBox and rules.ts's cycle detection. It still
-// needs a visibly different color from a normal container: it's a genuine
-// trap (push it flush against an edge and anything exiting through that
-// edge, including the player, falls into unresolvable infinite regress and
-// is removed from the world), and rendering it identically to a harmless
-// container would make that invisible until it kills you.
-const SELF_LOOP_COLOR = '#a855f7'
+// A container that's part of a containment cycle (a self-loop, or a longer
+// ring of several containers each owning the next) isn't a distinct
+// PieceKind — see worldEdit.ts's placeSelfLoopBox and rules.ts's cycle
+// detection. It still needs a visibly different color from an ordinary
+// container: pushing it (or anything else) flush against the edge that
+// closes the ring is a genuine trap (unresolvable infinite regress, the
+// piece attempting it removed from the world), and rendering it identically
+// to a harmless container would make that invisible until it kills you.
+// This is a visual distinction AID, not a uniqueness guarantee: for a ring
+// bigger than the palette, or on a hash collision, two members can share a
+// color. Every level this codebase ships has at most two cycle members.
+const CYCLE_PALETTE = ['#ef4444', '#eab308', '#a855f7', '#14b8a6', '#f97316']
 
-function isSelfLoopBox(pieceId: string, world: World): boolean {
+function isCycleMember(pieceId: PieceId, world: World): boolean {
   const piece = world.pieces[pieceId]
-  return (
-    piece.kind === 'container' &&
-    piece.boardRef !== undefined &&
-    world.locations[pieceId]?.board === piece.boardRef
-  )
+  if (piece.kind !== 'container' || piece.boardRef === undefined) return false
+  const start = piece.boardRef
+  let current: BoardId = start
+  const seen = new Set<BoardId>()
+  while (!seen.has(current)) {
+    seen.add(current)
+    const owner = findContainerFor(world, current)
+    if (owner === undefined) return false
+    const ownerLoc = world.locations[owner]
+    if (ownerLoc === undefined) return false
+    current = ownerLoc.board
+  }
+  return current === start
+}
+
+function cycleColorFor(pieceId: PieceId): string {
+  let hash = 0
+  for (const ch of pieceId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  return CYCLE_PALETTE[hash % CYCLE_PALETTE.length]
 }
 
 export function renderBoard(
@@ -53,7 +70,7 @@ export function renderBoard(
   for (const [pieceId, location] of Object.entries(world.locations)) {
     if (location.board !== board.id) continue
     const piece = world.pieces[pieceId]
-    ctx.fillStyle = isSelfLoopBox(pieceId, world) ? SELF_LOOP_COLOR : PIECE_COLORS[piece.kind]
+    ctx.fillStyle = isCycleMember(pieceId, world) ? cycleColorFor(pieceId) : PIECE_COLORS[piece.kind]
     ctx.fillRect(location.x * cellSize, location.y * cellSize, cellSize, cellSize)
   }
 }
