@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { GameScreen } from './GameScreen'
 import { makeFloorBoard, makeWorld, setRequirement, setWall } from './engine/testFixtures'
@@ -7,6 +7,9 @@ import { PLAYER_ID } from './engine/types'
 beforeEach(() => {
   HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
     fillRect: vi.fn(),
+    strokeRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
   }) as unknown as typeof HTMLCanvasElement.prototype.getContext
 })
 
@@ -89,7 +92,7 @@ test('undoing out of a won state allows onWin to fire again on re-winning', asyn
   expect(onWin).toHaveBeenCalledTimes(2)
 })
 
-test('a move that removes the player shows a lost notice, and its button recovers via undo', async () => {
+test('pushing the player into a self-loop sends them to the Void instead of showing a lost notice, and play continues', async () => {
   const root = makeFloorBoard('root', 2)
   const world = makeWorld(
     [root],
@@ -102,34 +105,18 @@ test('a move that removes the player shows a lost notice, and its button recover
       loopBox: { board: 'root', x: 0, y: 0 },
     },
   )
-  render(<GameScreen initialWorld={world} onExit={() => {}} onWin={() => {}} />)
+  const onExit = vi.fn()
+  render(<GameScreen initialWorld={world} onExit={onExit} onWin={() => {}} />)
   const user = userEvent.setup()
   await user.click(screen.getByLabelText('左'))
-  const notice = screen.getByTestId('lose-notice')
-  expect(within(notice).getByText('玩家迷失在无限递归中')).toBeInTheDocument()
 
-  await user.click(within(notice).getByLabelText('从无限递归中复位'))
   expect(screen.queryByTestId('lose-notice')).not.toBeInTheDocument()
-})
+  expect(screen.getByText('步数: 1')).toBeInTheDocument() // the move counted normally
 
-test('pressing a direction after losing does not crash, and the lost notice stays up', async () => {
-  const root = makeFloorBoard('root', 2)
-  const world = makeWorld(
-    [root],
-    [
-      { id: PLAYER_ID, kind: 'player' },
-      { id: 'loopBox', kind: 'container', boardRef: 'root' },
-    ],
-    {
-      [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
-      loopBox: { board: 'root', x: 0, y: 0 },
-    },
-  )
-  render(<GameScreen initialWorld={world} onExit={() => {}} onWin={() => {}} />)
-  const user = userEvent.setup()
-  await user.click(screen.getByLabelText('左'))
-  expect(screen.getByTestId('lose-notice')).toBeInTheDocument()
-
+  // still fully interactive: another move doesn't crash
   await user.click(screen.getByLabelText('右'))
-  expect(screen.getByTestId('lose-notice')).toBeInTheDocument()
+  expect(screen.getByText('步数: 2')).toBeInTheDocument()
+
+  await user.click(screen.getByText('离开'))
+  expect(onExit).toHaveBeenCalledTimes(1)
 })

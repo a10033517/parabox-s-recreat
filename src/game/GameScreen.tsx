@@ -23,12 +23,6 @@ export function GameScreen({
   const [, setTick] = useState(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wonRef = useRef(false)
-  // A lost move removes the player from `locations` entirely (see
-  // rules.ts's checkLose), so there is no longer a board to read the
-  // player's position from. Remember the last board the player actually
-  // stood on so rendering can keep showing it (now without the player
-  // drawn on it) instead of crashing on a missing location.
-  const lastBoardIdRef = useRef(initialWorld.locations[PLAYER_ID]?.board ?? 'root')
 
   const handleMove = (direction: Direction) => {
     if (state.move(direction)) setTick((t) => t + 1)
@@ -41,9 +35,7 @@ export function GameScreen({
     }
   }
 
-  const playerLocation = state.current.locations[PLAYER_ID]
-  if (playerLocation) lastBoardIdRef.current = playerLocation.board
-  const currentBoardId = lastBoardIdRef.current
+  const currentBoardId = state.current.locations[PLAYER_ID].board
   const currentBoard = state.current.boards[currentBoardId]
 
   useEffect(() => {
@@ -75,12 +67,6 @@ export function GameScreen({
         <button onClick={handleUndo}>复位上一步</button>
         <button onClick={onExit}>离开</button>
       </div>
-      {state.isLost && (
-        <div className="lose-notice" data-testid="lose-notice">
-          <p>玩家迷失在无限递归中</p>
-          <button onClick={handleUndo} aria-label="从无限递归中复位">复位上一步</button>
-        </div>
-      )}
       <SwipeLayer onMove={handleMove}>
         <canvas ref={canvasRef} width={CELL_SIZE * currentBoard.size} height={CELL_SIZE * currentBoard.size} />
       </SwipeLayer>
