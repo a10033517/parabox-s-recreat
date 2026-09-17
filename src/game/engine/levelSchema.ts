@@ -150,31 +150,39 @@ export function parseLevel(data: unknown): World {
     seenCells.add(cellKey)
   }
 
-  // Reachability: every board must be reachable from startBoardId by
-  // following container pieces down into their interiors, starting from
-  // whatever board each container is physically located on. The ownership
+  // Reachability: every board must be connected to startBoardId through the
+  // containment graph — an edge between the board a container physically sits
+  // on and the board it owns (its interior), in both directions. The graph
+  // must be undirected: startBoardId may be the cycle itself, or it may be
+  // partway down an ordinary tree branch hanging off one of the cycle's
+  // nodes (the spec explicitly allows this), and a branch can only be
+  // reached by walking "up" out of an interior board into whatever board its
+  // owning container sits on — a walk that only ever goes "down" (via
+  // piece.boardRef) can never climb back out to find it. The ownership
   // counts checked above (at most one owner per board, at most one board
-  // with zero) are necessary but not sufficient — a cycle disconnected
-  // from startBoardId, or a tree mixed with an unconnected cycle
-  // elsewhere, can satisfy those local counts while never actually
-  // connecting back to where play starts. This same walk also correctly
-  // traverses INTO a cycle that includes startBoardId itself: each step
-  // just follows one more owned board, and a ring closes back onto a board
-  // already in `reached`, which the `!reached.has(...)` guard below
-  // already treats as a no-op rather than an infinite loop.
+  // with zero) are necessary but not sufficient — a cycle disconnected from
+  // startBoardId, or a tree mixed with an unconnected cycle elsewhere, can
+  // satisfy those local counts while never actually connecting back to where
+  // play starts.
+  const adjacency = new Map<string, Set<string>>()
+  for (const boardId of Object.keys(boards)) {
+    adjacency.set(boardId, new Set())
+  }
+  for (const piece of Object.values(pieces)) {
+    if (piece.kind === 'container' && piece.boardRef !== undefined) {
+      const ownerBoard = locations[piece.id].board
+      adjacency.get(ownerBoard)?.add(piece.boardRef)
+      adjacency.get(piece.boardRef)?.add(ownerBoard)
+    }
+  }
   const reached = new Set<string>([startBoardId])
   const queue: string[] = [startBoardId]
   while (queue.length > 0) {
     const currentBoardId = queue.shift() as string
-    for (const piece of Object.values(pieces)) {
-      if (
-        piece.kind === 'container' &&
-        piece.boardRef !== undefined &&
-        locations[piece.id].board === currentBoardId &&
-        !reached.has(piece.boardRef)
-      ) {
-        reached.add(piece.boardRef)
-        queue.push(piece.boardRef)
+    for (const neighbor of adjacency.get(currentBoardId) ?? []) {
+      if (!reached.has(neighbor)) {
+        reached.add(neighbor)
+        queue.push(neighbor)
       }
     }
   }

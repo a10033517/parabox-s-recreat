@@ -251,6 +251,37 @@ describe('parseLevel board-ownership validation', () => {
     expect(parseLevel(data)).toEqual(world)
   })
 
+  it('accepts a cycle with a tree branch hanging off one node, when the player starts on the branch', () => {
+    // redPiece owns redInterior; yellowPiece (inside redInterior) owns root,
+    // closing a two-node cycle exactly like the test above. branchPiece
+    // sits on root (a member of the cycle) but is not itself part of the
+    // cycle — it owns an ordinary tree-branch board, branchBoard, where the
+    // player starts. Reachability must walk UP out of branchBoard into root
+    // (the board branchPiece sits on) to find the cycle at all; a directed
+    // walk that only follows boardRef "down" can never climb back out of
+    // branchBoard, and would wrongly reject this level as disconnected.
+    const root = makeFloorBoard('root', 2)
+    const redInterior = makeFloorBoard('redInterior', 1)
+    const branchBoard = makeFloorBoard('branchBoard', 1)
+    const world = makeWorld(
+      [root, redInterior, branchBoard],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'redPiece', kind: 'container', boardRef: 'redInterior' },
+        { id: 'yellowPiece', kind: 'container', boardRef: 'root' },
+        { id: 'branchPiece', kind: 'container', boardRef: 'branchBoard' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'branchBoard', x: 0, y: 0 },
+        redPiece: { board: 'root', x: 1, y: 0 },
+        yellowPiece: { board: 'redInterior', x: 0, y: 0 },
+        branchPiece: { board: 'root', x: 0, y: 1 },
+      },
+    )
+    const data = serializeLevel(world)
+    expect(parseLevel(data)).toEqual(world)
+  })
+
   it('rejects two boards that both have no owner', () => {
     const root = makeFloorBoard('root', 2)
     const orphan = makeFloorBoard('orphan', 1)

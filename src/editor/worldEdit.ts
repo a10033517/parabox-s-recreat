@@ -31,10 +31,11 @@ export function createEmptyWorld(rootSize: number): World {
 // Checks if a piece's subtree (including the piece itself and all pieces
 // on its owned board, recursively) contains the player piece.
 //
-// Guarded with a `seen` set even though nothing in this codebase can
-// currently create a cyclic containment graph: a future "loop box" feature
-// (self-referencing containers) is already planned, and without this guard
-// a cycle would make this traversal loop forever.
+// Guarded with a `seen` set because this codebase now supports containment
+// cycles (self-loop boxes and longer rings) — without this guard, a cycle
+// would make this traversal loop forever. The skipsCascade check below
+// additionally prevents descending into a cycle-closing piece's own board in
+// the first place, but this guard remains load-bearing as defense in depth.
 function subtreeContainsPlayer(world: World, pieceId: PieceId): boolean {
   const stack: PieceId[] = [pieceId]
   const seen = new Set<PieceId>()
