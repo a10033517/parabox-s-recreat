@@ -40,6 +40,12 @@ verified against the real engine (see the worked example below) by hand-construc
 `World` and replaying moves through `applyMove` directly, bypassing `parseLevel` (since
 today's schema would reject the very shape being tested).
 
+This spec was reviewed once already; the review's findings are incorporated directly
+into the sections below (not kept as a separate addendum) — in particular, the "starting
+board" must never be identified by the literal string `'root'` for anything that affects
+gameplay/editing safety (only the *convention* that builtin levels happen to name their
+starting board that way survives, purely as a file-naming habit, never as logic).
+
 ## Scope
 
 **In scope:**
@@ -53,8 +59,9 @@ today's schema would reject the very shape being tested).
   reason).
 - `worldEdit.ts`: generalize the "don't cascade-delete the board a piece is standing on"
   protection (`deletePieceRecursively`, `subtreeContainsPlayer`) to also cover a piece
-  that closes a cycle back to the literal `'root'` board, not just a piece that's
-  self-referencing in the narrow single-node sense.
+  that closes a cycle back to the level's **actual starting board** (the board
+  `locations[PLAYER_ID]` points at — never the literal string `'root'`), not just a
+  piece that's self-referencing in the narrow single-node sense.
 - Restrict the editor's self-loop-box tool to the root board only (tightening — Sub-
   project 6 shipped it usable on any board, which is exactly the shape this spec now
   rejects as invalid).
@@ -62,7 +69,8 @@ today's schema would reject the very shape being tested).
   gets a distinct, per-piece color from a small fixed palette — not one single "self-loop
   purple," so a multi-node cycle's members are visually distinguishable from each other
   (matching the user's own red/yellow example), not just distinguishable from ordinary
-  containers.
+  containers. The palette gives a *visual distinction aid*, not a uniqueness guarantee —
+  see the color section below for exactly what it does and doesn't promise.
 - Replace `08-nested-loop.json` (now an invalid shape) with a new demo level built on a
   genuine two-node cycle through root, verified against the real engine before being
   written to spec (see below) — same discipline the sub-project 6 demo levels used.
@@ -76,6 +84,9 @@ today's schema would reject the very shape being tested).
   unrelated to and not renumbered by this spec).
 - Any change to `computeTarget`, `tryMovePiece`, or `checkLose` (`rules.ts`) — the cycle
   classification/removal mechanism already generalizes correctly, confirmed empirically.
+- A cycle-local color-allocation algorithm that *guarantees* every ring member gets a
+  visually distinct color (e.g. for rings larger than the palette, or on a hash
+  collision). Not required this round — see the color section.
 
 ## Design
 
@@ -85,8 +96,9 @@ Today, `levelSchema.ts` finds "root" by computing `ownerCount` for every board a
 requiring **exactly one** board with a count of zero — that board becomes `rootBoardId`,
 and reachability is checked as a walk *from* it. This conflates two different things: "a
 board nothing owns" (which is what makes a tree a tree) and "the board where the player
-starts" (which is what the engine and the player actually care about). They happen to be
-the same board in every level shipped so far, purely because those levels have no cycle.
+starts" (what the engine and the player actually care about, and the only thing that may
+ever be used for gameplay/editing-safety logic). They happen to be the same board in
+every level shipped so far, purely because those levels have no cycle.
 
 Once a cycle exists, **every** board on it has exactly one owner — including whichever
 one the player starts on. There is no board with zero owners at all in that case. The
@@ -97,25 +109,35 @@ fix: stop requiring a zero-owner board to exist. Instead:
 - If **zero** boards have zero owners, the level's ownership graph is one connected
   cycle (with, optionally, ordinary tree branches hanging off any of its nodes — see the
   graph-theory note below). Reachability is instead walked from **the player's actual
-  starting board** (`locations[PLAYER_ID].board`) — which works precisely because a
-  cycle is reachable from any single node on it by walking forward around the ring, and
-  the existing downward walk (via `piece.boardRef`, unchanged) already does exactly
+  starting board** (`locations[PLAYER_ID].board`, validated to exist *before* it's used
+  as a traversal seed — see "Validation ordering" below) — which works precisely because
+  a cycle is reachable from any single node on it by walking forward around the ring,
+  and the existing downward walk (via `piece.boardRef`, unchanged) already does exactly
   that once it has a starting point.
 - More than one board with zero owners stays invalid, exactly as today (an incomplete
   or disconnected set of trees).
 
-**Why this can't accidentally accept two independent cycles, or a cycle that never
-connects to the start:** a connected graph with a `boards`-count of nodes and exactly
-that many ownership edges (which is what "zero orphans, and every board has exactly one
-owner" means numerically) has, as a basic graph-theory fact, **exactly one cycle** if
-it's connected at all — the existing "every board must be reachable" walk (unmodified)
-is what enforces connectivity. A second, disconnected cycle elsewhere in the same level
-data would simply fail that same reachability check today already does (its boards
-would never be visited by the walk from wherever play starts) — nothing new needs to be
-written to reject it. The existing "over-owned" check (`ownerCount > 1`, unmodified)
-still rejects a board claimed by two containers for any reason, which is now *also* what
-catches Sub-project 6's original mistake automatically: a board with both a
-self-referencing owner and a separate external owner has `ownerCount === 2` once
+**Ownership counting and reachability answer two different questions, and neither
+proves the other.** `ownerCount` answers "how many containers reference this board?" —
+a purely local, per-board count. Reachability answers "can every board actually be
+reached, by walking the graph, from wherever the level starts?" — a global,
+whole-graph property. A cycle disconnected from the start can satisfy every local
+owner-count constraint (every one of its boards has exactly one owner) while still
+failing reachability outright, because nothing on the reachable side of the level ever
+points into it. The two checks stay separate passes for exactly this reason; do not
+collapse the reasoning that "owner counts look right" into "therefore reachable."
+
+**Why this can't accidentally accept two independent cycles:** a connected graph with a
+`boards`-count of nodes and exactly that many ownership edges (which is what "zero
+orphans, and every board has exactly one owner" means numerically) has, as a basic
+graph-theory fact, **exactly one cycle** if it's connected at all — the existing "every
+board must be reachable" walk (unmodified) is what enforces connectivity. A second,
+disconnected cycle elsewhere in the same level data fails that same reachability check
+(its boards are never visited by the walk from wherever play starts) — nothing new
+needs to be written to reject it. The existing "over-owned" check (`ownerCount > 1`,
+unmodified) still rejects a board claimed by two containers for any reason, which is
+now *also* what catches Sub-project 6's original mistake automatically: a board with
+both a self-referencing owner and a separate external owner has `ownerCount === 2` once
 self-references stop being specially excluded from the count (see below) — no bespoke
 "reject this specific shape" code is needed for that anymore either.
 
@@ -145,7 +167,9 @@ for (const piece of Object.values(pieces)) {
 }
 ```
 
-**Branch on the orphan count** instead of always requiring exactly one:
+**Branch on the orphan count, validating the start board before it's used as a seed**
+(this ordering matters: never treat an unvalidated player location as a traversal seed
+and only discover it was invalid later):
 
 ```ts
 const orphanBoards = Object.entries(ownerCount).filter(([, count]) => count === 0)
@@ -160,18 +184,34 @@ if (overOwnedBoards.length > 0) {
   throw new Error(`Board "${boardId}" has more than one owner (container referencing it)`)
 }
 
-const playerLocation = locations[PLAYER_ID]
-const startBoardId = orphanBoards.length === 1 ? orphanBoards[0][0] : playerLocation?.board
-if (startBoardId === undefined || boards[startBoardId] === undefined) {
-  throw new Error('Could not determine a starting board for reachability (no orphan board, and the player has no valid location)')
+let startBoardId: string
+if (orphanBoards.length === 1) {
+  startBoardId = orphanBoards[0][0]
+} else {
+  // orphanBoards.length === 0: the level is one connected cycle (or a cycle
+  // with tree branches). There is no ownerless board to anchor on, so the
+  // player's own starting board is the only board that can serve as the
+  // reachability seed. Validate it explicitly here, before using it — do not
+  // let the later per-piece location checks be the only thing standing
+  // between an invalid player location and a confusing reachability error.
+  const playerLocation = locations[PLAYER_ID]
+  if (playerLocation === undefined) {
+    throw new Error(
+      'Cannot determine a starting board for reachability: no board is ownerless, and the player has no location',
+    )
+  }
+  if (boards[playerLocation.board] === undefined) {
+    throw new Error(
+      `Cannot determine a starting board for reachability: the player's board "${playerLocation.board}" does not exist`,
+    )
+  }
+  startBoardId = playerLocation.board
 }
 ```
 
-(The player-location and per-piece-location checks that already exist further down in
-`parseLevel` still run — `playerLocation` here is read defensively, before those
-checks, purely to pick a reachability starting point; a level with a missing/invalid
-player location still gets rejected by those existing checks regardless of which
-branch this takes.)
+The existing per-piece location/bounds/collision checks elsewhere in `parseLevel` are
+unaffected and still run in full — this is a narrower, earlier check specifically
+gating what may be used as the reachability BFS's starting point.
 
 **Reachability** keeps its existing algorithm verbatim, just seeded from `startBoardId`
 instead of the old `rootBoardId`:
@@ -194,8 +234,11 @@ branches hanging off it.
 
 The external-owner preference exists solely to cope with a board that has two owners —
 one self-referencing, one external. That shape is now always invalid (over-owned, per
-above), so a valid `World` can never reach this function with more than one container
-referencing the same board. Revert to the simple version:
+above), so a valid, already-parsed `World` can never reach this function with more than
+one container referencing the same board — this simplification is only safe *because*
+`parseLevel` rejects that shape before a `World` value can exist at all; a test must
+pin down that rejection (see Testing) so a future change to validation can't silently
+make this function ambiguous again. Revert to the simple version:
 
 ```ts
 export function findContainerFor(world: World, boardId: BoardId): PieceId | undefined {
@@ -208,23 +251,31 @@ export function findContainerFor(world: World, boardId: BoardId): PieceId | unde
 
 ### `worldEdit.ts` changes
 
-**Generalize the cascade-protection predicate.** Today, `deletePieceRecursively` and
+**Generalize the cascade-protection predicate — using the player's actual board, never
+the literal string `'root'`.** Today, `deletePieceRecursively` and
 `subtreeContainsPlayer` both skip descending into a piece's own board only when that
 piece is *self*-referencing (`locations[id].board === boardRef`). A piece that closes a
-longer cycle back to the literal starting board (`boardRef === 'root'`, but *not*
-self-referencing — it's physically standing somewhere else in the cycle) needs the same
-protection: deleting it must never cascade into deleting the board the whole level is
-built on. Both functions get the same widened guard:
+longer cycle back to the level's starting board (but is *not* self-referencing — it's
+physically standing somewhere else in the cycle) needs the same protection: deleting it
+must never cascade into deleting the board the whole level is built on. `'root'` is
+only ever a *naming convention* this codebase's tooling happens to use — hard-coding it
+here would make deletion safety depend on that convention and silently stop protecting
+any level whose starting board has a different ID. Use the actual player location
+instead:
 
 ```ts
-const skipsCascade = locations[id]?.board === piece.boardRef || piece.boardRef === 'root'
+const startBoardId = world.locations[PLAYER_ID]?.board
+const skipsCascade =
+  locations[id]?.board === piece.boardRef ||
+  (piece.boardRef !== undefined && piece.boardRef === startBoardId)
 ```
 
-(This is a pragmatic, convention-based check — it relies on this codebase's existing,
-consistent use of the literal string `'root'` for the level's starting board (the
-editor, the generator, and every hand-authored level all already do this) rather than
-on any more general "is this the board play starts on" computation, which isn't needed
-given multi-node cycle authoring is hand-authored JSON only this round, per Scope.)
+Every `World` this code ever legitimately runs against has a player location (the
+editor's own invariants — `createEmptyWorld`, `movePlayer` — guarantee exactly one
+player piece with a location at all times); `startBoardId` being `undefined` is not a
+reachable case in practice, but the optional chaining means it degrades safely (no
+piece's `boardRef` is ever literally `undefined`-as-a-string, so the second condition
+just never matches) rather than throwing, if that invariant is ever violated elsewhere.
 
 **Restrict `placeSelfLoopBox`'s caller to root only.** The function itself
 (`worldEdit.ts`) stays a plain, unopinionated placement primitive — exactly like
@@ -232,7 +283,11 @@ given multi-node cycle authoring is hand-authored JSON only this round, per Scop
 that rejection, not `worldEdit.ts`). The same pattern applies here: `EditorScreen.tsx`'s
 `self-loop-box` branch gets a root-only guard, mirroring the existing
 wall-blocks-a-goal-tool click-time rejection already in that file — no change to
-`worldEdit.ts` itself.
+`worldEdit.ts` itself. ("Root only" here is fine as the literal string `'root'` — this
+is the *editor's own* convention for where a fresh level's starting board lives
+(`createEmptyWorld` always names it that), not a claim about what's structurally
+required, so it doesn't have the same failure mode as the `worldEdit.ts` deletion guard
+above.)
 
 ### `CanvasRenderer.ts`: per-piece cycle colors
 
@@ -260,13 +315,13 @@ function isCycleMember(pieceId: PieceId, world: World): boolean {
 ```
 
 This correctly distinguishes a cycle member from an ordinary container hanging off a
-cycle node as a ordinary tree branch (e.g. Sub-project 6's `07-loop-eats-container`'s
+cycle node as a normal tree branch (e.g. Sub-project 6's `07-loop-eats-container`'s
 `obstacleContainer`, which owns an unrelated board and must **not** be colored as a
 cycle member) — traced by hand for both cases; verify with a unit test for each.
 
 A cycle-member container gets a color derived deterministically from its own piece id
 (a small fixed palette, indexed by a simple string hash), so two different pieces in the
-same ring reliably get two different colors (matching the user's red/yellow example)
+same ring usually get two different colors (matching the user's red/yellow example)
 without needing any new stored data on `Piece` — this stays a pure rendering-layer
 computation, same as everything else in this file:
 
@@ -282,6 +337,16 @@ function cycleColorFor(pieceId: PieceId): string {
 
 A single self-loop box (a 1-node "ring") still gets exactly one color from this same
 palette — there's no special case for ring size 1 versus larger.
+
+**What this does and doesn't guarantee:** the palette is a *visual distinction aid*, not
+a uniqueness guarantee. For a ring larger than the palette (more than 5 members), or on
+a hash collision between two piece ids, two cycle members can end up sharing a color.
+This is acceptable for this round — every demo level this spec ships has at most two
+cycle members, well within the palette. If a future requirement becomes "every ring
+member must always be visually distinct, no matter how large the ring," that needs a
+proper cycle-local allocation (walk the ring in order, assign each member the next
+unused palette slot) rather than a per-id hash — out of scope here; tests must not
+assert global color uniqueness beyond the specific fixtures this spec introduces.
 
 ## Worked example (verified against the real engine)
 
@@ -309,28 +374,62 @@ other builtin level.
 
 ## Testing
 
-- `levelSchema.test.ts`: update the two Sub-project 6 tests that are now wrong — the
-  self-loop-on-non-root-with-a-real-external-owner test must flip from "accepted" to
-  "rejected" (over-owned); the self-loop-on-non-root-without-an-external-owner test's
-  expected error may change (verify by tracing, don't assume) now that self-references
-  count normally. Add: a genuine two-node cycle through the level's start is accepted
-  (the worked example above, or a smaller fixture); the existing two-board mutual-cycle
-  test (`ca`/`cb`, neither touching the start) stays rejected — confirm by tracing it's
-  unaffected, don't just assume; a level with two boards *both* having zero owners is
-  still rejected (`> 1` case, message wording changes slightly — update the assertion).
+- `levelSchema.test.ts`:
+  - Update the two Sub-project 6 tests that are now wrong — the
+    self-loop-on-non-root-with-a-real-external-owner test must flip from "accepted" to
+    "rejected" (over-owned); the self-loop-on-non-root-without-an-external-owner test's
+    expected error may change (verify by tracing, don't assume) now that self-references
+    count normally.
+  - Add: a genuine two-node cycle through the level's start is accepted (the worked
+    example above, or a smaller fixture).
+  - The existing two-board mutual-cycle test (`ca`/`cb`, neither touching the start)
+    stays rejected — confirm by tracing it's unaffected, don't just assume.
+  - A level with two boards *both* having zero owners is still rejected (the `> 1` case
+    — message wording changes slightly, update the assertion).
+  - Explicit test: a board with both a self-referencing owner and a separate external
+    owner is rejected as over-owned (this is what makes `findContainerFor`'s
+    simplification safe — pin it down directly, don't rely on it being an incidental
+    side effect of some other test).
+  - Explicit test: an invalid/missing player location, when no board is ownerless
+    (cycle case), is rejected with a clear error *before* reachability runs — not a
+    generic "board not reachable" message.
 - `types.test.ts`: `findContainerFor`'s existing coverage should still pass unmodified
   (its behavior for every case that was ever legal is unchanged) — no new test strictly
-  required, but confirm the reverted version still satisfies every existing assertion.
-- `worldEdit.test.ts`: a hand-built two-node-cycle world (constructed directly, not
-  through `parseLevel`) where deleting the piece that closes the loop back to `'root'`
-  (not itself self-referencing) does not cascade-delete `root` or anything on it;
-  `EditorScreen.tsx`'s self-loop-box tool is a no-op when the active board isn't root
-  (new test, mirroring the existing wall-blocks-goal-tool test's shape).
+  required beyond the `levelSchema.test.ts` over-owned-rejection test above, since that's
+  what actually guarantees this function never sees an ambiguous board.
+- `worldEdit.test.ts`:
+  - A hand-built two-node-cycle world (constructed directly, not through `parseLevel`)
+    where deleting the piece that closes the loop back to the start (not itself
+    self-referencing) does not cascade-delete the starting board or anything on it.
+  - **Regression fixture whose starting board is not named `'root'`** (e.g. call it
+    `'start'` or similar) — proving the deletion guard genuinely reads
+    `locations[PLAYER_ID].board` rather than the literal string. This is the test that
+    would fail if a future edit reintroduces the old naming assumption.
+  - `EditorScreen.tsx`'s self-loop-box tool is a no-op when the active board isn't root
+    (new test, mirroring the existing wall-blocks-goal-tool test's shape).
 - `CanvasRenderer.test.ts`: a two-node-cycle world's two container pieces render with
   two *different* fillStyles from each other (not just each different from plain
   container blue); a container that merely owns an unrelated board (a normal tree
   branch hanging off a cycle node, like `07-loop-eats-container`'s `obstacleContainer`)
-  is confirmed **not** colored as a cycle member.
+  is confirmed **not** colored as a cycle member. Do not assert color uniqueness beyond
+  these specific fixtures (see the color section's guarantee/non-guarantee above).
 - `src/levels/index.test.ts`: update the builtin-level-id list for the `08-nested-loop`
   → `08-two-node-cycle` (or chosen name) rename; the "each parses to an unsolved world"
   assertion continues to hold.
+
+## Acceptance criteria
+
+This sub-project is complete only when all of the following hold:
+
+- A normal tree with exactly one ownerless board still parses.
+- A connected cycle through the player's starting board parses.
+- A disconnected cycle is rejected by reachability.
+- Two ownerless boards are rejected.
+- Any board with two owners is rejected, including self-loop plus external owner.
+- `computeTarget`, `tryMovePiece`, and `checkLose` remain unchanged.
+- Deleting a cycle-closing piece cannot delete the player's starting board — verified
+  with a fixture whose starting board is *not* named `'root'`.
+- A self-loop can be authored only on the root board through the editor UI.
+- Cycle members receive deterministic cycle colors; tests do not assume global color
+  uniqueness beyond the selected fixtures.
+- The old `08-nested-loop.json` fixture is replaced by the verified two-node cycle level.
