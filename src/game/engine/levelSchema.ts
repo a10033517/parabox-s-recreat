@@ -76,36 +76,54 @@ export function parseLevel(data: unknown): World {
     }
   }
 
-  // Board ownership: every board must be referenced by exactly one
-  // container, except a single root board referenced by none.
+  // Board ownership: every board must be referenced by at most one
+  // container, and at most one board may have zero owners. Root isn't
+  // structurally special — it's whichever board has no owner (a normal
+  // tree), or, when every board has exactly one owner (a cycle exists),
+  // whichever board the player starts on (see startBoardId below).
   const ownerCount: Record<string, number> = Object.fromEntries(
     Object.keys(boards).map((boardId) => [boardId, 0]),
   )
   for (const piece of Object.values(pieces)) {
     if (piece.kind === 'container' && piece.boardRef !== undefined) {
-      // A container located on the very board it owns (a self-loop box) is
-      // not a real external owner — it provides no path INTO this board
-      // from anywhere else, so it must not count toward "this board has an
-      // owner." Without this exclusion, a self-loop on the root board would
-      // make ownerCount[root] === 1 and break the "exactly one owner-less
-      // board is the root" invariant checked just below.
-      const isSelfReferencing = locations[piece.id]?.board === piece.boardRef
-      if (!isSelfReferencing) {
-        ownerCount[piece.boardRef] = (ownerCount[piece.boardRef] ?? 0) + 1
-      }
+      ownerCount[piece.boardRef] = (ownerCount[piece.boardRef] ?? 0) + 1
     }
   }
   const orphanBoards = Object.entries(ownerCount).filter(([, count]) => count === 0)
-  if (orphanBoards.length !== 1) {
+  if (orphanBoards.length > 1) {
     throw new Error(
-      `Level must have exactly one board with no owner (the root); found ${orphanBoards.length}`,
+      `Level must have at most one board with no owner; found ${orphanBoards.length}`,
     )
   }
-  const rootBoardId = orphanBoards[0][0]
   const overOwnedBoards = Object.entries(ownerCount).filter(([, count]) => count > 1)
   if (overOwnedBoards.length > 0) {
     const [boardId] = overOwnedBoards[0]
     throw new Error(`Board "${boardId}" has more than one owner (container referencing it)`)
+  }
+
+  let startBoardId: string
+  if (orphanBoards.length === 1) {
+    startBoardId = orphanBoards[0][0]
+  } else {
+    // orphanBoards.length === 0: the level is one connected cycle (or a
+    // cycle with tree branches). There is no ownerless board to anchor on,
+    // so the player's own starting board is the only board that can serve
+    // as the reachability seed. Validate it explicitly here, before using
+    // it — don't let the later per-piece location checks be the only thing
+    // standing between an invalid player location and a confusing
+    // reachability error.
+    const playerLocation = locations[PLAYER_ID]
+    if (playerLocation === undefined) {
+      throw new Error(
+        'Cannot determine a starting board for reachability: no board is ownerless, and the player has no location',
+      )
+    }
+    if (boards[playerLocation.board] === undefined) {
+      throw new Error(
+        `Cannot determine a starting board for reachability: the player's board "${playerLocation.board}" does not exist`,
+      )
+    }
+    startBoardId = playerLocation.board
   }
 
   for (const [pieceId] of Object.entries(pieces)) {
@@ -132,16 +150,20 @@ export function parseLevel(data: unknown): World {
     seenCells.add(cellKey)
   }
 
-  // Reachability: every board must be reachable from the root board by
+  // Reachability: every board must be reachable from startBoardId by
   // following container pieces down into their interiors, starting from
   // whatever board each container is physically located on. The ownership
-  // counts checked above (every non-root board has exactly one owner) are
-  // necessary but not sufficient — a cycle (A's interior is B, and a piece
-  // inside B has interior A) satisfies those counts while never actually
-  // connecting back to the true root, and would otherwise hang applyMove's
-  // board-exit recursion forever instead of ever resolving to null.
-  const reached = new Set<string>([rootBoardId])
-  const queue: string[] = [rootBoardId]
+  // counts checked above (at most one owner per board, at most one board
+  // with zero) are necessary but not sufficient — a cycle disconnected
+  // from startBoardId, or a tree mixed with an unconnected cycle
+  // elsewhere, can satisfy those local counts while never actually
+  // connecting back to where play starts. This same walk also correctly
+  // traverses INTO a cycle that includes startBoardId itself: each step
+  // just follows one more owned board, and a ring closes back onto a board
+  // already in `reached`, which the `!reached.has(...)` guard below
+  // already treats as a no-op rather than an infinite loop.
+  const reached = new Set<string>([startBoardId])
+  const queue: string[] = [startBoardId]
   while (queue.length > 0) {
     const currentBoardId = queue.shift() as string
     for (const piece of Object.values(pieces)) {
@@ -159,7 +181,7 @@ export function parseLevel(data: unknown): World {
   const unreachable = Object.keys(boards).filter((boardId) => !reached.has(boardId))
   if (unreachable.length > 0) {
     throw new Error(
-      `Board(s) not reachable from the root board: ${unreachable.join(', ')} (cyclic or disconnected containment graph)`,
+      `Board(s) not reachable from the starting board: ${unreachable.join(', ')} (cyclic or disconnected containment graph)`,
     )
   }
 

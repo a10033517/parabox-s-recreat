@@ -141,12 +141,12 @@ describe('parseLevel board-ownership validation', () => {
 
   it('rejects a self-referencing container on a non-root board with no external owner', () => {
     // cx self-references board x (its own interior is the very board it
-    // sits on), and nothing else references x at all — self-references are
-    // excluded from the owner tally (see levelSchema.ts), so x has zero
-    // owners, same as root. Two boards with zero owners is exactly as
-    // invalid as it always was; only the specific error changed (caught by
-    // the "exactly one owner-less board" ownership check now, before
-    // reachability is even walked).
+    // sits on). Self-references now count as ordinary owners (see
+    // levelSchema.ts), so x has exactly one owner (itself) — it's root that
+    // stays the sole orphan board. But nothing on root (or anywhere reached
+    // from root) ever references x, so x is simply never reached by the
+    // walk from root: still invalid, just caught by reachability instead of
+    // by the ownership count.
     const root = makeFloorBoard('root', 2)
     const x = makeFloorBoard('x', 2)
     const world = makeWorld(
@@ -161,7 +161,7 @@ describe('parseLevel board-ownership validation', () => {
       },
     )
     const data = serializeLevel(world)
-    expect(() => parseLevel(data)).toThrow(/owner/i)
+    expect(() => parseLevel(data)).toThrow(/reachable/i)
   })
 
   it('accepts a self-referencing container on the root board', () => {
@@ -181,7 +181,12 @@ describe('parseLevel board-ownership validation', () => {
     expect(parseLevel(data)).toEqual(world)
   })
 
-  it('accepts a self-referencing container on a non-root board that also has a real external owner', () => {
+  it('rejects a self-referencing container that shares a board with a separate external owner', () => {
+    // Once self-references count normally, board y has TWO owners here — d
+    // (external, on root) and loopBox (self-referencing y itself) — which
+    // is exactly as invalid as any other over-owned board. This is the
+    // shape that made the shipped self-loop box permanently inert whenever
+    // it coexisted with a real external owner: see the spec's Background.
     const root = makeFloorBoard('root', 2)
     const y = makeFloorBoard('y', 2)
     const world = makeWorld(
@@ -198,7 +203,7 @@ describe('parseLevel board-ownership validation', () => {
       },
     )
     const data = serializeLevel(world)
-    expect(parseLevel(data)).toEqual(world)
+    expect(() => parseLevel(data)).toThrow(/owner/i)
   })
 
   it('rejects a mutual two-board containment cycle', () => {
@@ -220,5 +225,77 @@ describe('parseLevel board-ownership validation', () => {
     )
     const data = serializeLevel(world)
     expect(() => parseLevel(data)).toThrow(/reachable/i)
+  })
+
+  it('accepts a two-node cycle that closes back through the starting board', () => {
+    // redPiece owns redInterior; yellowPiece (inside redInterior) owns
+    // root, closing the loop. Neither board has zero owners, so this is
+    // the "cycle" branch: reachability is seeded from the player's board
+    // (root) instead of an orphan.
+    const root = makeFloorBoard('root', 2)
+    const redInterior = makeFloorBoard('redInterior', 1)
+    const world = makeWorld(
+      [root, redInterior],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'redPiece', kind: 'container', boardRef: 'redInterior' },
+        { id: 'yellowPiece', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        redPiece: { board: 'root', x: 1, y: 0 },
+        yellowPiece: { board: 'redInterior', x: 0, y: 0 },
+      },
+    )
+    const data = serializeLevel(world)
+    expect(parseLevel(data)).toEqual(world)
+  })
+
+  it('rejects two boards that both have no owner', () => {
+    const root = makeFloorBoard('root', 2)
+    const orphan = makeFloorBoard('orphan', 1)
+    const world = makeWorld(
+      [root, orphan],
+      [{ id: PLAYER_ID, kind: 'player' }],
+      { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } },
+    )
+    const data = serializeLevel(world)
+    expect(() => parseLevel(data)).toThrow(/no owner/i)
+  })
+
+  it('rejects a cycle world whose player has no location, before reachability ever runs', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'loopBox', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        loopBox: { board: 'root', x: 1, y: 0 },
+      },
+    )
+    const data = serializeLevel(world) as { locations: Record<string, unknown> }
+    delete data.locations[PLAYER_ID]
+    expect(() => parseLevel(data)).toThrow(/starting board/i)
+  })
+
+  it('rejects a cycle world whose player location points at a nonexistent board', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'loopBox', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 0 },
+        loopBox: { board: 'root', x: 1, y: 0 },
+      },
+    )
+    const data = serializeLevel(world) as { locations: Record<string, { board: string }> }
+    data.locations[PLAYER_ID].board = 'nonexistent'
+    expect(() => parseLevel(data)).toThrow(/starting board/i)
   })
 })
