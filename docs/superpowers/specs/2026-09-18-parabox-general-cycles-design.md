@@ -110,10 +110,18 @@ fix: stop requiring a zero-owner board to exist. Instead:
   cycle (with, optionally, ordinary tree branches hanging off any of its nodes — see the
   graph-theory note below). Reachability is instead walked from **the player's actual
   starting board** (`locations[PLAYER_ID].board`, validated to exist *before* it's used
-  as a traversal seed — see "Validation ordering" below) — which works precisely because
-  a cycle is reachable from any single node on it by walking forward around the ring,
-  and the existing downward walk (via `piece.boardRef`, unchanged) already does exactly
-  that once it has a starting point.
+  as a traversal seed — see "Validation ordering" below).
+  **Correction (found by final review, post-implementation):** the reachability walk
+  must be **undirected**, not just the existing downward walk (via `piece.boardRef`).
+  A cycle is indeed reachable from any single node on it by walking forward around the
+  ring — but the player's starting board is not guaranteed to be ON the cycle; it may be
+  partway down an ordinary tree branch hanging off one of the cycle's nodes (explicitly
+  allowed by this same bullet). A branch can only be reached from the cycle — or the
+  cycle reached from a branch — by walking "up" out of an interior board into whatever
+  board its owning container physically sits on, which the downward-only walk can never
+  do. The fix: treat the containment graph as undirected (an edge between the board a
+  container sits on and the board it owns, in both directions) and BFS that from
+  `startBoardId`. See `levelSchema.ts`'s reachability block for the actual algorithm.
 - More than one board with zero owners stays invalid, exactly as today (an incomplete
   or disconnected set of trees).
 
@@ -213,22 +221,42 @@ The existing per-piece location/bounds/collision checks elsewhere in `parseLevel
 unaffected and still run in full — this is a narrower, earlier check specifically
 gating what may be used as the reachability BFS's starting point.
 
-**Reachability** keeps its existing algorithm verbatim, just seeded from `startBoardId`
-instead of the old `rootBoardId`:
+**Reachability** is seeded from `startBoardId` instead of the old `rootBoardId`, but —
+per the correction above — the walk itself is no longer the old directed downward walk.
+It now traverses an **undirected** adjacency built from every container piece (an edge
+between the board the container sits on and the board it owns, both directions), so a
+tree branch hanging off a cycle node is reachable regardless of which side of that edge
+`startBoardId` lands on:
 
 ```ts
+const adjacency = new Map<string, Set<string>>()
+for (const boardId of Object.keys(boards)) {
+  adjacency.set(boardId, new Set())
+}
+for (const piece of Object.values(pieces)) {
+  if (piece.kind === 'container' && piece.boardRef !== undefined) {
+    const ownerBoard = locations[piece.id].board
+    adjacency.get(ownerBoard)?.add(piece.boardRef)
+    adjacency.get(piece.boardRef)?.add(ownerBoard)
+  }
+}
 const reached = new Set<string>([startBoardId])
 const queue: string[] = [startBoardId]
 while (queue.length > 0) {
-  // ...unchanged...
+  const currentBoardId = queue.shift() as string
+  for (const neighbor of adjacency.get(currentBoardId) ?? []) {
+    if (!reached.has(neighbor)) {
+      reached.add(neighbor)
+      queue.push(neighbor)
+    }
+  }
 }
 ```
 
-Update the comment above it (currently claims a cycle is always rejected, which stops
-being true) to describe what reachability now actually guarantees: every board is
-either part of the one connected structure containing the start, or the level is
-invalid — regardless of whether that structure is a tree, a cycle, or a cycle with tree
-branches hanging off it.
+What reachability now actually guarantees: every board is either part of the one
+connected structure containing the start, or the level is invalid — regardless of
+whether that structure is a tree, a cycle, or a cycle with tree branches hanging off it,
+and regardless of which node of that structure the player happens to start on.
 
 ### `types.ts`: revert `findContainerFor`
 
@@ -251,31 +279,40 @@ export function findContainerFor(world: World, boardId: BoardId): PieceId | unde
 
 ### `worldEdit.ts` changes
 
-**Generalize the cascade-protection predicate — using the player's actual board, never
-the literal string `'root'`.** Today, `deletePieceRecursively` and
+**Generalize the cascade-protection predicate.** Today, `deletePieceRecursively` and
 `subtreeContainsPlayer` both skip descending into a piece's own board only when that
 piece is *self*-referencing (`locations[id].board === boardRef`). A piece that closes a
 longer cycle back to the level's starting board (but is *not* self-referencing — it's
 physically standing somewhere else in the cycle) needs the same protection: deleting it
-must never cascade into deleting the board the whole level is built on. `'root'` is
-only ever a *naming convention* this codebase's tooling happens to use — hard-coding it
-here would make deletion safety depend on that convention and silently stop protecting
-any level whose starting board has a different ID. Use the actual player location
-instead:
+must never cascade into deleting the board the whole level is built on.
+
+**Correction (found during Task 3's implementation, post-original-spec):** this section
+originally specified using `world.locations[PLAYER_ID]?.board` here, by analogy with
+`levelSchema.ts`. That is **wrong for this file** and was reverted during implementation
+after it broke 4 pre-existing tests. `worldEdit.ts` operates on **live editing state**,
+where "wherever the player currently is" is not a stable proxy for "the level's
+foundational board" — the player is routinely and legitimately positioned deep inside
+ordinary nested containers during normal editing, and keying cascade-protection off the
+player's current position wrongly protected every board the player happened to be
+standing in, hiding the player from `subtreeContainsPlayer`'s search exactly when it
+most needed to find them. The correct predicate for this file hard-codes the literal
+string `'root'`:
 
 ```ts
-const startBoardId = world.locations[PLAYER_ID]?.board
 const skipsCascade =
   locations[id]?.board === piece.boardRef ||
-  (piece.boardRef !== undefined && piece.boardRef === startBoardId)
+  piece.boardRef === 'root'
 ```
 
-Every `World` this code ever legitimately runs against has a player location (the
-editor's own invariants — `createEmptyWorld`, `movePlayer` — guarantee exactly one
-player piece with a location at all times); `startBoardId` being `undefined` is not a
-reachable case in practice, but the optional chaining means it degrades safely (no
-piece's `boardRef` is ever literally `undefined`-as-a-string, so the second condition
-just never matches) rather than throwing, if that invariant is ever violated elsewhere.
+This is safe specifically in `worldEdit.ts` — and only here, plus the `EditorScreen.tsx`
+root-restriction below — because it's editor-only code operating on live-editing state,
+`createEmptyWorld` (the editor's only world-creation entry point) always names the
+foundational board `'root'`, and there is currently no "load an existing level back into
+the editor for further editing" feature — so, unlike `levelSchema.ts` (which must
+validate arbitrary externally-authored JSON at parse time, where the starting board's
+name is never guaranteed), "the foundational board might not be named root" is not a
+reachable scenario through this file's own entry points. If the editor ever gains a
+load-existing-level feature, this guard needs revisiting.
 
 **Restrict `placeSelfLoopBox`'s caller to root only.** The function itself
 (`worldEdit.ts`) stays a plain, unopinionated placement primitive — exactly like
@@ -397,14 +434,15 @@ other builtin level.
   (its behavior for every case that was ever legal is unchanged) — no new test strictly
   required beyond the `levelSchema.test.ts` over-owned-rejection test above, since that's
   what actually guarantees this function never sees an ambiguous board.
+- `levelSchema.test.ts`: a cycle with an ordinary tree branch hanging off one of its
+  nodes, where the player starts on the branch (not on the cycle itself) — must be
+  ACCEPTED, proving the reachability walk is genuinely undirected rather than only
+  walking downward from `startBoardId`. This is the test that would fail if a future
+  edit reintroduces a directed-only walk.
 - `worldEdit.test.ts`:
   - A hand-built two-node-cycle world (constructed directly, not through `parseLevel`)
     where deleting the piece that closes the loop back to the start (not itself
     self-referencing) does not cascade-delete the starting board or anything on it.
-  - **Regression fixture whose starting board is not named `'root'`** (e.g. call it
-    `'start'` or similar) — proving the deletion guard genuinely reads
-    `locations[PLAYER_ID].board` rather than the literal string. This is the test that
-    would fail if a future edit reintroduces the old naming assumption.
   - `EditorScreen.tsx`'s self-loop-box tool is a no-op when the active board isn't root
     (new test, mirroring the existing wall-blocks-goal-tool test's shape).
 - `CanvasRenderer.test.ts`: a two-node-cycle world's two container pieces render with
@@ -423,12 +461,14 @@ This sub-project is complete only when all of the following hold:
 
 - A normal tree with exactly one ownerless board still parses.
 - A connected cycle through the player's starting board parses.
+- A cycle with an ordinary tree branch hanging off one of its nodes parses, even when
+  the player starts on the branch rather than on the cycle itself (reachability is
+  undirected).
 - A disconnected cycle is rejected by reachability.
 - Two ownerless boards are rejected.
 - Any board with two owners is rejected, including self-loop plus external owner.
 - `computeTarget`, `tryMovePiece`, and `checkLose` remain unchanged.
-- Deleting a cycle-closing piece cannot delete the player's starting board — verified
-  with a fixture whose starting board is *not* named `'root'`.
+- Deleting a cycle-closing piece cannot delete the player's starting board.
 - A self-loop can be authored only on the root board through the editor UI.
 - Cycle members receive deterministic cycle colors; tests do not assume global color
   uniqueness beyond the selected fixtures.

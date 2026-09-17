@@ -18,14 +18,23 @@
   own existing convention of building worlds via `createEmptyWorld`/`createEmptyBoard`
   (from `worldEdit.ts` itself) plus, where no existing helper produces the needed shape
   (a cross-referencing cycle), a directly-typed `World` object literal.
-- **Never key any gameplay- or editing-safety logic off the literal string `'root'`.**
-  It stays a valid *file-naming convention* (the editor, the generator, and every
-  hand-authored level all use it for their starting board), but `worldEdit.ts`'s
-  cascade-protection must read the actual player location instead. Only
-  `EditorScreen.tsx`'s self-loop-box root-restriction may use the literal string,
-  because that really is the editor's own fixed convention for a fresh level's starting
-  board (`createEmptyWorld` always names it that), not a claim about what's
-  structurally required elsewhere.
+- **Never key gameplay- or level-validation logic off the literal string `'root'`** —
+  `levelSchema.ts` and `CanvasRenderer.ts` must stay purely structural (ownership
+  counts, `boardRef` graph walks, player-location-based reachability seeding).
+  **Correction (ruled during Task 3's implementation, superseding this section's
+  original text):** `worldEdit.ts`'s cascade-protection guard is the one exception —
+  it correctly hard-codes the literal string `'root'`, not the player's current
+  location. `worldEdit.ts` operates on live-editing state, where "wherever the player
+  currently is" is not a stable proxy for "the level's foundational board" (the player
+  is routinely and legitimately positioned inside ordinary nested containers during
+  normal editing); using the player-location approach there broke 4 pre-existing tests.
+  Hard-coding `'root'` is safe specifically in `worldEdit.ts` — and in
+  `EditorScreen.tsx`'s self-loop-box root-restriction — because both are editor-only
+  code, `createEmptyWorld` always names the foundational board `'root'`, and there is
+  no "load an existing level back into the editor" feature, so a differently-named
+  starting board is not a reachable scenario through either file's own entry points.
+  See `.superpowers/sdd/2026-09-18-parabox-general-cycles/progress.md`'s Task 3 section
+  for the full ruling and rationale.
 - Do not assume global color uniqueness in `CanvasRenderer.ts` tests beyond the specific
   fixtures each test constructs (the palette is a visual aid, not a uniqueness
   guarantee — see the spec).
