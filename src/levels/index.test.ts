@@ -6,7 +6,7 @@ import { solve } from '../../tools/generator/solver'
 
 describe('BUILTIN_LEVELS', () => {
   it('has one entry per shipped level file, each parsing to an unsolved world', () => {
-    expect(BUILTIN_LEVELS).toHaveLength(8)
+    expect(BUILTIN_LEVELS).toHaveLength(7)
     for (const level of BUILTIN_LEVELS) {
       expect(level.world.locations[PLAYER_ID]).toBeDefined()
       expect(checkWin(level.world)).toBe(false)
@@ -22,7 +22,6 @@ describe('BUILTIN_LEVELS', () => {
       '05-double-nested',
       '06-self-loop',
       '07-loop-eats-container',
-      '08-nested-loop',
     ])
   })
 })
