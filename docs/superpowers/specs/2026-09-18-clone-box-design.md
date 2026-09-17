@@ -1,4 +1,30 @@
-# Clone Box — Design
+# Clone — Design
+
+## Revision note
+
+The user supplied external research citing Patrick's Parabox's own custom-level
+format, which models a clone as a `Ref` — "a reference to a Block defined elsewhere"
+— with no interior of its own at all, rather than a full container that happens to
+carry an unused `boardRef`. Two changes adopted from that here, both consistent with
+(not contradicting) everything already confirmed in this spec:
+
+1. **`parseLevel` no longer requires a clone to have a valid `boardRef`.** The
+   original draft kept the existing `kind === 'container'` + `boardRef` requirement
+   for clones too, calling the resulting unused `boardRef` "dead weight." Since a
+   clone's own interior is genuinely never reached (confirmed: `tryEnter` redirects
+   before ever consulting it), requiring one at all was an unnecessary authoring
+   burden — this revision drops it.
+2. **Multiple clones may point at the same main body, and clone entry was never
+   player-specific.** Both of these were raised as if they were fixes, but neither
+   needed a design change: nothing in the original `resolveCloneTeleport` or
+   `cloneOf` shape ever restricted how many pieces could set `cloneOf` to the same
+   `mainBodyId`, or cared which piece was entering. Noted here for the record, not
+   because anything is being changed.
+
+A third point — a clone can carry its own `fliph`, independent of its main body's —
+is covered by the Flip spec (same `Piece.fliph` field, no clone-specific code needed
+since `tryEnter` already checks `into.fliph` on whichever piece was entered, and a
+clone is exactly that piece).
 
 ## Goal
 
@@ -69,13 +95,6 @@ property of `tryEnter` itself.
   coloring existed. A distinguishing color/marker can be added in a follow-up the same
   way the infinite destination's `∞` marker was, once the core mechanic is confirmed
   working.
-- **What a clone's own `boardRef` should point to.** `parseLevel`'s existing validation
-  already requires any `kind: 'container'` piece to have a `boardRef` pointing at a
-  real board — a clone is no exception, and this round doesn't relax that. In practice
-  a clone's `boardRef` becomes dead weight (its own interior is never reached, since
-  `tryEnter` redirects before ever consulting it) — level authors can point it at a
-  self-loop of the clone's own board, an unused empty board, or anything else valid;
-  the schema doesn't need to know or care which.
 - **A clone of a clone**, or a main body whose `cloneOf` points at another clone. Not
   addressed; `resolveCloneTeleport` reads `world.locations[mainBodyId]` directly and
   does not itself check whether `mainBodyId` is itself a clone. If this needs defined
@@ -91,9 +110,10 @@ property of `tryEnter` itself.
 export interface Piece {
   id: PieceId
   kind: PieceKind
-  boardRef?: BoardId    // present only when kind === 'container'
+  boardRef?: BoardId    // present when kind === 'container' AND cloneOf is unset — see parseLevel below
   infiniteFor?: PieceId // present only on an infinite destination
   cloneOf?: PieceId     // present only on a clone — names its main body
+  fliph?: boolean       // see the Flip spec — a clone can carry its own, independent of its main body's
 }
 ```
 
@@ -161,11 +181,25 @@ entirely inside `tryEnter` itself.
 
 ### `parseLevel`
 
-No change. A clone piece must still satisfy the existing `kind === 'container'` +
-valid `boardRef` requirement (see "explicitly out of scope" above for what that
-`boardRef` practically means once entry always redirects). `cloneOf` itself needs no
-new validation this round — an authored level pointing `cloneOf` at a nonexistent
-piece id would simply make `resolveCloneTeleport` return `null` at `world.locations[mainBodyId] === undefined`
+The existing `kind === 'container'` → requires-valid-`boardRef` check must skip a
+piece that has `cloneOf` set:
+
+```ts
+// src/game/engine/levelSchema.ts — inside the per-piece validation loop
+    if (piece.kind === 'container') {
+      if (piece.cloneOf === undefined && (piece.boardRef === undefined || boards[piece.boardRef] === undefined)) {
+        throw new Error(`Container piece "${pieceId}" has a boardRef that does not exist`)
+      }
+    } else if (piece.boardRef !== undefined) {
+      throw new Error(`Piece "${pieceId}" has kind "${piece.kind}" but also has a boardRef, which only container pieces may have`)
+    }
+```
+
+A clone may still be authored with a `boardRef` if a level wants one for some other
+reason (nothing forbids it), but it's never required, and never consulted by
+`resolveCloneTeleport`. `cloneOf` itself still needs no new validation this round —
+an authored level pointing `cloneOf` at a nonexistent piece id makes
+`resolveCloneTeleport` return `null` at `world.locations[mainBodyId] === undefined`
 (entering that clone always fails cleanly), which is acceptable degrade-safely
 behavior rather than a parse-time error, consistent with how this codebase treats
 similar "structurally odd but not unsafe" shapes elsewhere.

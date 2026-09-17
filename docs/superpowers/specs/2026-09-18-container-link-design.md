@@ -1,4 +1,40 @@
-# Container Link — Design
+# Container Link (Transfer) — Design
+
+## Revision note — ruling on external research with an unresolved gap
+
+The user supplied external research arguing this mechanic should match Patrick's
+Parabox's own "Transfer": a *movement-resolution fallback* (try the normal push/enter
+first; only when that's impossible, check whether a transfer applies) rather than an
+author-specified `linkedTo` pair. The cited material describes Transfer only in
+general terms ("same-position transitioning between boxes," used when a target box
+can't otherwise be pushed into available space at the same/larger/smaller layer) and
+does not specify — anywhere I could find in what was supplied — **how the engine is
+supposed to determine which box is the transfer partner of which**. Every other piece
+of research incorporated into these three specs (Clone, Flip) came with either a
+confirmed worked example or a concrete, directly implementable rule; this one piece
+does not, and I asked the user directly whether they had a concrete candidate-matching
+rule in mind or wanted to keep the already-confirmed `linkedTo` design — the question
+went unanswered before being pointed back at the same document a second time.
+
+**Ruling: keep the `linkedTo` design (author-specified, one hop, already fully
+specified and verified against the user's own coordinate example in an earlier
+round), and adopt only the *terminology* alignment** — this mechanic maps to what the
+official game calls Transfer, so the spec and file are titled accordingly, and the
+Global-Constraints-equivalent "why" below explains the mapping. The behavior itself —
+`linkedTo`, one-directional per field, author-controlled, one hop, terminal
+`location` result — is unchanged from the version the user already confirmed via a
+concrete example. If a genuine auto-detection rule is wanted later, it needs its own
+round with either a concrete example or an explicit specification of the matching
+algorithm — inventing one now and presenting it as "the official design" would be
+exactly the kind of unverified guess this whole design process has been built to
+avoid.
+
+Also adopted from the same research, since it's independent of the gap above: the
+`flipsEntry`/`mirroredEntry` fields referenced in the original draft of this spec are
+gone (see the Flip spec) — `fliph` is what a container carries now, and it has no
+special interaction with a `linkedTo` container beyond composing the way any two
+independent per-container properties would (both checks can run at the same point in
+`computeTarget`, in either order, since neither reads the other's field).
 
 ## Goal
 
@@ -52,8 +88,10 @@ climb-to-owner path). Verified for all four directions against the confirmed exa
   sizes, or is actually immovable. If sizes mismatch, the mapped cell may land out of
   bounds — this round's behavior for that case (see "Design" below: the move simply
   fails) is a deliberate, minimal fallback, not a validated/rejected authoring error.
-- Any interaction with the Flip Box mechanic (separate spec, same round) — independent
-  features, not explored together.
+- Any interaction between a linked container and `fliph` on either side of the link
+  (separate spec, same round) — `linkedEntryCell` doesn't consult either container's
+  `fliph`, so a linked+flipped container behaves as a plain link this round; whether
+  that composition should itself mirror is unexplored.
 - Chained/transitive links (`C1.linkedTo = C2`, `C2.linkedTo = C3`, entering from C1
   expecting to somehow reach C3). This round only resolves one hop.
 - Rendering: no visual indicator that two containers are linked.
@@ -70,8 +108,7 @@ export interface Piece {
   boardRef?: BoardId
   infiniteFor?: PieceId
   cloneOf?: PieceId
-  flipsEntry?: boolean
-  mirroredEntry?: boolean
+  fliph?: boolean
   linkedTo?: PieceId // present only on a container linked directly to another — see computeTarget
 }
 ```
@@ -98,7 +135,12 @@ function linkedEntryCell(size: number, x: number, y: number, dir: Direction): { 
 
 ```ts
 // src/game/engine/rules.ts — computeTarget, replacing the unconditional climb-to-owner
-// step with a link check first
+// step with a link check first. Shown together with the Flip spec's climbDir change,
+// since both patch this same step — the link check runs first and, when it applies,
+// returns a terminal result before fliph is ever considered for THIS container (a
+// linked container's own fliph, if it had one, would need its own decision about
+// whether it also applies to linkedEntryCell — not addressed this round; see
+// "explicitly out of scope").
   const containerId = findContainerFor(world, loc.board)
   if (containerId === undefined) return null
   const container = world.pieces[containerId]
@@ -112,10 +154,11 @@ function linkedEntryCell(size: number, x: number, y: number, dir: Direction): { 
     return { kind: 'location', location: { board: linked.boardRef as BoardId, x: cell.x, y: cell.y }, relativeCoord }
   }
 
-  const offset = dir === 'up' || dir === 'down' ? loc.x : loc.y
+  const climbDir = container.fliph ? mirrorHorizontal(dir) : dir // see the Flip spec
+  const offset = climbDir === 'up' || climbDir === 'down' ? loc.x : loc.y
   const newRelativeCoord = divideByInt(addInt(relativeCoord, offset), board.size)
   const containerLoc = world.locations[containerId]
-  return computeTarget(world, containerLoc, dir, newRelativeCoord, visited)
+  return computeTarget(world, containerLoc, climbDir, newRelativeCoord, visited)
 ```
 
 The link check sits between finding `containerId` and the existing offset/climb logic
