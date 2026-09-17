@@ -70,4 +70,27 @@ describe('GameState', () => {
     state.undo()
     expect(state.moveCount).toBe(1)
   })
+
+  it('reports isLost after a move resolves into infinite regress, and undo recovers it', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'loopBox', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+        loopBox: { board: 'root', x: 0, y: 0 },
+      },
+    )
+    const state = new GameState(world)
+    expect(state.isLost).toBe(false)
+    const ok = state.move('left')
+    expect(ok).toBe(true) // the move succeeds — it just produces a world with no player
+    expect(state.isLost).toBe(true)
+    expect(state.undo()).toBe(true)
+    expect(state.isLost).toBe(false)
+    expect(state.current.locations[PLAYER_ID]).toEqual({ board: 'root', x: 0, y: 1 })
+  })
 })

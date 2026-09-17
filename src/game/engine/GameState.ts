@@ -1,5 +1,5 @@
 import { World, Direction } from './types'
-import { applyMove, checkWin } from './rules'
+import { applyMove, checkLose, checkWin } from './rules'
 
 export class GameState {
   private history: World[]
@@ -14,6 +14,10 @@ export class GameState {
 
   get isWon(): boolean {
     return checkWin(this.current)
+  }
+
+  get isLost(): boolean {
+    return checkLose(this.current)
   }
 
   get moveCount(): number {
