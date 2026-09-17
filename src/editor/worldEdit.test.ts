@@ -241,6 +241,47 @@ test('deletePieceRecursively deleting a self-referencing piece leaves its board 
   expect(next.boards.root).toBeDefined() // the board itself survives
 })
 
+test('canPlacePieceAt is true for a cell occupied by a self-loop box even when the player is elsewhere on the board it owns', () => {
+  let world = createEmptyWorld(6) // player defaults to (5, 5) on root
+  const withLoop = placeSelfLoopBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 })!
+  world = withLoop.world
+  // The self-loop box's "owned" board is root itself, where the player
+  // still stands elsewhere — this must not be mistaken for the player
+  // being inside the box's subtree.
+  expect(canPlacePieceAt(world, 'root', 1, 1)).toBe(true)
+})
+
+test('setCellType can overwrite (erase into a wall) a self-loop box', () => {
+  let world = createEmptyWorld(6)
+  const withLoop = placeSelfLoopBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 })!
+  world = withLoop.world
+  const next = setCellType(world, 'root', 1, 1, 'wall')
+  expect(next.pieces['box-0']).toBeUndefined()
+  expect(next.locations['box-0']).toBeUndefined()
+  expect(next.boards.root.cells[1][1].type).toBe('wall')
+  expect(next.locations[PLAYER_ID]).toEqual({ board: 'root', x: 5, y: 5 }) // player untouched
+})
+
+test('placeNormalBox can overwrite a self-loop box', () => {
+  let world = createEmptyWorld(6)
+  const withLoop = placeSelfLoopBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 })!
+  world = withLoop.world
+  const result = placeNormalBox(world, 'root', 1, 1, withLoop.ids)
+  expect(result).not.toBeNull()
+  expect(result!.world.pieces['box-0']).toBeUndefined() // the self-loop box is gone
+  expect(result!.world.pieces['box-1']).toEqual({ id: 'box-1', kind: 'normal' })
+})
+
+test('movePlayer can move the player onto (and delete) a self-loop box', () => {
+  let world = createEmptyWorld(6)
+  const withLoop = placeSelfLoopBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 })!
+  world = withLoop.world
+  const next = movePlayer(world, 'root', 1, 1)
+  expect(next.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 1 })
+  expect(next.pieces['box-0']).toBeUndefined()
+  expect(next.boards.root).toBeDefined() // the board itself survives (it's root)
+})
+
 test("deletePieceRecursively deleting a board's external owner still cascades through a self-referencing piece inside it", () => {
   const world = createEmptyWorld(6)
   const outer = placeContainerBox(world, 'root', 1, 1, { nextBoxId: 0, nextBoardId: 0 }, 3)!

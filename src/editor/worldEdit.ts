@@ -44,7 +44,14 @@ function subtreeContainsPlayer(world: World, pieceId: PieceId): boolean {
     seen.add(id)
     if (id === PLAYER_ID) return true
     const piece = world.pieces[id]
-    if (piece?.kind === 'container' && piece.boardRef !== undefined) {
+    // A self-referencing (self-loop) container's own board is not solely
+    // "owned" by it — deleting it never touches that board (see
+    // deletePieceRecursively's matching guard), so descending into it here
+    // would be a stale false positive: it could find the player standing on
+    // that same board even though deleting this piece can't remove the
+    // player at all.
+    const isSelfReferencing = world.locations[id]?.board === piece?.boardRef
+    if (piece?.kind === 'container' && piece.boardRef !== undefined && !isSelfReferencing) {
       for (const [otherId, loc] of Object.entries(world.locations)) {
         if (loc.board === piece.boardRef && !seen.has(otherId)) stack.push(otherId)
       }
