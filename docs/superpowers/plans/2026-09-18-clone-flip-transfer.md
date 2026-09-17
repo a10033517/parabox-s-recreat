@@ -1,6 +1,6 @@
 # Clone, Flip, Transfer Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add three independent mechanics on top of the existing Void/infinite-exit
 system: Clone (`cloneOf` — entering redirects to a main body's current location),
@@ -58,7 +58,7 @@ touch the same `Piece` interface and the same `levelSchema.ts` validation block)
   set.
 - Consumes: nothing new — this is the foundation task the other three build on.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `src/game/engine/levelSchema.test.ts`, add these to the existing
 `describe('parseLevel structural validation', ...)` block:
@@ -77,7 +77,7 @@ In `src/game/engine/levelSchema.test.ts`, add these to the existing
   })
 ```
 
-- [ ] **Step 2: Run and confirm they fail**
+- [x] **Step 2: Run and confirm they fail**
 
 Run: `npx vitest run src/game/engine/levelSchema.test.ts`
 Expected: the first new test FAILS (current code still requires `boardRef` on every
@@ -85,7 +85,7 @@ container regardless of `cloneOf`); the second new test currently PASSES already
 (it's a control case pinning down existing behavior — confirm it passes both before
 and after Step 3, i.e. this one is not expected to ever go red).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/game/engine/types.ts`, update the `Piece` interface:
 
@@ -118,7 +118,7 @@ and change it to:
 (Only the `if (piece.kind === 'container')` branch's condition changes — the
 `else if` branch and everything else in the loop is unchanged.)
 
-- [ ] **Step 4: Run and confirm they pass**
+- [x] **Step 4: Run and confirm they pass**
 
 Run: `npx vitest run src/game/engine/levelSchema.test.ts`
 Expected: PASS, every test in the file (including all pre-existing ones — this
@@ -129,7 +129,7 @@ Run: `npx tsc --noEmit -p tsconfig.json`
 Expected: zero errors (the three new `Piece` fields are all optional, so nothing
 that constructs a `Piece` literal elsewhere in the codebase needs updating).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/game/engine/types.ts src/game/engine/levelSchema.ts src/game/engine/levelSchema.test.ts
@@ -151,7 +151,7 @@ git commit -m "feat(engine): add cloneOf/fliph/linkedTo fields; clones don't nee
   check. Task 3 (Flip) modifies `tryEnter` again, after this task — its brief
   reproduces this task's exact resulting shape as its own starting point.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `src/game/engine/rules.test.ts`, add this new `describe` block (anywhere after
 the existing `describe('resolveBlocked — locked pieces...', ...)` block):
@@ -259,7 +259,7 @@ describe('tryEnter — a clone redirects before normal container entry', () => {
 })
 ```
 
-- [ ] **Step 2: Run and confirm they fail**
+- [x] **Step 2: Run and confirm they fail**
 
 Run: `npx vitest run src/game/engine/rules.test.ts`
 Expected: the `resolveCloneTeleport`/clone-`tryEnter` tests fail (`resolveCloneTeleport`
@@ -267,7 +267,7 @@ doesn't exist yet — a `TypeError` from `getEntryCell` reading `board.size` on
 `undefined` is expected and fine here, since `B` has no `boardRef` and nothing yet
 intercepts before that line is reached).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/game/engine/rules.ts`, add (anywhere before `tryEnter`, e.g. right after
 `resolveInfiniteExit`):
@@ -328,7 +328,7 @@ export function tryEnter(
 }
 ```
 
-- [ ] **Step 4: Run and confirm they pass**
+- [x] **Step 4: Run and confirm they pass**
 
 Run: `npx vitest run src/game/engine/rules.test.ts`
 Expected: PASS, every test in the file — including the corrected expected value from
@@ -337,7 +337,7 @@ Step 2's hand-trace for the "ordinary box pushed into a clone" test.
 Run: `npx tsc --noEmit -p tsconfig.json`
 Expected: zero errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/game/engine/rules.ts src/game/engine/rules.test.ts
@@ -358,7 +358,7 @@ git commit -m "feat(engine): entering a clone redirects to its main body's curre
 - Produces: `mirrorHorizontal(dir): Direction` (module-private, not exported — no
   other task needs to import it, both call sites are inside `rules.ts`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `src/game/engine/rules.test.ts`, add:
 
@@ -447,13 +447,13 @@ mirror pair via `getEntryCell` (`right`→`(0,1)`, `left`→`(3,1)`), up/down-un
 pair via `getEntryCell` (`up`→`(2,3)`, `down`→`(2,0)`), exit-side pair via
 `computeTarget` (`(0,1)` with `fliph`, `(2,1)` without).
 
-- [ ] **Step 2: Run and confirm they fail**
+- [x] **Step 2: Run and confirm they fail**
 
 Run: `npx vitest run src/game/engine/rules.test.ts`
 Expected: the new `fliph` tests fail (the field is parsed/stored but nothing reads
 it yet).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/game/engine/rules.ts`, add near the top (module-private, not exported):
 
@@ -500,7 +500,7 @@ In `computeTarget`, change the climb-out step:
 `dir` to `climbDir`; `const container = world.pieces[containerId]` is a new line,
 everything else in this block is unchanged.)
 
-- [ ] **Step 4: Run and confirm they pass**
+- [x] **Step 4: Run and confirm they pass**
 
 Run: `npx vitest run src/game/engine/rules.test.ts`
 Expected: PASS, every test in the file.
@@ -508,7 +508,7 @@ Expected: PASS, every test in the file.
 Run: `npx tsc --noEmit -p tsconfig.json`
 Expected: zero errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/game/engine/rules.ts src/game/engine/rules.test.ts
@@ -530,7 +530,7 @@ git commit -m "feat(engine): fliph mirrors both entry and exit direction mapping
   considered for a linked container, per both specs' "explicitly out of scope" notes
   on the two mechanics not composing this round).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `src/game/engine/rules.test.ts`, add:
 
@@ -652,13 +652,13 @@ describe('linkedTo — exiting a linked container lands at the mirrored-offset c
 })
 ```
 
-- [ ] **Step 2: Run and confirm they fail**
+- [x] **Step 2: Run and confirm they fail**
 
 Run: `npx vitest run src/game/engine/rules.test.ts`
 Expected: the new `linkedTo` tests fail (the field is parsed/stored but nothing reads
 it yet); the control test already passes (pins down existing, unmodified behavior).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/game/engine/rules.ts`, add near `mirrorHorizontal` (or anywhere above
 `computeTarget`):
@@ -704,7 +704,7 @@ In `computeTarget`, insert the link check between finding `containerId` and Task
   return computeTarget(world, containerLoc, climbDir, newRelativeCoord, visited)
 ```
 
-- [ ] **Step 4: Run and confirm they pass**
+- [x] **Step 4: Run and confirm they pass**
 
 Run: `npx vitest run src/game/engine/rules.test.ts`
 Expected: PASS, every test in the file.
@@ -716,7 +716,7 @@ Run the FULL suite: `npx vitest run`
 Expected: every test file passes — this is the last task, so a clean full run here
 means the whole plan is done.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/game/engine/rules.ts src/game/engine/rules.test.ts

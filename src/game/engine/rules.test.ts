@@ -880,7 +880,13 @@ describe('resolveBlocked — locked pieces push only, never enter or eat, on eit
 })
 
 describe('resolveCloneTeleport — entering a clone redirects to its main body\'s current location', () => {
-  it('teleports the entrant directly there when the main body\'s cell is free', () => {
+  it('teleports the entrant directly there when the main body\'s own board is not registered in the world (degrade-safe fallback, not a reachable "free cell" state)', () => {
+    // occupantAt(world, world.locations[mainBodyId]) is provably always mainBodyId
+    // itself in any valid world — a main body's own cell can never genuinely be
+    // "free". This fixture instead exercises the degrade-safe fallback added for
+    // when mainBodyId's own board isn't registered in `world.boards`: a
+    // structurally odd but not unsafe shape that can't arise from a level
+    // parseLevel accepts, but is handled cleanly rather than crashing.
     const world = makeWorld(
       [makeFloorBoard('root', 4)],
       [{ id: 'A', kind: 'normal' }, { id: 'entrant', kind: 'normal' }],

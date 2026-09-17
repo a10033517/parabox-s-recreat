@@ -162,19 +162,27 @@ function linkedEntryCell(size: number, x: number, y: number, dir: Direction): { 
 ```
 
 The link check sits between finding `containerId` and the existing offset/climb logic
-— everything before it (the `inBounds`/`visited`/infinite-detection checks earlier in
+— everything before it (the `inBounds`/infinite-detection checks earlier in
 `computeTarget`, unchanged) and everything in the non-linked branch (unchanged) stay
 exactly as they are. A linked exit is a **terminal** `location` result: it does not
-add `loc.board` to `visited` and does not recurse further, so it cannot be
-misclassified as part of an infinite cycle by the existing detection, and a link
-resolution never itself contributes to a cycle the *unlinked* infinite-exit machinery
-would need to know about.
+recurse further, so it cannot be misclassified as part of an infinite cycle by the
+existing detection, and a link resolution never itself contributes to a cycle the
+*unlinked* infinite-exit machinery would need to know about. Corrected after the
+final whole-branch review: `loc.board` IS added to `visited` on the way in (the
+unconditional `visited.add(loc.board)` a few lines above the link check runs
+regardless of whether a link applies) — this is harmless because a terminal result
+never recurses back into `computeTarget`, so nothing ever consults that entry, but
+the earlier claim that it's skipped was wrong.
 
 `relativeCoord` is passed through unchanged in the linked-result case — it's part of
-`MoveTarget`'s shape for every `location` result, but nothing consumes it for a result
-that resolves directly to an in-bounds cell (confirmed by reading every caller of
-`computeTarget`'s `location` branch), so there's no meaningful value to compute here
-beyond satisfying the type.
+`MoveTarget`'s shape for every `location` result. Corrected after the final
+whole-branch review: this value IS consumed downstream in the common case where the
+linked-to cell turns out to be occupied — `tryMovePiece` forwards the whole
+`MoveTarget` into `resolveBlocked` → `tryEnter` → `getEntryCell`, which reads
+`relativeCoord` to compute the actual entry cell. The value passed through here is
+the correct one (it's simply the coordinate carried over from the piece's own move,
+unmodified by the link jump) — the earlier claim that nothing consumes it was wrong,
+but the value itself was never incorrect.
 
 ## Testing
 
