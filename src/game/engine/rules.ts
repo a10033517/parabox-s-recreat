@@ -176,11 +176,11 @@ export function resolveCloneTeleport(
   if (targetLoc === undefined) return null
 
   const occupant = occupantAt(world, targetLoc)
-  // occupantAt(world, targetLoc) always finds mainBodyId itself here (it's
-  // tautologically standing at its own reported location), UNLESS mainBodyId's
-  // own board isn't even present in this world — a structurally odd but not
-  // unsafe shape (see the missing-mainBodyId case above), in which case there's
-  // nothing to push against or walk: the entrant just teleports directly there.
+  // occupant is always mainBodyId (occupantAt never consults world.boards — it's
+  // tautologically standing at its own reported location). The real guard here is
+  // the board-presence check: without it, the push below would crash trying to walk
+  // a nonexistent board — a structurally odd but not unsafe shape (see the
+  // missing-mainBodyId case above), so the entrant just teleports directly there.
   if (occupant === undefined || world.boards[targetLoc.board] === undefined) {
     return moveTo(world, pieceId, targetLoc)
   }
