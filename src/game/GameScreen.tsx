@@ -28,7 +28,7 @@ export function GameScreen({
   // player's position from. Remember the last board the player actually
   // stood on so rendering can keep showing it (now without the player
   // drawn on it) instead of crashing on a missing location.
-  const lastBoardIdRef = useRef(initialWorld.locations[PLAYER_ID].board)
+  const lastBoardIdRef = useRef(initialWorld.locations[PLAYER_ID]?.board ?? 'root')
 
   const handleMove = (direction: Direction) => {
     if (state.move(direction)) setTick((t) => t + 1)
@@ -78,7 +78,7 @@ export function GameScreen({
       {state.isLost && (
         <div className="lose-notice" data-testid="lose-notice">
           <p>玩家迷失在无限递归中</p>
-          <button onClick={handleUndo}>复位上一步</button>
+          <button onClick={handleUndo} aria-label="从无限递归中复位">复位上一步</button>
         </div>
       )}
       <SwipeLayer onMove={handleMove}>

@@ -108,6 +108,28 @@ test('a move that removes the player shows a lost notice, and its button recover
   const notice = screen.getByTestId('lose-notice')
   expect(within(notice).getByText('玩家迷失在无限递归中')).toBeInTheDocument()
 
-  await user.click(within(notice).getByText('复位上一步'))
+  await user.click(within(notice).getByLabelText('从无限递归中复位'))
   expect(screen.queryByTestId('lose-notice')).not.toBeInTheDocument()
+})
+
+test('pressing a direction after losing does not crash, and the lost notice stays up', async () => {
+  const root = makeFloorBoard('root', 2)
+  const world = makeWorld(
+    [root],
+    [
+      { id: PLAYER_ID, kind: 'player' },
+      { id: 'loopBox', kind: 'container', boardRef: 'root' },
+    ],
+    {
+      [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+      loopBox: { board: 'root', x: 0, y: 0 },
+    },
+  )
+  render(<GameScreen initialWorld={world} onExit={() => {}} onWin={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('左'))
+  expect(screen.getByTestId('lose-notice')).toBeInTheDocument()
+
+  await user.click(screen.getByLabelText('右'))
+  expect(screen.getByTestId('lose-notice')).toBeInTheDocument()
 })
