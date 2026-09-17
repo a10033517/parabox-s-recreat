@@ -1,0 +1,22 @@
+{
+  "boards": {
+    "root": {
+      "id": "root",
+      "size": 4,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor", "requirement": "player" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    }
+  },
+  "pieces": {
+    "player": { "id": "player", "kind": "player" },
+    "loopBox": { "id": "loopBox", "kind": "container", "boardRef": "root" }
+  },
+  "locations": {
+    "player": { "board": "root", "x": 0, "y": 0 },
+    "loopBox": { "board": "root", "x": 1, "y": 0 }
+  }
+}

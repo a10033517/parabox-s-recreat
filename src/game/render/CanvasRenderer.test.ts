@@ -50,6 +50,28 @@ describe('renderBoard', () => {
     expect(calls).toBe(5) // 4 cells + 1 piece (player only; box1 is on 'inside')
   })
 
+  it('renders a self-loop container with a different fillStyle than a normal container', () => {
+    const root = makeFloorBoard('root', 2)
+    const inside = makeFloorBoard('inside', 1)
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: 'c1', kind: 'container', boardRef: 'inside' },
+        { id: 'c2', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        c1: { board: 'root', x: 0, y: 0 },
+        c2: { board: 'root', x: 1, y: 0 }, // self-referencing: boardRef === its own board
+      },
+    )
+    const ctx = mockContext()
+    const styles: string[] = []
+    ctx.fillRect = () => { styles.push(ctx.fillStyle as string) }
+    renderBoard(ctx, root, world, 32)
+    // 4 cell draws (2x2, no requirements), then c1 (normal container), then c2 (self-loop)
+    expect(styles[5]).not.toBe(styles[4])
+  })
+
   it('uses a different fillStyle for a wall cell than a floor cell', () => {
     const board = makeFloorBoard('root', 2)
     setWall(board, 1, 0)
