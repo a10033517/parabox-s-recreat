@@ -71,7 +71,7 @@ describe('GameState', () => {
     expect(state.moveCount).toBe(1)
   })
 
-  it('reports isLost after a move resolves into infinite regress, and undo recovers it', () => {
+  it('undoes a move that sends the player to the Void, restoring the exact pre-move state', () => {
     const root = makeFloorBoard('root', 2)
     const world = makeWorld(
       [root],
@@ -85,12 +85,30 @@ describe('GameState', () => {
       },
     )
     const state = new GameState(world)
-    expect(state.isLost).toBe(false)
     const ok = state.move('left')
-    expect(ok).toBe(true) // the move succeeds — it just produces a world with no player
-    expect(state.isLost).toBe(true)
+    expect(ok).toBe(true)
+    expect(state.current.locations[PLAYER_ID]).toEqual({ board: 'void', x: 2, y: 2 })
     expect(state.undo()).toBe(true)
-    expect(state.isLost).toBe(false)
     expect(state.current.locations[PLAYER_ID]).toEqual({ board: 'root', x: 0, y: 1 })
+    expect(state.current.boards.void).toBeUndefined() // the pre-move world never had a Void board
+  })
+
+  it('continues to accept moves and track history normally after the player is in the Void', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'loopBox', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 0, y: 1 },
+        loopBox: { board: 'root', x: 0, y: 0 },
+      },
+    )
+    const state = new GameState(world)
+    state.move('left') // player now in the Void
+    expect(() => state.move('right')).not.toThrow()
+    expect(state.moveCount).toBe(2)
   })
 })
