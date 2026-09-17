@@ -111,8 +111,9 @@ const VOID_CELL_ORDER: Array<{ x: number; y: number }> = [
 ]
 
 // A piece that resolves to infinite recursion is relocated into the shared Void
-// board instead of being deleted from the world (see removePiece, now gone — this
-// replaces its only caller). It's marked `locked`, which resolveBlocked reads to
+// board instead of being deleted from the world — this function replaces the
+// now-deleted `removePiece`, and is called from `removePiece`'s one former call
+// site in rules.ts. It's marked `locked`, which resolveBlocked reads to
 // keep it pushable but never enterable/mergeable again. Rejects (returns null, no
 // mutation) an unknown pieceId, an already-locked piece (a piece is only ever sent
 // to the Void once), or a full Void — the caller always gets back either the

@@ -16,14 +16,14 @@ const PIECE_COLORS: Record<PieceKind, string> = {
 // PieceKind — see worldEdit.ts's placeSelfLoopBox and rules.ts's cycle
 // detection. It still needs a visibly different color from an ordinary
 // container: pushing it (or anything else) flush against the edge that
-// closes the ring is a genuine trap (unresolvable infinite regress, the
-// piece attempting it removed from the world), and rendering it identically
-// to a harmless container would make that invisible until it kills you.
+// closes the ring resolves to infinite recursion (see sendToVoid in
+// types.ts) and sends it to the Void, locked — rendering it identically to
+// a harmless container would make that outcome invisible until it happens.
 // This is a visual distinction AID, not a uniqueness guarantee: for a ring
 // bigger than the palette, or on a hash collision, two members can share a
 // color. Every level this codebase ships has at most two cycle members.
 const CYCLE_PALETTE = ['#ef4444', '#eab308', '#a855f7', '#14b8a6', '#f97316']
-const LOCKED_RING_COLOR = '#facc15' // gold/yellow, distinct from any PIECE_COLORS or CYCLE_PALETTE entry
+const LOCKED_RING_COLOR = '#e2e8f0' // pale slate/white — reads as "frozen", stays visually distinct from every PIECE_COLORS and CYCLE_PALETTE entry (all of which are saturated hues), unlike the previous yellow-400 which was a near-miss against CYCLE_PALETTE's yellow-500
 
 function isCycleMember(pieceId: PieceId, world: World): boolean {
   const piece = world.pieces[pieceId]

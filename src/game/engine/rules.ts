@@ -98,7 +98,7 @@ export function tryMovePiece(
   // it is relocated into the Void instead (see sendToVoid), locked so nothing
   // can enter or merge into it again. If pieceId is PLAYER_ID, the player simply
   // ends up standing in the Void — this is no longer a loss (there is no loss
-  // state anymore; see checkLose's removal). If it's any other piece,
+  // state anymore — checkLose is gone). If it's any other piece,
   // resolveBlocked's existing "pushed succeeded" path (moveTo(pushed, pieceId,
   // target.location)) already treats a non-null return as a completed push, so
   // the pusher still ends up at its own target cell while the pushed piece ends

@@ -155,14 +155,14 @@ describe('renderBoard', () => {
     )
     const ctx = mockContext()
     let strokeCalls = 0
-    let sawGoldStroke = false
+    let sawPaleSlateStroke = false
     ctx.strokeRect = () => {
       strokeCalls++
-      if (ctx.strokeStyle === '#facc15') sawGoldStroke = true
+      if (ctx.strokeStyle === '#e2e8f0') sawPaleSlateStroke = true
     }
     renderBoard(ctx, root, world, 32)
     expect(strokeCalls).toBe(1)
-    expect(sawGoldStroke).toBe(true)
+    expect(sawPaleSlateStroke).toBe(true)
   })
 
   it('does not draw a ring around a non-locked piece of the same kind', () => {
@@ -217,5 +217,19 @@ describe('renderBoard', () => {
     renderBoard(ctx, root, world, 32)
     expect(saveCalls).toBe(1)
     expect(restoreCalls).toBe(1) // one save/restore pair for the one locked piece, not leaked into normal1's draw
+  })
+
+  it('LOCKED_RING_COLOR does not collide with any known piece or cycle color', () => {
+    // Pinned literal comparison, not an import — PIECE_COLORS/CYCLE_PALETTE aren't
+    // exported. Catches an exact collision if either palette or the ring color
+    // changes later without updating this test. (Does not catch near-miss
+    // perceptual similarity, e.g. the yellow-400/yellow-500 pair this replaces —
+    // that required a human/reviewer judgment call, not an automatable check.)
+    const knownPieceAndCycleColors = [
+      '#f59e0b', '#38bdf8', '#f472b6', // PIECE_COLORS
+      '#ef4444', '#eab308', '#a855f7', '#14b8a6', '#f97316', // CYCLE_PALETTE
+    ]
+    const LOCKED_RING_COLOR = '#e2e8f0'
+    expect(knownPieceAndCycleColors).not.toContain(LOCKED_RING_COLOR)
   })
 })
