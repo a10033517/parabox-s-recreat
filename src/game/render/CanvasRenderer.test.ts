@@ -4,7 +4,15 @@ import { makeFloorBoard, makeWorld, setWall, setRequirement } from '../engine/te
 import { PLAYER_ID } from '../engine/types'
 
 function mockContext() {
-  return { fillRect: () => {}, fillStyle: '' } as unknown as CanvasRenderingContext2D
+  return {
+    fillRect: () => {},
+    fillStyle: '',
+    strokeRect: () => {},
+    strokeStyle: '',
+    lineWidth: 0,
+    save: () => {},
+    restore: () => {},
+  } as unknown as CanvasRenderingContext2D
 }
 
 describe('renderBoard', () => {
@@ -136,5 +144,78 @@ describe('renderBoard', () => {
     // 9 cell draws (3x3), then loopBox, then obstacleContainer
     expect(styles[10]).toBe('#38bdf8') // obstacleContainer: plain container color
     expect(styles[9]).not.toBe('#38bdf8') // loopBox: cycle color
+  })
+
+  it('draws a gold ring around a locked piece', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld(
+      [root],
+      [{ id: 'box1', kind: 'normal', locked: true }],
+      { box1: { board: 'root', x: 0, y: 0 } },
+    )
+    const ctx = mockContext()
+    let strokeCalls = 0
+    let sawGoldStroke = false
+    ctx.strokeRect = () => {
+      strokeCalls++
+      if (ctx.strokeStyle === '#facc15') sawGoldStroke = true
+    }
+    renderBoard(ctx, root, world, 32)
+    expect(strokeCalls).toBe(1)
+    expect(sawGoldStroke).toBe(true)
+  })
+
+  it('does not draw a ring around a non-locked piece of the same kind', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld(
+      [root],
+      [{ id: 'box1', kind: 'normal' }],
+      { box1: { board: 'root', x: 0, y: 0 } },
+    )
+    const ctx = mockContext()
+    let strokeCalls = 0
+    ctx.strokeRect = () => { strokeCalls++ }
+    renderBoard(ctx, root, world, 32)
+    expect(strokeCalls).toBe(0)
+  })
+
+  it('draws both the cycle fill color and the locked ring for a piece that is both', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld(
+      [root],
+      [{ id: 'loopBox', kind: 'container', boardRef: 'root', locked: true }],
+      { loopBox: { board: 'root', x: 0, y: 0 } },
+    )
+    const ctx = mockContext()
+    let fillStyleAtPieceDraw = ''
+    let strokeCalls = 0
+    ctx.fillRect = () => { fillStyleAtPieceDraw = ctx.fillStyle as string }
+    ctx.strokeRect = () => { strokeCalls++ }
+    renderBoard(ctx, root, world, 32)
+    expect(fillStyleAtPieceDraw).not.toBe('#38bdf8') // still the cycle color, not the plain container color
+    expect(strokeCalls).toBe(1) // still gets the ring
+  })
+
+  it('restores context state after drawing a locked ring, so a later piece is not affected', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld(
+      [root, makeFloorBoard('inside', 1)],
+      [
+        { id: 'locked1', kind: 'normal', locked: true },
+        { id: 'normal1', kind: 'normal' },
+      ],
+      {
+        locked1: { board: 'root', x: 0, y: 0 },
+        normal1: { board: 'root', x: 1, y: 0 },
+      },
+    )
+    const ctx = mockContext()
+    let saveCalls = 0
+    let restoreCalls = 0
+    ctx.save = () => { saveCalls++ }
+    ctx.restore = () => { restoreCalls++ }
+    renderBoard(ctx, root, world, 32)
+    expect(saveCalls).toBe(1)
+    expect(restoreCalls).toBe(1) // one save/restore pair for the one locked piece, not leaked into normal1's draw
   })
 })

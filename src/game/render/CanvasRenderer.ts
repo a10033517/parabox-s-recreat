@@ -23,6 +23,7 @@ const PIECE_COLORS: Record<PieceKind, string> = {
 // bigger than the palette, or on a hash collision, two members can share a
 // color. Every level this codebase ships has at most two cycle members.
 const CYCLE_PALETTE = ['#ef4444', '#eab308', '#a855f7', '#14b8a6', '#f97316']
+const LOCKED_RING_COLOR = '#facc15' // gold/yellow, distinct from any PIECE_COLORS or CYCLE_PALETTE entry
 
 function isCycleMember(pieceId: PieceId, world: World): boolean {
   const piece = world.pieces[pieceId]
@@ -72,5 +73,18 @@ export function renderBoard(
     const piece = world.pieces[pieceId]
     ctx.fillStyle = isCycleMember(pieceId, world) ? cycleColorFor(pieceId) : PIECE_COLORS[piece.kind]
     ctx.fillRect(location.x * cellSize, location.y * cellSize, cellSize, cellSize)
+    if (piece.locked) {
+      ctx.save()
+      ctx.strokeStyle = LOCKED_RING_COLOR
+      ctx.lineWidth = Math.max(2, cellSize / 8)
+      const inset = ctx.lineWidth / 2
+      ctx.strokeRect(
+        location.x * cellSize + inset,
+        location.y * cellSize + inset,
+        cellSize - inset * 2,
+        cellSize - inset * 2,
+      )
+      ctx.restore()
+    }
   }
 }
