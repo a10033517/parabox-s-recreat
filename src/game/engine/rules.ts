@@ -10,6 +10,20 @@ function mirrorHorizontal(dir: Direction): Direction {
   return dir
 }
 
+// The four directions' worth of "which cell of a same-size linked board does exiting
+// this cell land on" — opposite edge, matching offset, exactly like exiting any board
+// already lands you on the opposite edge of wherever the climb continues to; this is
+// the same idea applied directly between two linked containers' interiors instead of
+// via the normal owner-climb.
+function linkedEntryCell(size: number, x: number, y: number, dir: Direction): { x: number; y: number } {
+  switch (dir) {
+    case 'right': return { x: 0, y }
+    case 'left':  return { x: size - 1, y }
+    case 'down':  return { x, y: 0 }
+    case 'up':    return { x, y: size - 1 }
+  }
+}
+
 export type MoveTarget =
   | { kind: 'location'; location: Location; relativeCoord: Fraction }
   | { kind: 'infinite'; board: BoardId; ownerId: PieceId }
@@ -46,6 +60,15 @@ export function computeTarget(
   const containerId = findContainerFor(world, loc.board)
   if (containerId === undefined) return null
   const container = world.pieces[containerId]
+
+  if (container.linkedTo !== undefined) {
+    const linked = world.pieces[container.linkedTo]
+    const linkedBoard = linked?.boardRef !== undefined ? world.boards[linked.boardRef] : undefined
+    if (linkedBoard === undefined) return null // malformed link — fail cleanly, don't fall through
+    const cell = linkedEntryCell(board.size, loc.x, loc.y, dir)
+    if (!inBounds(linkedBoard, cell.x, cell.y)) return null // e.g. a size mismatch the author didn't intend
+    return { kind: 'location', location: { board: linked.boardRef as BoardId, x: cell.x, y: cell.y }, relativeCoord }
+  }
 
   const climbDir = container.fliph ? mirrorHorizontal(dir) : dir
   const offset = climbDir === 'up' || climbDir === 'down' ? loc.x : loc.y

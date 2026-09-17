@@ -1101,3 +1101,119 @@ describe('fliph — exit direction is horizontally mirrored', () => {
     expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 2, y: 1 }, relativeCoord: expect.anything() })
   })
 })
+
+describe('linkedTo — exiting a linked container lands at the mirrored-offset cell in the linked container\'s interior', () => {
+  it('reproduces the confirmed example: exiting (3,1) of a 4x4 linked interior pushing right lands at (0,1) of the linked interior', () => {
+    const c1Interior = makeFloorBoard('c1Interior', 4)
+    const c2Interior = makeFloorBoard('c2Interior', 4)
+    const world = makeWorld(
+      [c1Interior, c2Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior' },
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 5, y: 0 } },
+    )
+    const result = computeTarget(world, { board: 'c1Interior', x: 3, y: 1 }, 'right', HALF)
+    expect(result?.kind).toBe('location')
+    expect(result && result.kind === 'location' ? result.location : null).toEqual({ board: 'c2Interior', x: 0, y: 1 })
+  })
+
+  it('all four directions map to the opposite edge at the matching offset', () => {
+    const c1Interior = makeFloorBoard('c1Interior', 4)
+    const c2Interior = makeFloorBoard('c2Interior', 4)
+    const world = makeWorld(
+      [c1Interior, c2Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior' },
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 5, y: 0 } },
+    )
+    const left = computeTarget(world, { board: 'c1Interior', x: 0, y: 2 }, 'left', HALF)
+    const up = computeTarget(world, { board: 'c1Interior', x: 2, y: 0 }, 'up', HALF)
+    const down = computeTarget(world, { board: 'c1Interior', x: 1, y: 3 }, 'down', HALF)
+    expect(left?.kind === 'location' ? left.location : null).toEqual({ board: 'c2Interior', x: 3, y: 2 })
+    expect(up?.kind === 'location' ? up.location : null).toEqual({ board: 'c2Interior', x: 2, y: 3 })
+    expect(down?.kind === 'location' ? down.location : null).toEqual({ board: 'c2Interior', x: 1, y: 0 })
+  })
+
+  it('a one-directional link only affects exiting the linked side — C2 (unlinked) still climbs to its own owner normally', () => {
+    const root = makeFloorBoard('root', 6)
+    const c1Interior = makeFloorBoard('c1Interior', 4)
+    const c2Interior = makeFloorBoard('c2Interior', 4)
+    const world = makeWorld(
+      [root, c1Interior, c2Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior' }, // no linkedTo back
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 2, y: 2 } },
+    )
+    const result = computeTarget(world, { board: 'c2Interior', x: 3, y: 1 }, 'right', HALF)
+    // Normal climb-to-owner: exits toward wherever C2 itself is (root), NOT toward C1.
+    expect(result?.kind).toBe('location')
+    expect(result && result.kind === 'location' ? result.location.board : null).toBe('root')
+  })
+
+  it('a malformed link (target has no boardRef) fails the move rather than falling back to normal climbing', () => {
+    const c1Interior = makeFloorBoard('c1Interior', 4)
+    const world = makeWorld(
+      [c1Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'ghost' },
+        { id: 'ghost', kind: 'normal' }, // exists, but not a container — no boardRef
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, ghost: { board: 'root', x: 9, y: 9 } },
+    )
+    const result = computeTarget(world, { board: 'c1Interior', x: 3, y: 1 }, 'right', HALF)
+    expect(result).toBeNull()
+  })
+
+  it('a size-mismatched link that maps out of bounds fails the move', () => {
+    const c1Interior = makeFloorBoard('c1Interior', 4)
+    const c2InteriorSmaller = makeFloorBoard('c2Interior', 2) // mismatched size
+    const world = makeWorld(
+      [c1Interior, c2InteriorSmaller],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior' },
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 5, y: 0 } },
+    )
+    // Exiting at y=3 (valid in a size-4 board) maps to y=3 in the linked board too
+    // (linkedEntryCell preserves the offset unchanged) — out of bounds for a size-2 board.
+    const result = computeTarget(world, { board: 'c1Interior', x: 3, y: 3 }, 'right', HALF)
+    expect(result).toBeNull()
+  })
+
+  it('a link never triggers infinite-exit detection, even for a shape that would otherwise be a textbook cycle', () => {
+    // C1 and C2 linked to each other, closing what WOULD be an infinite regress if
+    // resolved via the normal climb — but a link resolution is terminal and never
+    // touches `visited`, so this must resolve as an ordinary location, not infinite.
+    const c1Interior = makeFloorBoard('c1Interior', 2)
+    const c2Interior = makeFloorBoard('c2Interior', 2)
+    const world = makeWorld(
+      [c1Interior, c2Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior', linkedTo: 'C1' },
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 5, y: 0 } },
+    )
+    const result = computeTarget(world, { board: 'c1Interior', x: 1, y: 0 }, 'right', HALF)
+    expect(result?.kind).toBe('location')
+  })
+
+  it('control: a container with no linkedTo climbs to its own owner exactly as before', () => {
+    const root = makeFloorBoard('root', 3)
+    const inside = makeFloorBoard('inside', 3)
+    const world = makeWorld(
+      [root, inside],
+      [{ id: 'C', kind: 'container', boardRef: 'inside' }],
+      { C: { board: 'root', x: 1, y: 1 } },
+    )
+    const result = computeTarget(world, { board: 'inside', x: 2, y: 1 }, 'right', HALF)
+    expect(result?.kind === 'location' ? result.location : null).toEqual({ board: 'root', x: 2, y: 1 })
+  })
+})
