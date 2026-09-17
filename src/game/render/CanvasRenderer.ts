@@ -24,6 +24,7 @@ const PIECE_COLORS: Record<PieceKind, string> = {
 // color. Every level this codebase ships has at most two cycle members.
 const CYCLE_PALETTE = ['#ef4444', '#eab308', '#a855f7', '#14b8a6', '#f97316']
 const LOCKED_RING_COLOR = '#e2e8f0' // pale slate/white — reads as "frozen", stays visually distinct from every PIECE_COLORS and CYCLE_PALETTE entry (all of which are saturated hues), unlike the previous yellow-400 which was a near-miss against CYCLE_PALETTE's yellow-500
+const INFINITY_MARKER_COLOR = '#0f172a' // dark, readable against LOCKED_RING_COLOR's pale fill
 
 function isCycleMember(pieceId: PieceId, world: World): boolean {
   const piece = world.pieces[pieceId]
@@ -71,7 +72,12 @@ export function renderBoard(
   for (const [pieceId, location] of Object.entries(world.locations)) {
     if (location.board !== board.id) continue
     const piece = world.pieces[pieceId]
-    ctx.fillStyle = isCycleMember(pieceId, world) ? cycleColorFor(pieceId) : PIECE_COLORS[piece.kind]
+    // An infinite destination (piece.infiniteFor set) has no cycle membership
+    // or kind of its own worth rendering — it's colored as whichever real
+    // piece it represents.
+    const colorSourceId = piece.infiniteFor ?? pieceId
+    const colorSource = piece.infiniteFor !== undefined ? world.pieces[piece.infiniteFor] : piece
+    ctx.fillStyle = isCycleMember(colorSourceId, world) ? cycleColorFor(colorSourceId) : PIECE_COLORS[colorSource.kind]
     ctx.fillRect(location.x * cellSize, location.y * cellSize, cellSize, cellSize)
     // A piece "is locked" exactly when it's standing in the Void (see
     // isInVoid in types.ts) — every piece this loop reaches has already been
@@ -88,6 +94,13 @@ export function renderBoard(
         cellSize - inset * 2,
         cellSize - inset * 2,
       )
+      if (piece.infiniteFor !== undefined) {
+        ctx.fillStyle = INFINITY_MARKER_COLOR
+        ctx.font = `${Math.floor(cellSize / 2)}px sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('∞', location.x * cellSize + cellSize / 2, location.y * cellSize + cellSize / 2)
+      }
       ctx.restore()
     }
   }

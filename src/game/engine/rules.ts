@@ -6,7 +6,7 @@ import {
 
 export type MoveTarget =
   | { kind: 'location'; location: Location; relativeCoord: Fraction }
-  | { kind: 'infinite' }
+  | { kind: 'infinite'; board: BoardId; ownerId: PieceId }
   | null // blocked: no owner to climb through (e.g. the true root boundary)
 
 export function computeTarget(
@@ -27,7 +27,14 @@ export function computeTarget(
     return { kind: 'location', location: { board: loc.board, x, y }, relativeCoord }
   }
 
-  if (visited.has(loc.board)) return { kind: 'infinite' }
+  if (visited.has(loc.board)) {
+    // loc.board can only be in `visited` because an earlier step in this same
+    // climb already called findContainerFor(world, loc.board) successfully —
+    // that's the only way the climb reaches a board at all — so this can
+    // never be undefined here.
+    const ownerId = findContainerFor(world, loc.board) as PieceId
+    return { kind: 'infinite', board: loc.board, ownerId }
+  }
   visited.add(loc.board)
 
   const containerId = findContainerFor(world, loc.board)
@@ -95,7 +102,9 @@ export function tryMovePiece(
   const target = computeTarget(world, loc, dir, HALF)
   if (target === null) return null
   // The transition can never resolve to a real location — the piece attempting
-  // it is relocated into the Void instead (see sendToVoid); being physically in
+  // it is relocated into the Void instead, adjacent to the "infinite
+  // destination" representing whichever container owns the board the cycle
+  // actually broke on (target.ownerId; see sendToVoid). Being physically in
   // the Void is itself what makes it "locked" (see isInVoid), so nothing more
   // needs to happen here. If pieceId is PLAYER_ID, the player simply
   // ends up standing in the Void — this is no longer a loss (there is no loss
@@ -104,7 +113,7 @@ export function tryMovePiece(
   // target.location)) already treats a non-null return as a completed push, so
   // the pusher still ends up at its own target cell while the pushed piece ends
   // up in the Void — no change needed there.
-  if (target.kind === 'infinite') return sendToVoid(world, pieceId)
+  if (target.kind === 'infinite') return sendToVoid(world, pieceId, target.ownerId)
 
   const targetBoard = world.boards[target.location.board]
   if (targetBoard.cells[target.location.y][target.location.x].type === 'wall') return null

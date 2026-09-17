@@ -12,6 +12,10 @@ function mockContext() {
     lineWidth: 0,
     save: () => {},
     restore: () => {},
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    fillText: () => {},
   } as unknown as CanvasRenderingContext2D
 }
 
@@ -254,5 +258,43 @@ describe('renderBoard', () => {
     ]
     const LOCKED_RING_COLOR = '#e2e8f0'
     expect(knownPieceAndCycleColors).not.toContain(LOCKED_RING_COLOR)
+  })
+
+  it('an infinite destination renders with the color of the real piece it represents, plus the infinity marker', () => {
+    const voidBoard = makeFloorBoard('void', 5)
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld(
+      [voidBoard, root],
+      [
+        { id: 'realOwner', kind: 'container', boardRef: 'root' }, // self-loop -> a cycle member
+        { id: 'void-infinite:realOwner', kind: 'normal', infiniteFor: 'realOwner' },
+      ],
+      {
+        realOwner: { board: 'root', x: 0, y: 0 },
+        'void-infinite:realOwner': { board: 'void', x: 2, y: 2 },
+      },
+    )
+    const ctx = mockContext()
+    let destinationFillStyle = ''
+    let markerDrawn = false
+    ctx.fillRect = () => { destinationFillStyle = ctx.fillStyle as string }
+    ctx.fillText = (text) => { if (text === '∞') markerDrawn = true }
+    renderBoard(ctx, voidBoard, world, 32)
+    expect(destinationFillStyle).not.toBe('#38bdf8') // realOwner's cycle color, not the plain container color
+    expect(markerDrawn).toBe(true)
+  })
+
+  it('an ordinary locked Void piece (no infiniteFor) does not render the infinity marker', () => {
+    const voidBoard = makeFloorBoard('void', 5)
+    const world = makeWorld(
+      [voidBoard],
+      [{ id: 'box1', kind: 'normal' }],
+      { box1: { board: 'void', x: 2, y: 2 } },
+    )
+    const ctx = mockContext()
+    let markerDrawn = false
+    ctx.fillText = (text) => { if (text === '∞') markerDrawn = true }
+    renderBoard(ctx, voidBoard, world, 32)
+    expect(markerDrawn).toBe(false)
   })
 })

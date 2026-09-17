@@ -73,7 +73,39 @@ describe('computeTarget', () => {
       { loopBox: { board: 'root', x: 0, y: 1 } }, // flush against the left edge
     )
     const result = computeTarget(world, { board: 'root', x: 0, y: 0 }, 'left', HALF)
-    expect(result).toEqual({ kind: 'infinite' })
+    expect(result).toEqual({ kind: 'infinite', board: 'root', ownerId: 'loopBox' })
+  })
+
+  it('infinite result names the board that actually repeats, even when it is not the moved piece\'s own starting board', () => {
+    // branchBoard hangs off root (owned by branchPiece, sitting flush on root).
+    // root<->redInterior is a genuine 2-node cycle (redPiece/yellowPiece), both
+    // also flush. A piece starting on branchBoard climbs branchBoard -> root ->
+    // redInterior -> root again — the repeat is on root (owned by yellowPiece),
+    // three hops from where the piece actually started, not on branchBoard itself.
+    const root = makeFloorBoard('root', 4)
+    const redInterior = makeFloorBoard('redInterior', 4)
+    const branchBoard = makeFloorBoard('branchBoard', 2)
+    const world = makeWorld(
+      [root, redInterior, branchBoard],
+      [
+        { id: 'branchPiece', kind: 'container', boardRef: 'branchBoard' },
+        { id: 'redPiece', kind: 'container', boardRef: 'redInterior' },
+        { id: 'yellowPiece', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        branchPiece: { board: 'root', x: 3, y: 0 }, // flush right on root
+        redPiece: { board: 'root', x: 3, y: 1 },    // flush right on root
+        yellowPiece: { board: 'redInterior', x: 3, y: 1 }, // flush right on redInterior
+      },
+    )
+    const result = computeTarget(world, { board: 'branchBoard', x: 1, y: 0 }, 'right', HALF)
+    expect(result).toEqual({ kind: 'infinite', board: 'root', ownerId: 'yellowPiece' })
+  })
+
+  it('a non-cyclic boundary (no owner to climb through) is blocked, not infinite', () => {
+    const world = makeWorld([makeFloorBoard('root', 2)], [], {})
+    const result = computeTarget(world, { board: 'root', x: 0, y: 0 }, 'left', HALF)
+    expect(result).toBeNull()
   })
 
   it('resolves as a normal wrap when the recursive owner position lands in bounds', () => {
@@ -538,7 +570,9 @@ describe('tryMovePiece / applyMove — infinite regress', () => {
     )
     const next = applyMove(world, 'left')
     expect(next).not.toBeNull()
-    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'void', x: 2, y: 2 })
+    expect(next?.pieces['void-infinite:loopBox']).toEqual({ id: 'void-infinite:loopBox', kind: 'normal', infiniteFor: 'loopBox' })
+    expect(next?.locations['void-infinite:loopBox']).toEqual({ board: 'void', x: 2, y: 2 })
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'void', x: 2, y: 1 }) // adjacent to the destination
     expect(next?.pieces[PLAYER_ID]).toEqual({ id: PLAYER_ID, kind: 'player' })
   })
 
@@ -576,7 +610,9 @@ describe('tryMovePiece / applyMove — infinite regress', () => {
     const next = applyMove(world, 'right')
     expect(next).not.toBeNull()
     expect(next?.locations[PLAYER_ID]).toEqual({ board: 'root', x: 2, y: 1 })
-    expect(next?.locations.loopBox).toEqual({ board: 'void', x: 2, y: 2 })
+    expect(next?.pieces['void-infinite:loopBox']).toEqual({ id: 'void-infinite:loopBox', kind: 'normal', infiniteFor: 'loopBox' })
+    expect(next?.locations['void-infinite:loopBox']).toEqual({ board: 'void', x: 2, y: 2 })
+    expect(next?.locations.loopBox).toEqual({ board: 'void', x: 2, y: 1 }) // adjacent to its own destination
     expect(next?.pieces.loopBox).toEqual({ id: 'loopBox', kind: 'container', boardRef: 'root' })
   })
 
@@ -604,7 +640,9 @@ describe('tryMovePiece / applyMove — infinite regress', () => {
     if (target === null || target.kind !== 'location') throw new Error('test setup: pusher must have a valid target')
     const result = resolveBlocked(world, 'pusher', PLAYER_ID, target, 'left', new Map(), new Set())
     expect(result?.locations.pusher).toEqual({ board: 'root', x: 0, y: 0 })
-    expect(result?.locations[PLAYER_ID]).toEqual({ board: 'void', x: 2, y: 2 })
+    expect(result?.pieces['void-infinite:loopBox']).toEqual({ id: 'void-infinite:loopBox', kind: 'normal', infiniteFor: 'loopBox' })
+    expect(result?.locations['void-infinite:loopBox']).toEqual({ board: 'void', x: 2, y: 2 })
+    expect(result?.locations[PLAYER_ID]).toEqual({ board: 'void', x: 2, y: 1 }) // adjacent to the destination
     expect(result?.pieces[PLAYER_ID]).toEqual({ id: PLAYER_ID, kind: 'player' })
     expect(result?.locations.loopBox).toEqual({ board: 'root', x: 0, y: 1 })
   })

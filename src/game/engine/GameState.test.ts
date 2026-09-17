@@ -87,7 +87,7 @@ describe('GameState', () => {
     const state = new GameState(world)
     const ok = state.move('left')
     expect(ok).toBe(true)
-    expect(state.current.locations[PLAYER_ID]).toEqual({ board: 'void', x: 2, y: 2 })
+    expect(state.current.locations[PLAYER_ID]).toEqual({ board: 'void', x: 2, y: 1 }) // adjacent to the void-infinite:loopBox destination
     expect(state.undo()).toBe(true)
     expect(state.current.locations[PLAYER_ID]).toEqual({ board: 'root', x: 0, y: 1 })
     expect(state.current.boards.void).toBeUndefined() // the pre-move world never had a Void board

@@ -10,6 +10,7 @@ beforeEach(() => {
     strokeRect: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),
+    fillText: vi.fn(),
   }) as unknown as typeof HTMLCanvasElement.prototype.getContext
 })
 
