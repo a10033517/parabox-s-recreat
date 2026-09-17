@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { serializeLevel, parseLevel } from './levelSchema'
 import { makeFloorBoard, makeWorld, setRequirement } from './testFixtures'
-import { PLAYER_ID, World } from './types'
+import { PLAYER_ID, VOID_BOARD_ID, World } from './types'
 
 function sampleWorld(): World {
   const root = makeFloorBoard('root', 2)
@@ -108,6 +108,15 @@ describe('parseLevel structural validation', () => {
     const data = serializeLevel(sampleWorld()) as { boards: Record<string, { cells: { requirement?: string }[][] }> }
     data.boards.root.cells[0][0].requirement = 'nonsense'
     expect(() => parseLevel(data)).toThrow(/requirement/i)
+  })
+
+  it('rejects an authored board using the reserved void board id', () => {
+    const data = serializeLevel(makeWorld(
+      [makeFloorBoard('void', 2)],
+      [{ id: PLAYER_ID, kind: 'player' }],
+      { [PLAYER_ID]: { board: 'void', x: 0, y: 0 } },
+    ))
+    expect(() => parseLevel(data)).toThrow(/reserved/i)
   })
 
   it('rejects a requirement placed on a wall cell', () => {

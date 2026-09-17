@@ -1,4 +1,4 @@
-import { World, Board, Piece, Location, PLAYER_ID, inBounds } from './types'
+import { World, Board, Piece, Location, PLAYER_ID, VOID_BOARD_ID, inBounds } from './types'
 
 const VALID_PIECE_KINDS = new Set(['player', 'normal', 'container'])
 const VALID_CELL_TYPES = new Set(['floor', 'wall'])
@@ -29,6 +29,9 @@ export function parseLevel(data: unknown): World {
   const locations = raw.locations as Record<string, Location>
 
   for (const [boardId, board] of Object.entries(boards)) {
+    if (boardId === VOID_BOARD_ID) {
+      throw new Error(`Board id "${VOID_BOARD_ID}" is reserved for the runtime Void and cannot be authored`)
+    }
     if (board.id !== boardId) {
       throw new Error(`Board "${boardId}" has a mismatched id "${board.id}"`)
     }
