@@ -91,6 +91,7 @@ export function tryMovePiece(
   }
 
   const loc = world.locations[pieceId]
+  if (loc === undefined) return null // the piece is no longer in the world
   const target = computeTarget(world, loc, dir, HALF)
   if (target === null) return null
   // The transition can never resolve to a real location — the piece

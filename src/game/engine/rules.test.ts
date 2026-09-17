@@ -92,6 +92,44 @@ describe('computeTarget', () => {
   })
 })
 
+describe('computeTarget — two-owner board (external owner + self-referencing owner)', () => {
+  // 'elsewhere' is owned both by extBox (an external container sitting in
+  // root) and by loopBox (a self-referencing container standing inside
+  // 'elsewhere' itself, flush against its top-left corner). Exiting
+  // 'elsewhere' upward should always climb out through extBox into root —
+  // never resolve to infinite via loopBox's self-reference — regardless of
+  // which piece appears first in the pieces map.
+  function buildWorld(order: 'loopFirst' | 'extFirst') {
+    const root = makeFloorBoard('root', 3)
+    const elsewhere = makeFloorBoard('elsewhere', 3)
+    const extBox: { id: string; kind: 'container'; boardRef: string } =
+      { id: 'extBox', kind: 'container', boardRef: 'elsewhere' }
+    const loopBox: { id: string; kind: 'container'; boardRef: string } =
+      { id: 'loopBox', kind: 'container', boardRef: 'elsewhere' }
+    const pieces = order === 'loopFirst' ? [loopBox, extBox] : [extBox, loopBox]
+    return makeWorld(
+      [root, elsewhere],
+      pieces,
+      {
+        extBox: { board: 'root', x: 1, y: 1 }, // center of root — an in-bounds wrap target
+        loopBox: { board: 'elsewhere', x: 0, y: 0 }, // flush top-left corner of its own board
+      },
+    )
+  }
+
+  it('resolves normally through the external owner when the self-referencing piece is declared first', () => {
+    const world = buildWorld('loopFirst')
+    const result = computeTarget(world, { board: 'elsewhere', x: 1, y: 0 }, 'up', HALF)
+    expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 1, y: 0 }, relativeCoord: HALF })
+  })
+
+  it('resolves normally through the external owner when the self-referencing piece is declared second', () => {
+    const world = buildWorld('extFirst')
+    const result = computeTarget(world, { board: 'elsewhere', x: 1, y: 0 }, 'up', HALF)
+    expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 1, y: 0 }, relativeCoord: HALF })
+  })
+})
+
 describe('getEntryCell', () => {
   it('lands on the center cell of a 3x3 board for all four directions when relativeCoord is HALF', () => {
     const board = makeFloorBoard('inside', 3)
@@ -542,7 +580,7 @@ describe('tryMovePiece / applyMove — infinite regress', () => {
     expect(next?.pieces[PLAYER_ID]).toBeUndefined()
   })
 
-  it('walking through a self-loop box via a non-flush edge wraps to a different cell of the same board, without crashing', () => {
+  it('exiting a board via a non-flush self-loop owner wraps to a different cell of the same board, without crashing', () => {
     const root = makeFloorBoard('root', 3)
     const world = makeWorld(
       [root],
@@ -607,6 +645,51 @@ describe('tryMovePiece / applyMove — infinite regress', () => {
     expect(result?.locations[PLAYER_ID]).toBeUndefined()
     expect(result?.pieces[PLAYER_ID]).toBeUndefined()
     expect(result?.locations.loopBox).toEqual({ board: 'root', x: 0, y: 1 })
+  })
+})
+
+describe('tryMovePiece — piece already removed from the world', () => {
+  it('applyMove returns null instead of throwing when the player has already been removed', () => {
+    const world = makeWorld(
+      [makeFloorBoard('root', 2)],
+      [{ id: PLAYER_ID, kind: 'player' }],
+      { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } },
+    )
+    const lost = removePiece(world, PLAYER_ID)
+    expect(() => applyMove(lost, 'up')).not.toThrow()
+    expect(applyMove(lost, 'up')).toBeNull()
+    expect(applyMove(lost, 'down')).toBeNull()
+    expect(applyMove(lost, 'left')).toBeNull()
+    expect(applyMove(lost, 'right')).toBeNull()
+  })
+})
+
+describe('applyMove — entering a self-loop box directly', () => {
+  it('enters a self-loop box (forced by a wall behind it) landing on a cell of the same board it owns', () => {
+    // A wall directly behind loopBox in the push direction means pushing it
+    // fails, forcing tryEnter to be attempted instead of tryMovePiece's
+    // push path — this is the genuinely-uncovered path (unlike the
+    // "non-flush edge wraps" test above, which never calls tryEnter at
+    // all). Board size 4, and the player NOT flush against the left edge,
+    // so the computed entry cell (0,1) is distinguishable from the
+        // player's own starting cell (1,1) — proving an actual move happened.
+    const root = makeFloorBoard('root', 4)
+    setWall(root, 3, 1) // directly behind loopBox in the push direction
+    const world = makeWorld(
+      [root],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'loopBox', kind: 'container', boardRef: 'root' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 1, y: 1 },
+        loopBox: { board: 'root', x: 2, y: 1 },
+      },
+    )
+    const next = applyMove(world, 'right')
+    expect(next).not.toBeNull()
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'root', x: 0, y: 1 })
+    expect(next?.locations.loopBox).toEqual({ board: 'root', x: 2, y: 1 }) // unmoved — the push failed
   })
 })
 
