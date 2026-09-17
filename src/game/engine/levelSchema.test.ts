@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { serializeLevel, parseLevel } from './levelSchema'
 import { makeFloorBoard, makeWorld, setRequirement } from './testFixtures'
-import { PLAYER_ID, VOID_BOARD_ID, World } from './types'
+import { PLAYER_ID, World } from './types'
 
 function sampleWorld(): World {
   const root = makeFloorBoard('root', 2)
