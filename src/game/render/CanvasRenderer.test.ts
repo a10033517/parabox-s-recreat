@@ -147,11 +147,14 @@ describe('renderBoard', () => {
   })
 
   it('draws a gold ring around a locked piece', () => {
-    const root = makeFloorBoard('root', 2)
+    // "Locked" is derived from physically standing on the Void board (see
+    // isInVoid in types.ts) — so this fixture places the piece on 'void'
+    // itself and renders that board, rather than tagging the piece.
+    const voidBoard = makeFloorBoard('void', 5)
     const world = makeWorld(
-      [root],
-      [{ id: 'box1', kind: 'normal', locked: true }],
-      { box1: { board: 'root', x: 0, y: 0 } },
+      [voidBoard],
+      [{ id: 'box1', kind: 'normal' }],
+      { box1: { board: 'void', x: 2, y: 2 } },
     )
     const ctx = mockContext()
     let strokeCalls = 0
@@ -160,7 +163,7 @@ describe('renderBoard', () => {
       strokeCalls++
       if (ctx.strokeStyle === '#e2e8f0') sawPaleSlateStroke = true
     }
-    renderBoard(ctx, root, world, 32)
+    renderBoard(ctx, voidBoard, world, 32)
     expect(strokeCalls).toBe(1)
     expect(sawPaleSlateStroke).toBe(true)
   })
@@ -179,44 +182,64 @@ describe('renderBoard', () => {
     expect(strokeCalls).toBe(0)
   })
 
-  it('draws both the cycle fill color and the locked ring for a piece that is both', () => {
-    const root = makeFloorBoard('root', 2)
+  it('a voided former cycle member gets the plain container color plus the ring, not the cycle color', () => {
+    // Once a self-loop container is physically relocated into the Void, it's
+    // structurally disconnected from the containment graph: isCycleMember's
+    // walk (boardRef -> owner -> owner's own location -> ...) can no longer
+    // find its way back to 'start', because nothing owns the Void board.
+    // So a voided piece correctly loses its cycle coloring — it keeps only
+    // its plain PIECE_COLORS[kind] fill, plus the lock ring (which is purely
+    // board-based, independent of cycle membership).
+    const voidBoard = makeFloorBoard('void', 5)
     const world = makeWorld(
-      [root],
-      [{ id: 'loopBox', kind: 'container', boardRef: 'root', locked: true }],
-      { loopBox: { board: 'root', x: 0, y: 0 } },
+      [voidBoard],
+      [{ id: 'loopBox', kind: 'container', boardRef: 'root' }],
+      { loopBox: { board: 'void', x: 2, y: 2 } },
     )
     const ctx = mockContext()
     let fillStyleAtPieceDraw = ''
     let strokeCalls = 0
     ctx.fillRect = () => { fillStyleAtPieceDraw = ctx.fillStyle as string }
     ctx.strokeRect = () => { strokeCalls++ }
-    renderBoard(ctx, root, world, 32)
-    expect(fillStyleAtPieceDraw).not.toBe('#38bdf8') // still the cycle color, not the plain container color
+    renderBoard(ctx, voidBoard, world, 32)
+    expect(fillStyleAtPieceDraw).toBe('#38bdf8') // plain container color — no longer a cycle member once voided
     expect(strokeCalls).toBe(1) // still gets the ring
   })
 
-  it('restores context state after drawing a locked ring, so a later piece is not affected', () => {
-    const root = makeFloorBoard('root', 2)
+  it('restores context state after drawing a locked ring, so it does not bleed into the next piece drawn', () => {
+    // Every piece standing on the Void board is locked (see isInVoid), so
+    // there's no such thing as an "unlocked piece on the same board" anymore
+    // to prove non-leakage against. Instead: two DIFFERENT locked pieces,
+    // confirm each gets its own save/restore pair (not fewer than expected,
+    // which would mean state bled/got skipped), and confirm the second
+    // piece's fill color is unaffected by the first piece's ring-drawing.
+    const voidBoard = makeFloorBoard('void', 5)
     const world = makeWorld(
-      [root, makeFloorBoard('inside', 1)],
+      [voidBoard],
       [
-        { id: 'locked1', kind: 'normal', locked: true },
-        { id: 'normal1', kind: 'normal' },
+        { id: 'locked1', kind: 'normal' },
+        { id: 'locked2', kind: 'container', boardRef: 'someInterior' },
       ],
       {
-        locked1: { board: 'root', x: 0, y: 0 },
-        normal1: { board: 'root', x: 1, y: 0 },
+        locked1: { board: 'void', x: 2, y: 2 },
+        locked2: { board: 'void', x: 3, y: 2 },
       },
     )
     const ctx = mockContext()
     let saveCalls = 0
     let restoreCalls = 0
+    const pieceFillStyles: string[] = []
     ctx.save = () => { saveCalls++ }
     ctx.restore = () => { restoreCalls++ }
-    renderBoard(ctx, root, world, 32)
-    expect(saveCalls).toBe(1)
-    expect(restoreCalls).toBe(1) // one save/restore pair for the one locked piece, not leaked into normal1's draw
+    ctx.strokeRect = () => {}
+    ctx.fillRect = () => { pieceFillStyles.push(ctx.fillStyle as string) }
+    renderBoard(ctx, voidBoard, world, 32)
+    expect(saveCalls).toBe(2)
+    expect(restoreCalls).toBe(2) // one save/restore pair per locked piece — neither shared nor skipped
+    // pieceFillStyles also records the 25 floor-cell fills before the two
+    // piece fills — only the last two entries are the pieces themselves.
+    expect(pieceFillStyles.at(-2)).toBe('#f59e0b') // locked1: plain 'normal' color
+    expect(pieceFillStyles.at(-1)).toBe('#38bdf8') // locked2: plain 'container' color, unaffected by locked1's ring
   })
 
   it('LOCKED_RING_COLOR does not collide with any known piece or cycle color', () => {

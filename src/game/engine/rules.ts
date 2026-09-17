@@ -1,7 +1,7 @@
 import { Fraction, addInt, divideByInt, multiplyByInt, isZero, fractionDivMod, makeFraction, HALF } from './fraction'
 import {
   World, Location, Direction, Board, BoardId, Piece, PieceId,
-  inBounds, step, findContainerFor, occupantAt, moveTo, sendToVoid, opposite, PLAYER_ID,
+  inBounds, step, findContainerFor, occupantAt, moveTo, sendToVoid, isInVoid, opposite, PLAYER_ID,
 } from './types'
 
 export type MoveTarget =
@@ -95,8 +95,9 @@ export function tryMovePiece(
   const target = computeTarget(world, loc, dir, HALF)
   if (target === null) return null
   // The transition can never resolve to a real location — the piece attempting
-  // it is relocated into the Void instead (see sendToVoid), locked so nothing
-  // can enter or merge into it again. If pieceId is PLAYER_ID, the player simply
+  // it is relocated into the Void instead (see sendToVoid); being physically in
+  // the Void is itself what makes it "locked" (see isInVoid), so nothing more
+  // needs to happen here. If pieceId is PLAYER_ID, the player simply
   // ends up standing in the Void — this is no longer a loss (there is no loss
   // state anymore — checkLose is gone). If it's any other piece,
   // resolveBlocked's existing "pushed succeeded" path (moveTo(pushed, pieceId,
@@ -162,10 +163,11 @@ export function resolveBlocked(
   const pushed = tryMovePiece(world, occupantId, dir, nextInMotion, new Set())
   if (pushed) return moveTo(pushed, pieceId, target.location)
 
-  // No push was possible. If either side of this interaction is locked, it may
-  // never be entered, eaten, or itself enter/eat the other — skip straight to
-  // failure instead of trying either tryEnter direction below.
-  if (world.pieces[pieceId]?.locked || world.pieces[occupantId]?.locked) return null
+  // No push was possible. If either side of this interaction is in the Void
+  // (see isInVoid), it may never be entered, eaten, or itself enter/eat the
+  // other — skip straight to failure instead of trying either tryEnter
+  // direction below.
+  if (isInVoid(world, pieceId) || isInVoid(world, occupantId)) return null
 
   const entered = tryEnter(
     world, pieceId, occupantId, dir, target.relativeCoord,

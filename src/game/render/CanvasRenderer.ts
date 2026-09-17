@@ -1,4 +1,4 @@
-import { Board, BoardId, PieceId, PieceKind, World, findContainerFor } from '../engine/types'
+import { Board, BoardId, PieceId, PieceKind, World, findContainerFor, VOID_BOARD_ID } from '../engine/types'
 
 const FLOOR_COLOR = '#1e293b'
 const WALL_COLOR = '#0f172a'
@@ -73,7 +73,11 @@ export function renderBoard(
     const piece = world.pieces[pieceId]
     ctx.fillStyle = isCycleMember(pieceId, world) ? cycleColorFor(pieceId) : PIECE_COLORS[piece.kind]
     ctx.fillRect(location.x * cellSize, location.y * cellSize, cellSize, cellSize)
-    if (piece.locked) {
+    // A piece "is locked" exactly when it's standing in the Void (see
+    // isInVoid in types.ts) — every piece this loop reaches has already been
+    // filtered to location.board === board.id, so board.id === VOID_BOARD_ID
+    // here means this particular piece is in the Void too.
+    if (board.id === VOID_BOARD_ID) {
       ctx.save()
       ctx.strokeStyle = LOCKED_RING_COLOR
       ctx.lineWidth = Math.max(2, cellSize / 8)

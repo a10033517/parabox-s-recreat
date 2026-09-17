@@ -539,7 +539,7 @@ describe('tryMovePiece / applyMove — infinite regress', () => {
     const next = applyMove(world, 'left')
     expect(next).not.toBeNull()
     expect(next?.locations[PLAYER_ID]).toEqual({ board: 'void', x: 2, y: 2 })
-    expect(next?.pieces[PLAYER_ID]).toEqual({ id: PLAYER_ID, kind: 'player', locked: true })
+    expect(next?.pieces[PLAYER_ID]).toEqual({ id: PLAYER_ID, kind: 'player' })
   })
 
   it('exiting a board via a non-flush self-loop owner wraps to a different cell of the same board, without crashing', () => {
@@ -577,7 +577,7 @@ describe('tryMovePiece / applyMove — infinite regress', () => {
     expect(next).not.toBeNull()
     expect(next?.locations[PLAYER_ID]).toEqual({ board: 'root', x: 2, y: 1 })
     expect(next?.locations.loopBox).toEqual({ board: 'void', x: 2, y: 2 })
-    expect(next?.pieces.loopBox).toEqual({ id: 'loopBox', kind: 'container', boardRef: 'root', locked: true })
+    expect(next?.pieces.loopBox).toEqual({ id: 'loopBox', kind: 'container', boardRef: 'root' })
   })
 
   it('resolveBlocked sends the player to the Void when pushing it resolves to infinite, treating it the same as any other piece', () => {
@@ -605,7 +605,7 @@ describe('tryMovePiece / applyMove — infinite regress', () => {
     const result = resolveBlocked(world, 'pusher', PLAYER_ID, target, 'left', new Map(), new Set())
     expect(result?.locations.pusher).toEqual({ board: 'root', x: 0, y: 0 })
     expect(result?.locations[PLAYER_ID]).toEqual({ board: 'void', x: 2, y: 2 })
-    expect(result?.pieces[PLAYER_ID]).toEqual({ id: PLAYER_ID, kind: 'player', locked: true })
+    expect(result?.pieces[PLAYER_ID]).toEqual({ id: PLAYER_ID, kind: 'player' })
     expect(result?.locations.loopBox).toEqual({ board: 'root', x: 0, y: 1 })
   })
 })
@@ -640,122 +640,114 @@ describe('applyMove — entering a self-loop box directly', () => {
 })
 
 describe('resolveBlocked — locked pieces push only, never enter or eat, on either side', () => {
+  // "Locked" is now derived from physically standing on the Void board (see
+  // isInVoid in types.ts), not a separately-tracked flag — so these fixtures
+  // place pieces directly on a plain 5x5 'void' board (identical in shape to
+  // the real one, now that it has no wall cells) rather than tagging them
+  // `locked: true`. resolveBlocked is called directly with a hand-built
+  // target rather than derived via computeTarget, since these are low-level
+  // unit tests of the guard itself, not full realistic move simulations.
   it('an unlocked pusher can push a locked occupant when the destination beyond it is free', () => {
-    const root = makeFloorBoard('root', 4)
     const world = makeWorld(
-      [root],
+      [makeFloorBoard('root', 2), makeFloorBoard('void', 5)],
       [
         { id: 'pusher', kind: 'normal' },
-        { id: 'locked1', kind: 'normal', locked: true },
+        { id: 'locked1', kind: 'normal' },
       ],
       {
-        pusher: { board: 'root', x: 0, y: 0 },
-        locked1: { board: 'root', x: 1, y: 0 },
+        pusher: { board: 'root', x: 0, y: 0 }, // not in the Void — the "unlocked" side
+        locked1: { board: 'void', x: 2, y: 2 },
       },
     )
-    const target = computeTarget(world, world.locations.pusher, 'right', HALF)
-    if (target === null || target.kind !== 'location') throw new Error('test setup')
+    const target = { location: { board: 'void', x: 2, y: 2 }, relativeCoord: HALF }
     const result = resolveBlocked(world, 'pusher', 'locked1', target, 'right', new Map(), new Set())
-    expect(result?.locations.pusher).toEqual({ board: 'root', x: 1, y: 0 })
-    expect(result?.locations.locked1).toEqual({ board: 'root', x: 2, y: 0 })
+    expect(result?.locations.pusher).toEqual({ board: 'void', x: 2, y: 2 })
+    expect(result?.locations.locked1).toEqual({ board: 'void', x: 3, y: 2 })
   })
 
   it('an unlocked pusher cannot enter or eat a locked occupant when the push fails', () => {
-    const root = makeFloorBoard('root', 3)
-    setWall(root, 2, 0) // directly behind locked1 — push fails
     const world = makeWorld(
-      [root],
+      [makeFloorBoard('root', 4), makeFloorBoard('void', 5)],
       [
         { id: 'pusher', kind: 'container', boardRef: 'root' }, // a container, so "eaten" would otherwise be viable
-        { id: 'locked1', kind: 'normal', locked: true },
+        { id: 'locked1', kind: 'normal' },
       ],
       {
         pusher: { board: 'root', x: 0, y: 0 },
-        locked1: { board: 'root', x: 1, y: 0 },
+        locked1: { board: 'void', x: 4, y: 2 }, // flush against the Void's own edge — push fails
       },
     )
-    const target = computeTarget(world, world.locations.pusher, 'right', HALF)
-    if (target === null || target.kind !== 'location') throw new Error('test setup')
+    const target = { location: { board: 'void', x: 4, y: 2 }, relativeCoord: HALF }
     const result = resolveBlocked(world, 'pusher', 'locked1', target, 'right', new Map(), new Set())
     expect(result).toBeNull()
   })
 
   it('a locked moving piece can push an unlocked occupant when the push succeeds', () => {
-    const root = makeFloorBoard('root', 4)
     const world = makeWorld(
-      [root],
+      [makeFloorBoard('void', 5)],
       [
-        { id: 'locked1', kind: 'normal', locked: true },
+        { id: 'locked1', kind: 'normal' },
         { id: 'normalBox', kind: 'normal' },
       ],
       {
-        locked1: { board: 'root', x: 0, y: 0 },
-        normalBox: { board: 'root', x: 1, y: 0 },
+        locked1: { board: 'void', x: 2, y: 2 },
+        normalBox: { board: 'void', x: 3, y: 2 },
       },
     )
-    const target = computeTarget(world, world.locations.locked1, 'right', HALF)
-    if (target === null || target.kind !== 'location') throw new Error('test setup')
+    const target = { location: { board: 'void', x: 3, y: 2 }, relativeCoord: HALF }
     const result = resolveBlocked(world, 'locked1', 'normalBox', target, 'right', new Map(), new Set())
-    expect(result?.locations.locked1).toEqual({ board: 'root', x: 1, y: 0 })
-    expect(result?.locations.normalBox).toEqual({ board: 'root', x: 2, y: 0 })
+    expect(result?.locations.locked1).toEqual({ board: 'void', x: 3, y: 2 })
+    expect(result?.locations.normalBox).toEqual({ board: 'void', x: 4, y: 2 })
   })
 
   it('a locked moving piece cannot enter or eat an unlocked occupant when its push fails', () => {
-    const root = makeFloorBoard('root', 3)
-    setWall(root, 2, 0) // directly behind normalBox — push fails
     const world = makeWorld(
-      [root],
+      [makeFloorBoard('root', 3), makeFloorBoard('void', 5)],
       [
-        { id: 'locked1', kind: 'normal', locked: true },
+        { id: 'locked1', kind: 'normal' },
         { id: 'normalBox', kind: 'container', boardRef: 'root' }, // a container, so "entered" would otherwise be viable
       ],
       {
-        locked1: { board: 'root', x: 0, y: 0 },
-        normalBox: { board: 'root', x: 1, y: 0 },
+        locked1: { board: 'void', x: 2, y: 2 },
+        normalBox: { board: 'void', x: 4, y: 2 }, // flush against the Void's own edge — push fails
       },
     )
-    const target = computeTarget(world, world.locations.locked1, 'right', HALF)
-    if (target === null || target.kind !== 'location') throw new Error('test setup')
+    const target = { location: { board: 'void', x: 4, y: 2 }, relativeCoord: HALF }
     const result = resolveBlocked(world, 'locked1', 'normalBox', target, 'right', new Map(), new Set())
     expect(result).toBeNull()
   })
 
   it('two locked pieces: a successful push chain is still allowed', () => {
-    const root = makeFloorBoard('root', 4)
     const world = makeWorld(
-      [root],
+      [makeFloorBoard('void', 5)],
       [
-        { id: 'locked1', kind: 'normal', locked: true },
-        { id: 'locked2', kind: 'normal', locked: true },
+        { id: 'locked1', kind: 'normal' },
+        { id: 'locked2', kind: 'normal' },
       ],
       {
-        locked1: { board: 'root', x: 0, y: 0 },
-        locked2: { board: 'root', x: 1, y: 0 },
+        locked1: { board: 'void', x: 1, y: 2 },
+        locked2: { board: 'void', x: 2, y: 2 },
       },
     )
-    const target = computeTarget(world, world.locations.locked1, 'right', HALF)
-    if (target === null || target.kind !== 'location') throw new Error('test setup')
+    const target = { location: { board: 'void', x: 2, y: 2 }, relativeCoord: HALF }
     const result = resolveBlocked(world, 'locked1', 'locked2', target, 'right', new Map(), new Set())
-    expect(result?.locations.locked1).toEqual({ board: 'root', x: 1, y: 0 })
-    expect(result?.locations.locked2).toEqual({ board: 'root', x: 2, y: 0 })
+    expect(result?.locations.locked1).toEqual({ board: 'void', x: 2, y: 2 })
+    expect(result?.locations.locked2).toEqual({ board: 'void', x: 3, y: 2 })
   })
 
   it('two locked pieces: a failed push returns null, no enter/eat fallback on either side', () => {
-    const root = makeFloorBoard('root', 3)
-    setWall(root, 2, 0) // directly behind locked2 — push fails
     const world = makeWorld(
-      [root],
+      [makeFloorBoard('root', 3), makeFloorBoard('void', 5)],
       [
-        { id: 'locked1', kind: 'container', boardRef: 'root', locked: true },
-        { id: 'locked2', kind: 'container', boardRef: 'root', locked: true },
+        { id: 'locked1', kind: 'container', boardRef: 'root' },
+        { id: 'locked2', kind: 'container', boardRef: 'root' },
       ],
       {
-        locked1: { board: 'root', x: 0, y: 0 },
-        locked2: { board: 'root', x: 1, y: 0 },
+        locked1: { board: 'void', x: 3, y: 2 },
+        locked2: { board: 'void', x: 4, y: 2 }, // flush against the Void's own edge — push fails
       },
     )
-    const target = computeTarget(world, world.locations.locked1, 'right', HALF)
-    if (target === null || target.kind !== 'location') throw new Error('test setup')
+    const target = { location: { board: 'void', x: 4, y: 2 }, relativeCoord: HALF }
     const result = resolveBlocked(world, 'locked1', 'locked2', target, 'right', new Map(), new Set())
     expect(result).toBeNull()
   })
@@ -784,15 +776,22 @@ describe('resolveBlocked — locked pieces push only, never enter or eat, on eit
 describe('tryMovePiece — infinite resolution when the Void is full', () => {
   it('fails the whole move cleanly, leaving the pusher and the piece being pushed into infinite untouched', () => {
     const voidCells: { x: number; y: number }[] = [
-      { x: 2, y: 2 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 },
-      { x: 1, y: 2 }, { x: 3, y: 2 }, { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 },
+      { x: 2, y: 2 },
+      { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 },
+      { x: 1, y: 2 },                 { x: 3, y: 2 },
+      { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 },
+      { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 },
+      { x: 0, y: 1 },                                                 { x: 4, y: 1 },
+      { x: 0, y: 2 },                                                 { x: 4, y: 2 },
+      { x: 0, y: 3 },                                                 { x: 4, y: 3 },
+      { x: 0, y: 4 }, { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 }, { x: 4, y: 4 },
     ]
     const voidBoard = {
       id: 'void',
       size: 5,
       cells: Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ type: 'floor' as const }))),
     }
-    const fillerPieces = voidCells.map((_, i) => ({ id: `filler${i}`, kind: 'normal' as const, locked: true }))
+    const fillerPieces = voidCells.map((_, i) => ({ id: `filler${i}`, kind: 'normal' as const }))
     const fillerLocations = Object.fromEntries(
       voidCells.map(({ x, y }, i) => [`filler${i}`, { board: 'void', x, y }]),
     )
