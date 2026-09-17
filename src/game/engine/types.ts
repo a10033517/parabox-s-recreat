@@ -136,8 +136,8 @@ function infiniteDestinationIdFor(ownerId: PieceId): PieceId {
 // A valid destination for ownerId is either the real ownerId piece itself, if
 // it's already sitting in the Void (once the real piece is there, later
 // arrivals through the same cycle use it directly, no separate placeholder),
-// or any piece — synthesized by sendToVoid below, or hand-authored in a level
-// — whose infiniteFor names ownerId.
+// or any piece — synthesized below, or hand-authored in a level — whose
+// infiniteFor names ownerId.
 function findInfiniteDestination(world: World, ownerId: PieceId): PieceId | undefined {
   if (isInVoid(world, ownerId)) return ownerId
   for (const [pieceId, piece] of Object.entries(world.pieces)) {
@@ -146,59 +146,30 @@ function findInfiniteDestination(world: World, ownerId: PieceId): PieceId | unde
   return undefined
 }
 
-const VOID_EXIT_OFFSETS: Array<{ dx: number; dy: number }> = [
-  { dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 },
-]
-
-// A genuinely adjacent free cell to a destination, bounds-checked against the
-// Void's own 5x5 extent — unlike reusing the board-wide placement search
-// (VOID_CELL_ORDER), whose later entries are not necessarily adjacent to its
-// earlier ones.
-function findVoidExitCell(world: World, destination: { x: number; y: number }): { x: number; y: number } | undefined {
-  for (const { dx, dy } of VOID_EXIT_OFFSETS) {
-    const x = destination.x + dx
-    const y = destination.y + dy
-    if (x < 0 || y < 0 || x >= 5 || y >= 5) continue
-    if (occupantAt(world, { board: VOID_BOARD_ID, x, y }) === undefined) return { x, y }
-  }
-  return undefined
-}
-
-// A piece that resolves to infinite recursion is relocated into the shared Void
-// board, adjacent to the "infinite destination" representing whichever
-// container owns the board the cycle actually broke on (ownerId — see
-// computeTarget in rules.ts). If a valid destination for ownerId already
-// exists (see findInfiniteDestination), it's reused; otherwise one is
-// synthesized at the board-wide placement search's next free cell. Rejects
-// (returns null, no mutation) an unknown pieceId, a piece already in the Void,
-// a full Void (no cell for a new destination), or a destination with no free
-// adjacent cell to exit into.
-export function sendToVoid(world: World, pieceId: PieceId, ownerId: PieceId): World | null {
-  if (world.pieces[pieceId] === undefined || isInVoid(world, pieceId)) return null
-
+// Finds (or synthesizes) the infinite destination representing ownerId,
+// returning the resulting world and the destination's location. This is the
+// data half of resolving an infinite exit — deciding WHERE the exiting piece
+// actually lands, by moving in the original push direction from this
+// location and (if blocked) chaining a push, lives in rules.ts, since that
+// needs tryMovePiece. Returns null only when a brand-new destination is
+// needed but the Void is full (no free cell for it).
+export function ensureInfiniteDestination(world: World, ownerId: PieceId): { world: World; location: Location } | null {
   const next = cloneWorld(world)
   if (next.boards[VOID_BOARD_ID] === undefined) {
     next.boards[VOID_BOARD_ID] = makeVoidBoard()
   }
 
   const existingDestinationId = findInfiniteDestination(next, ownerId)
-  let destinationLoc: Location
   if (existingDestinationId !== undefined) {
-    destinationLoc = next.locations[existingDestinationId]
-  } else {
-    const destinationCell = VOID_CELL_ORDER.find(
-      ({ x, y }) => occupantAt(next, { board: VOID_BOARD_ID, x, y }) === undefined,
-    )
-    if (destinationCell === undefined) return null
-    const destinationId = infiniteDestinationIdFor(ownerId)
-    next.pieces[destinationId] = { id: destinationId, kind: 'normal', infiniteFor: ownerId }
-    next.locations[destinationId] = { board: VOID_BOARD_ID, x: destinationCell.x, y: destinationCell.y }
-    destinationLoc = next.locations[destinationId]
+    return { world: next, location: next.locations[existingDestinationId] }
   }
 
-  const exitCell = findVoidExitCell(next, destinationLoc)
-  if (exitCell === undefined) return null
-
-  next.locations[pieceId] = { board: VOID_BOARD_ID, x: exitCell.x, y: exitCell.y }
-  return next
+  const destinationCell = VOID_CELL_ORDER.find(
+    ({ x, y }) => occupantAt(next, { board: VOID_BOARD_ID, x, y }) === undefined,
+  )
+  if (destinationCell === undefined) return null
+  const destinationId = infiniteDestinationIdFor(ownerId)
+  next.pieces[destinationId] = { id: destinationId, kind: 'normal', infiniteFor: ownerId }
+  next.locations[destinationId] = { board: VOID_BOARD_ID, x: destinationCell.x, y: destinationCell.y }
+  return { world: next, location: next.locations[destinationId] }
 }

@@ -1,5 +1,28 @@
 # Void Infinite Destination — Design
 
+## Correction after implementation: exit direction
+
+The design below (and the code it originally shipped with) placed the ejected piece at
+whichever of the destination's 4 neighbors was free first, in a fixed priority order
+(up, right, down, left) — regardless of which direction the piece was actually being
+pushed. This was wrong: the user's own correction, given directly after seeing it in
+play, is that a piece pushed **up** must exit from the **top** of its destination — the
+exit direction is the same as the push direction, full stop. And if that exact exit
+cell is occupied, the occupant gets pushed further in that same direction (an ordinary
+push, chaining through as many occupied Void cells as necessary); if it can't be pushed,
+the whole move fails — it does not silently try a different side.
+
+This is now the actual, shipped behavior (`resolveInfiniteExit` in `rules.ts`, which
+reuses `tryMovePiece` for the push-chain rather than reinventing it). The rest of this
+document — everywhere it describes "genuinely adjacent" placement via a fixed 4-neighbor
+search (the `VOID_EXIT_OFFSETS`/`findVoidExitCell` shape in Section 3/4, and every
+"adjacent to the destination" claim in the worked example and acceptance criteria) — is
+**superseded** by this correction and kept below only as the historical record of what
+was tried first and why it needed fixing again. Concretely, in the worked example
+below, pushing `redPiece` **right** now lands it to the right of the destination
+(`(3,2)`, not `(2,1)`) — verified against a standalone reimplementation of the corrected
+algorithm before shipping, the same way every other claim in this document was.
+
 ## Review summary
 
 This revision replaces an earlier draft of the same feature after external review

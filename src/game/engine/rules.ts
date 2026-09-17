@@ -1,7 +1,7 @@
 import { Fraction, addInt, divideByInt, multiplyByInt, isZero, fractionDivMod, makeFraction, HALF } from './fraction'
 import {
   World, Location, Direction, Board, BoardId, Piece, PieceId,
-  inBounds, step, findContainerFor, occupantAt, moveTo, sendToVoid, isInVoid, opposite, PLAYER_ID,
+  inBounds, step, findContainerFor, occupantAt, moveTo, ensureInfiniteDestination, isInVoid, opposite, PLAYER_ID, VOID_BOARD_ID,
 } from './types'
 
 export type MoveTarget =
@@ -102,18 +102,19 @@ export function tryMovePiece(
   const target = computeTarget(world, loc, dir, HALF)
   if (target === null) return null
   // The transition can never resolve to a real location — the piece attempting
-  // it is relocated into the Void instead, adjacent to the "infinite
-  // destination" representing whichever container owns the board the cycle
-  // actually broke on (target.ownerId; see sendToVoid). Being physically in
-  // the Void is itself what makes it "locked" (see isInVoid), so nothing more
-  // needs to happen here. If pieceId is PLAYER_ID, the player simply
-  // ends up standing in the Void — this is no longer a loss (there is no loss
-  // state anymore — checkLose is gone). If it's any other piece,
-  // resolveBlocked's existing "pushed succeeded" path (moveTo(pushed, pieceId,
-  // target.location)) already treats a non-null return as a completed push, so
-  // the pusher still ends up at its own target cell while the pushed piece ends
-  // up in the Void — no change needed there.
-  if (target.kind === 'infinite') return sendToVoid(world, pieceId, target.ownerId)
+  // it exits into the Void instead, from the "infinite destination"
+  // representing whichever container owns the board the cycle actually broke
+  // on (target.ownerId), in the SAME direction it was already moving (see
+  // resolveInfiniteExit). Being physically in the Void is itself what makes a
+  // piece "locked" (see isInVoid), so nothing more needs to happen here. If
+  // pieceId is PLAYER_ID, the player simply ends up standing in the Void —
+  // this is no longer a loss (there is no loss state anymore — checkLose is
+  // gone). If it's any other piece, resolveBlocked's existing "pushed
+  // succeeded" path (moveTo(pushed, pieceId, target.location)) already treats
+  // a non-null return as a completed push, so the pusher still ends up at its
+  // own target cell while the pushed piece ends up in the Void — no change
+  // needed there.
+  if (target.kind === 'infinite') return resolveInfiniteExit(world, pieceId, target.ownerId, dir, inMotion)
 
   const targetBoard = world.boards[target.location.board]
   if (targetBoard.cells[target.location.y][target.location.x].type === 'wall') return null
@@ -122,6 +123,38 @@ export function tryMovePiece(
   if (!occupant) return moveTo(world, pieceId, target.location)
 
   return resolveBlocked(world, pieceId, occupant, target, dir, inMotion, beingEntered)
+}
+
+// Resolves where a piece exiting into the Void via ownerId's infinite
+// destination actually lands: from the destination's own location, one step
+// further in the SAME direction the piece was already moving (dir) — "pushed
+// up, comes out the top" — not an arbitrary nearby free cell. If that exit
+// cell is occupied, the occupant is pushed further in the same direction
+// (reusing tryMovePiece — an ordinary push, chaining through as many
+// occupied Void cells as necessary, same as anywhere else in the game); if
+// that push isn't possible, the whole move fails and nothing is placed.
+export function resolveInfiniteExit(
+  world: World,
+  pieceId: PieceId,
+  ownerId: PieceId,
+  dir: Direction,
+  inMotion: Map<PieceId, Direction>,
+): World | null {
+  const destination = ensureInfiniteDestination(world, ownerId)
+  if (destination === null) return null
+  const { world: next, location: destinationLoc } = destination
+
+  const voidBoard = next.boards[VOID_BOARD_ID]
+  const { x, y } = step(destinationLoc.x, destinationLoc.y, dir)
+  if (!inBounds(voidBoard, x, y)) return null
+
+  const exitLoc: Location = { board: VOID_BOARD_ID, x, y }
+  const occupant = occupantAt(next, exitLoc)
+  if (occupant === undefined) return moveTo(next, pieceId, exitLoc)
+
+  const pushed = tryMovePiece(next, occupant, dir, new Map(inMotion).set(pieceId, dir), new Set())
+  if (pushed === null) return null
+  return moveTo(pushed, pieceId, exitLoc)
 }
 
 export function tryEnter(

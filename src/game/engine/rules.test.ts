@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece, resolveBlocked, checkWin } from './rules'
+import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece, resolveBlocked, resolveInfiniteExit, checkWin } from './rules'
 import { HALF, makeFraction, ZERO, ONE } from './fraction'
 import { makeFloorBoard, makeWorld, setWall, setRequirement } from './testFixtures'
 import { PLAYER_ID } from './types'
@@ -572,7 +572,7 @@ describe('tryMovePiece / applyMove — infinite regress', () => {
     expect(next).not.toBeNull()
     expect(next?.pieces['void-infinite:loopBox']).toEqual({ id: 'void-infinite:loopBox', kind: 'normal', infiniteFor: 'loopBox' })
     expect(next?.locations['void-infinite:loopBox']).toEqual({ board: 'void', x: 2, y: 2 })
-    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'void', x: 2, y: 1 }) // adjacent to the destination
+    expect(next?.locations[PLAYER_ID]).toEqual({ board: 'void', x: 1, y: 2 }) // left of the destination — pushed left, exits left
     expect(next?.pieces[PLAYER_ID]).toEqual({ id: PLAYER_ID, kind: 'player' })
   })
 
@@ -612,7 +612,7 @@ describe('tryMovePiece / applyMove — infinite regress', () => {
     expect(next?.locations[PLAYER_ID]).toEqual({ board: 'root', x: 2, y: 1 })
     expect(next?.pieces['void-infinite:loopBox']).toEqual({ id: 'void-infinite:loopBox', kind: 'normal', infiniteFor: 'loopBox' })
     expect(next?.locations['void-infinite:loopBox']).toEqual({ board: 'void', x: 2, y: 2 })
-    expect(next?.locations.loopBox).toEqual({ board: 'void', x: 2, y: 1 }) // adjacent to its own destination
+    expect(next?.locations.loopBox).toEqual({ board: 'void', x: 3, y: 2 }) // right of its own destination — pushed right, exits right
     expect(next?.pieces.loopBox).toEqual({ id: 'loopBox', kind: 'container', boardRef: 'root' })
   })
 
@@ -642,9 +642,77 @@ describe('tryMovePiece / applyMove — infinite regress', () => {
     expect(result?.locations.pusher).toEqual({ board: 'root', x: 0, y: 0 })
     expect(result?.pieces['void-infinite:loopBox']).toEqual({ id: 'void-infinite:loopBox', kind: 'normal', infiniteFor: 'loopBox' })
     expect(result?.locations['void-infinite:loopBox']).toEqual({ board: 'void', x: 2, y: 2 })
-    expect(result?.locations[PLAYER_ID]).toEqual({ board: 'void', x: 2, y: 1 }) // adjacent to the destination
+    expect(result?.locations[PLAYER_ID]).toEqual({ board: 'void', x: 1, y: 2 }) // left of the destination — pushed left, exits left
     expect(result?.pieces[PLAYER_ID]).toEqual({ id: PLAYER_ID, kind: 'player' })
     expect(result?.locations.loopBox).toEqual({ board: 'root', x: 0, y: 1 })
+  })
+})
+
+describe('resolveInfiniteExit — exits in the same direction it was pushed, chaining a push if blocked', () => {
+  it('a piece pushed right exits to the right of its destination', () => {
+    const world = makeWorld([makeFloorBoard('root', 2)], [{ id: 'box1', kind: 'normal' }], { box1: { board: 'root', x: 0, y: 0 } })
+    const result = resolveInfiniteExit(world, 'box1', 'ownerA', 'right', new Map())!
+    expect(result.locations['void-infinite:ownerA']).toEqual({ board: 'void', x: 2, y: 2 })
+    expect(result.locations.box1).toEqual({ board: 'void', x: 3, y: 2 })
+  })
+
+  it('a piece pushed up exits above its destination', () => {
+    const world = makeWorld([makeFloorBoard('root', 2)], [{ id: 'box1', kind: 'normal' }], { box1: { board: 'root', x: 0, y: 0 } })
+    const result = resolveInfiniteExit(world, 'box1', 'ownerA', 'up', new Map())!
+    expect(result.locations.box1).toEqual({ board: 'void', x: 2, y: 1 })
+  })
+
+  it('a second arrival through the same owner and direction pushes the first exited piece further, rather than landing elsewhere', () => {
+    const world = makeWorld(
+      [makeFloorBoard('root', 2)],
+      [
+        { id: 'box1', kind: 'normal' },
+        { id: 'box2', kind: 'normal' },
+      ],
+      {
+        box1: { board: 'root', x: 0, y: 0 },
+        box2: { board: 'root', x: 1, y: 0 },
+      },
+    )
+    const after1 = resolveInfiniteExit(world, 'box1', 'ownerA', 'right', new Map())!
+    const after2 = resolveInfiniteExit(after1, 'box2', 'ownerA', 'right', new Map())!
+    expect(after2.locations.box1).toEqual({ board: 'void', x: 4, y: 2 }) // pushed one further right
+    expect(after2.locations.box2).toEqual({ board: 'void', x: 3, y: 2 }) // takes the freed cell right next to the destination
+  })
+
+  it('returns null when the exit direction points off the Void\'s own edge', () => {
+    const voidBoard = { id: 'void', size: 5, cells: Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ type: 'floor' as const }))) }
+    const world = makeWorld(
+      [makeFloorBoard('root', 2), voidBoard],
+      [
+        { id: 'destOwner', kind: 'normal', infiniteFor: 'ownerB' },
+        { id: 'box3', kind: 'normal' },
+      ],
+      {
+        destOwner: { board: 'void', x: 4, y: 2 }, // already flush against the Void's right edge
+        box3: { board: 'root', x: 0, y: 0 },
+      },
+    )
+    expect(resolveInfiniteExit(world, 'box3', 'ownerB', 'right', new Map())).toBeNull()
+  })
+
+  it('returns null, mutating nothing, when the exit cell is occupied and cannot be pushed further', () => {
+    const voidBoard = { id: 'void', size: 5, cells: Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ type: 'floor' as const }))) }
+    const world = makeWorld(
+      [makeFloorBoard('root', 2), voidBoard],
+      [
+        { id: 'destOwner', kind: 'normal', infiniteFor: 'ownerC' },
+        { id: 'blocker', kind: 'normal' }, // flush against the Void's own edge — can't be pushed further right
+        { id: 'box4', kind: 'normal' },
+      ],
+      {
+        destOwner: { board: 'void', x: 3, y: 2 },
+        blocker: { board: 'void', x: 4, y: 2 },
+        box4: { board: 'root', x: 0, y: 0 },
+      },
+    )
+    expect(resolveInfiniteExit(world, 'box4', 'ownerC', 'right', new Map())).toBeNull()
+    expect(world.locations.box4).toEqual({ board: 'root', x: 0, y: 0 }) // untouched
   })
 })
 
