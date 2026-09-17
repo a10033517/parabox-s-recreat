@@ -60,28 +60,7 @@ describe('findContainerFor', () => {
     expect(findContainerFor(world, 'root')).toBeUndefined()
   })
 
-  it('prefers the external owner over a self-referencing owner of the same board, regardless of declaration order', () => {
-    const root = makeFloorBoard('root', 3)
-    // loopBox is declared FIRST (and is self-referencing on 'root'), extBox
-    // is declared SECOND (an external container elsewhere whose boardRef
-    // also points at 'root'). Object.values(pieces) would visit loopBox
-    // before extBox on unpatched code, so this ordering actually exercises
-    // the fix rather than passing by accident.
-    const world = makeWorld(
-      [root, makeFloorBoard('elsewhere', 2)],
-      [
-        { id: 'loopBox', kind: 'container', boardRef: 'root' },
-        { id: 'extBox', kind: 'container', boardRef: 'root' },
-      ],
-      {
-        loopBox: { board: 'root', x: 0, y: 0 },
-        extBox: { board: 'elsewhere', x: 0, y: 0 },
-      },
-    )
-    expect(findContainerFor(world, 'root')).toBe('extBox')
-  })
-
-  it('falls back to the self-referencing owner when it is the only candidate', () => {
+  it('finds a self-referencing container as its own board\'s owner', () => {
     const root = makeFloorBoard('root', 3)
     const world = makeWorld(
       [root],

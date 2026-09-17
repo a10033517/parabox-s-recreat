@@ -69,26 +69,11 @@ export function occupantAt(world: World, location: Location): PieceId | undefine
   return undefined
 }
 
-// When a board is owned by both a self-referencing container (standing on
-// the very board it owns) and a separate external container elsewhere, the
-// external owner is the semantically meaningful one for climbing out of the
-// board — the self-referencing piece's "ownership" is really just the
-// self-loop trap, not a real parent to exit into. Prefer the external owner
-// deterministically (not by object-key iteration order, which is not a
-// semantic property of the level), falling back to the self-referencing
-// piece only when it's the sole candidate — this preserves the root
-// self-loop trap and every single-owner case unchanged.
 export function findContainerFor(world: World, boardId: BoardId): PieceId | undefined {
-  let selfRef: PieceId | undefined
   for (const piece of Object.values(world.pieces)) {
-    if (piece.kind !== 'container' || piece.boardRef !== boardId) continue
-    if (world.locations[piece.id]?.board === boardId) {
-      selfRef ??= piece.id
-    } else {
-      return piece.id
-    }
+    if (piece.kind === 'container' && piece.boardRef === boardId) return piece.id
   }
-  return selfRef
+  return undefined
 }
 
 export function cloneWorld(world: World): World {

@@ -92,44 +92,6 @@ describe('computeTarget', () => {
   })
 })
 
-describe('computeTarget — two-owner board (external owner + self-referencing owner)', () => {
-  // 'elsewhere' is owned both by extBox (an external container sitting in
-  // root) and by loopBox (a self-referencing container standing inside
-  // 'elsewhere' itself, flush against its top-left corner). Exiting
-  // 'elsewhere' upward should always climb out through extBox into root —
-  // never resolve to infinite via loopBox's self-reference — regardless of
-  // which piece appears first in the pieces map.
-  function buildWorld(order: 'loopFirst' | 'extFirst') {
-    const root = makeFloorBoard('root', 3)
-    const elsewhere = makeFloorBoard('elsewhere', 3)
-    const extBox: { id: string; kind: 'container'; boardRef: string } =
-      { id: 'extBox', kind: 'container', boardRef: 'elsewhere' }
-    const loopBox: { id: string; kind: 'container'; boardRef: string } =
-      { id: 'loopBox', kind: 'container', boardRef: 'elsewhere' }
-    const pieces = order === 'loopFirst' ? [loopBox, extBox] : [extBox, loopBox]
-    return makeWorld(
-      [root, elsewhere],
-      pieces,
-      {
-        extBox: { board: 'root', x: 1, y: 1 }, // center of root — an in-bounds wrap target
-        loopBox: { board: 'elsewhere', x: 0, y: 0 }, // flush top-left corner of its own board
-      },
-    )
-  }
-
-  it('resolves normally through the external owner when the self-referencing piece is declared first', () => {
-    const world = buildWorld('loopFirst')
-    const result = computeTarget(world, { board: 'elsewhere', x: 1, y: 0 }, 'up', HALF)
-    expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 1, y: 0 }, relativeCoord: HALF })
-  })
-
-  it('resolves normally through the external owner when the self-referencing piece is declared second', () => {
-    const world = buildWorld('extFirst')
-    const result = computeTarget(world, { board: 'elsewhere', x: 1, y: 0 }, 'up', HALF)
-    expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 1, y: 0 }, relativeCoord: HALF })
-  })
-})
-
 describe('getEntryCell', () => {
   it('lands on the center cell of a 3x3 board for all four directions when relativeCoord is HALF', () => {
     const board = makeFloorBoard('inside', 3)
