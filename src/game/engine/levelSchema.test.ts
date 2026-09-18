@@ -273,6 +273,29 @@ describe('parseLevel board-ownership validation', () => {
     expect(parseLevel(data)).toEqual(world)
   })
 
+  it('accepts the same two-node cycle when the starting board is not named "root"', () => {
+    // Same shape as the test above, but the starting board is called 'start'
+    // — proves the cycle-reachability seed is genuinely read from
+    // locations[PLAYER_ID].board, not the literal string 'root'.
+    const start = makeFloorBoard('start', 2)
+    const redInterior = makeFloorBoard('redInterior', 1)
+    const world = makeWorld(
+      [start, redInterior],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'redPiece', kind: 'container', boardRef: 'redInterior' },
+        { id: 'yellowPiece', kind: 'container', boardRef: 'start' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'start', x: 0, y: 0 },
+        redPiece: { board: 'start', x: 1, y: 0 },
+        yellowPiece: { board: 'redInterior', x: 0, y: 0 },
+      },
+    )
+    const data = serializeLevel(world)
+    expect(parseLevel(data)).toEqual(world)
+  })
+
   it('accepts a cycle with a tree branch hanging off one node, when the player starts on the branch', () => {
     // redPiece owns redInterior; yellowPiece (inside redInterior) owns root,
     // closing a two-node cycle exactly like the test above. branchPiece

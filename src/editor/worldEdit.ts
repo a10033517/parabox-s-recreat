@@ -56,6 +56,18 @@ function subtreeContainsPlayer(world: World, pieceId: PieceId): boolean {
     // assume 'root'. Descending into either case here would be a stale
     // false positive: it could find the player standing on that same board
     // even though deleting this piece can't remove the player at all.
+    //
+    // NOT world.locations[PLAYER_ID]?.board: that's the player's CURRENT
+    // position, which movePlayer freely relocates during interactive
+    // editing/preview — using it here would move the protected boundary
+    // along with the player instead of keeping it fixed to the level's
+    // actual foundation (confirmed by a real regression: moving the player
+    // into a placed container's interior, then checking whether deleting
+    // that container's own external owner is safe, broke once this read
+    // "current player board" instead of the fixed root id). When a future
+    // "load an existing level" feature ships, the real fix is a separate,
+    // immutable "this level's starting board" value established once when
+    // the level is loaded — not a live read of wherever the player is now.
     const skipsCascade =
       world.locations[id]?.board === piece?.boardRef ||
       piece?.boardRef === 'root'
@@ -90,7 +102,8 @@ export function deletePieceRecursively(world: World, pieceId: PieceId): World {
     // 'root'; there's currently no way to load an existing level back into
     // the editor for further editing, so unlike levelSchema.ts (which must
     // validate arbitrary externally-authored JSON), this file can safely
-    // assume 'root'.
+    // assume 'root'. See the matching comment in subtreeContainsPlayer above
+    // for why the player's CURRENT location is not a valid substitute here.
     const skipsCascade =
       next.locations[id]?.board === piece.boardRef ||
       piece.boardRef === 'root'
