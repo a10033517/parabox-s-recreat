@@ -1,98 +1,191 @@
 # Recursive Render & Camera — Design
 
+## Revision note
+
+The user supplied an external revision of this spec's first draft. Verified each change
+independently rather than adopting wholesale; nearly all of it is correct and catches real
+gaps the first draft had. What follows documents what changed and why.
+
+**Adopted as genuine bug fixes to the first draft:**
+- **`maxRecursionDepth` as a hard backstop, independent of the pixel cutoff (§2.1).** The
+  first draft's termination argument ("a self-loop shrinks by `1/board.size` every step, so
+  it always terminates for any `board.size > 1`") silently assumed `board.size > 1` without
+  ever confirming the engine enforces that. It doesn't — nothing in `Board`'s type or
+  `levelSchema.ts` rejects a `size: 1` board. A self-loop onto a `1×1` board never shrinks
+  (`scale / 1 = scale`, forever) — the pixel cutoff alone would hang. A hard depth limit,
+  checked independently of pixel size, is required.
+- **Clone tint must compose across nested clones (§4.2).** The first draft passed a boolean
+  `paleTint` per recursive call, resolved fresh from `resolveRecursionTarget` at each level —
+  a clone nested inside another clone's peek, or an *ordinary* container reached deep inside
+  a clone's peek, would silently reset to normal (untinted) color the moment the current
+  piece itself isn't a clone, even though the whole subtree is still visually "inside a
+  clone." Fixed by accumulating a numeric `tintAmount` through `DrawContext`, composed via
+  `combineTint` at every level, so the accumulated paleness never resets partway down.
+- **Viewport culling, not just a total cell budget (§2.3).** The first draft's only guard
+  against runaway draw cost was a flat `maxCellsPerFrame` counter with no notion of what's
+  actually on screen. A big board (or many root-level siblings) could exhaust that budget on
+  off-screen content before the camera's own visible region is ever reached, leaving the
+  screen looking incomplete even for a simple visible scene. Cull by screen-space
+  intersection first; only count visible cell draws against the budget.
+- **Pre-index pieces by board once per frame (§2.2).** The first draft's recursive function
+  scanned `Object.entries(world.locations)` fresh inside every single board-draw call — an
+  O(boards-drawn × total-pieces) scan. Build the per-board index once per frame instead.
+- **Draw order: container border/marker last (§3).** The first draft never specified whether
+  a container's own border marker (e.g. the `linkedTo` edge stripe) is drawn before or after
+  its recursively-drawn interior. Before would mean the interior's own fills paint directly
+  over the border, making it invisible. Marker must be drawn last.
+- **Canonical board position vs. visual clone placement must be two different concepts
+  (§1.2).** The first draft reused `childTransform` for both "where a board really sits in
+  the containment tree" and "where a clone visually places someone else's board" without
+  ever naming these as distinct. They must never be conflated: `cameraForPlayer` needs the
+  player's *canonical* position (there is exactly one), never a clone's incidental visual
+  copy of the same board content.
+- **A `linkedTo` container's target should NOT always get a matching border (§6.2) — this
+  corrects an actual mistake in the first draft, not just an omission.** The first draft
+  claimed "the link's terminal `location` result is symmetric in effect even though
+  `linkedTo` is authored one-directionally" and drew the border on both sides on that
+  premise. That premise is simply false — confirmed against the Container Link spec and its
+  own shipped test ("a one-directional link only affects exiting the linked side — C2
+  (unlinked) still climbs to its own owner normally"). A container gets the border because
+  **its own** `linkedTo` field is set, full stop; a target with no `linkedTo` of its own gets
+  no border, because gameplay-wise nothing special happens when *entering* it from outside.
+- **Non-player cross-board piece motion should NOT claim full ghost-rendered animation this
+  round (§10.4).** The first draft's animation section implied any piece's clone-teleport or
+  link-crossing would get the same camera-pan treatment as the player's — but the camera only
+  ever tracks the player; there's no defined meaning for "pan the camera to a pushed box's
+  destination" without confusing the player about their own position. Scoped down to a plain
+  state-to-state snap for non-player cross-board motion this round.
+- **Explicit anchor-mismatch guard on animation interpolation (§12).** Root-space and
+  Void-space coordinates are not comparable — interpolating between them would produce a
+  meaningless pan through unrelated numbers. Must check `sourceCamera.anchor !==
+  targetCamera.anchor` and route to the dedicated Void transition instead of ever lerping
+  across anchors.
+- **A moving container's recursive interior must animate together with the container
+  itself (§10.2).** Genuinely missed in the first draft: if a pushed container's own fill
+  position is tweened but its nested recursive interior is computed from its un-tweened
+  (snapped) `Location`, the shell slides smoothly while its visible contents jump. Both must
+  read from the same interpolated `Location`.
+
+**Adopted as reasonable engineering hygiene, low risk:** one explicit `worldToScreen`
+helper instead of ad hoc camera math per call site (§9.1); explicit min/max camera zoom
+clamps and a defined fallback for a missing/invalid player location (§9.2); an explicit
+small `RenderAnimation` state object instead of scattered `useEffect` timing refs (§11);
+concrete canvas/viewport requirements — DPR, `ResizeObserver`, cancel RAF on unmount (§13);
+a recommended (not mandatory) budget-exhaustion priority order favoring the player's own
+containment path over arbitrary iteration order (§14.1).
+
+**Corrected, not adopted as written:** §10.1's illustrative code (`const result = move(action);
+const postMoveWorld = result.state;`) does not match the real, already-shipped
+`GameState.move(dir: Direction): boolean` — it returns a boolean, not an object with a
+`.state` field. The underlying point (capture the exact pre/post `World`, don't assume
+anything about `GameState`'s internal history representation) is correct and kept; the code
+below reads `state.current` before and after calling `state.move(dir)`, which achieves the
+same guarantee against the real shipped API instead of an invented one.
+
+**Found independently, addressed by neither the first draft nor the revision:** how is the
+render anchor's `identity` board concretely determined? Both versions wrote
+`{ boardId: 'root', originX: 0, originY: 0, scale: 1 }` as if `'root'` unambiguously names a
+structurally distinguishable board. It doesn't, as of this session's own earlier work —
+`docs/superpowers/specs/2026-09-18-parabox-general-cycles.md` made `root` explicitly
+*not* structurally special: a level whose containment graph is one connected cycle running
+through the start has **no board with zero owners at all**, `root` included. `levelSchema.ts`
+already handles this (`startBoardId` is the sole orphan board if one exists, otherwise
+`locations[PLAYER_ID].board` at parse time) — the renderer's own anchor-resolution needs the
+identical concept, and its upward walk needs the identical cycle-safety `computeTarget`
+already has, or resolving a canonical transform for a board sitting on a cycle would hang
+exactly the way the recursion budget exists to prevent. See §1.3 below — new content, not in
+either prior version.
+
 ## Background
 
 The current renderer (`src/game/render/CanvasRenderer.ts`, `GameScreen.tsx`) was built in
-sub-project 2 as a deliberate simplification: the old pre-flat-`World` renderer drew a
-box's interior recursively because the old `Grid`/`Box` data model was itself a nested
-object tree. When the engine moved to a flat `World` (`boards`/`pieces`/`locations`
-records, `Piece.boardRef` as a lookup rather than an embedded structure), sub-project 2's
-spec explicitly scoped out "any transition animation on board switch (hard cut only)" and
-rewrote the renderer to draw exactly one `Board` at a time — whichever board
-`world.locations[PLAYER_ID].board` currently names — with a hard camera cut (canvas
-resize + full redraw) on every board change. Every piece (`normal`, `container`, `player`)
-is a flat color block; a container's interior is never drawn inside it.
+sub-project 2 as a deliberate simplification: the old pre-flat-`World` renderer drew a box's
+interior recursively because the old `Grid`/`Box` data model was itself a nested object
+tree. When the engine moved to a flat `World` (`boards`/`pieces`/`locations` records,
+`Piece.boardRef` as a lookup rather than an embedded structure), sub-project 2's spec
+explicitly scoped out "any transition animation on board switch (hard cut only)" and rewrote
+the renderer to draw exactly one `Board` at a time — whichever board
+`world.locations[PLAYER_ID].board` currently names — with a hard camera cut on every board
+change. Every piece (`normal`, `container`, `player`) is a flat color block; a container's
+interior is never drawn inside it.
 
-Since then, this session added Void/self-loop-exit, Clone (`cloneOf`), Flip (`fliph`), and
-Transfer (`linkedTo`) — four mechanics whose whole *point* is spatial relationships between
-boards (what's inside what, what teleports where, what mirrors what). The flat-color,
-one-board-at-a-time renderer makes none of this visible: a self-loop, a clone, and a plain
-container currently differ only by an easily-missed hash-based fill color; a `fliph` or
-`linkedTo` container has no visual marker at all; and there's no way to see what's "next
-to" or "inside" anything without physically walking there and losing sight of where you
-came from.
+Since then, this session added Void/self-loop-exit, general containment cycles, Clone
+(`cloneOf`), Flip (`fliph`), and Transfer (`linkedTo`) — mechanics whose whole point is
+spatial relationships between boards (what's inside what, what teleports where, what
+mirrors what, what closes back on itself). The flat-color, one-board-at-a-time renderer
+makes none of this visible.
 
-The user supplied two reference screenshots of the real Patrick's Parabox renderer. They
-show the actual answer this spec adopts: **true continuous recursive rendering**. A
-container is never a flat block — its own board is drawn, live, scaled down, inside its
-cell, recursively, to whatever depth remains legible. There is no separate "camera cut"
-between boards at all: the camera is a pan/zoom transform over one continuously-rendered
-scene rooted at `root`, and entering/leaving a container is just that transform changing
-smoothly. Content that belongs to no board at all (nothing above `root` in the containment
-tree) renders as a black backdrop with sparse gray decorative dust — pure art direction,
-unrelated to this engine's own `VOID_BOARD_ID` Void mechanic (a real, disconnected board
-with real gameplay semantics — see "Two floating islands" below for how these interact).
+The user supplied reference screenshots of the real Patrick's Parabox renderer, showing the
+intended direction: **true continuous recursive rendering**. A container is not a flat block
+— its own board is drawn, live, scaled down, inside its cell, recursively, to whatever depth
+remains legible. There is no camera cut between boards for ordinary containment changes: the
+camera is a pan/zoom transform over one continuously rendered scene, and entering/leaving a
+container is that transform changing smoothly. Content that belongs to no board above the
+level's own start renders as a black backdrop with sparse gray decorative dust — art
+direction, unrelated to the engine's `VOID_BOARD_ID` gameplay board.
 
 ## Goal
 
 Replace the flat one-board-at-a-time renderer with a recursive renderer and a continuous
-camera, so that: (1) every mechanic this session shipped is visually self-explanatory
-without a separate icon legend, because the mechanic's actual effect (mirrored content,
-a live peek at the main body, a shared edge) is what's drawn; (2) moving through the game
-never "cuts" — the camera pans and zooms across one continuous scene; and (3) test levels
-"feel like" they're testing something, because the mechanic they exercise is visibly
-happening as you play, not just conceptually stateful under the hood.
+camera so that:
+
+1. every mechanic is visually self-explanatory through the thing it actually does;
+2. movement through the game no longer uses a hard cut for ordinary containment changes;
+3. the recursive scene remains bounded and performant even for deep, cyclic, or
+   clone-duplicated structures;
+4. animation is driven by exact pre-move/post-move snapshots, never inferred history
+   internals.
 
 ## Explicitly out of scope this round
 
-- **Click-to-inspect / peek-without-moving (originally proposed sub-project #5).** Once
-  recursion is live, most of the motivating need — "let me see what's inside/around
-  without walking there" — is already satisfied passively by the recursive draw itself.
-  Revisit only if playtesting shows a real remaining gap (e.g. wanting to peek somewhere
-  the camera currently can't reach because it's off the path from root to the player).
-- **Final art / asset pipeline.** Per the user's explicit call this round: the goal is
-  *diagnostic clarity* (can you tell what mechanic just happened), not shipped visual
-  polish. Colors, shapes, and easing curves below are chosen to be clearly distinguishable
-  and cheap to implement, not final art — expect a reskin pass later.
-- **Mouse/touch interaction with the recursive scene** (clicking into a nested box,
-  dragging the camera manually). Camera is fully driven by game state this round; manual
-  camera control is a separate, later feature if wanted.
-- **Editor (`EditorScreen.tsx`) rendering.** This spec covers `GameScreen`/`CanvasRenderer`
-  only. The editor's own rendering is untouched and keeps its current flat style.
-- **Mobile/perf tuning by device profiling.** The budget mechanism below (pixel-size cutoff
-  + total-draw cap) is a *design-time* guardrail, not a tuned-against-real-hardware number.
-  Exact constants are starting points for the implementer to adjust empirically.
+- **Click-to-inspect / peek-without-moving.** Once recursion is live, most of the original
+  motivation is already satisfied passively. Revisit only if playtesting finds a specific
+  remaining gap.
+- **Final art / asset pipeline.** The target is diagnostic clarity, not final visual polish.
+  Colors, shapes, and easing below are implementation-friendly starting points.
+- **Mouse/touch interaction with the recursive scene.** The camera is fully state-driven
+  this round.
+- **Editor (`EditorScreen.tsx`) rendering.** Stays on its current flat renderer.
+- **Device-specific performance tuning.** The limits below are starting values, tuned
+  empirically during implementation, not device-certified numbers.
+- **Ghost-rendered animation for a non-player piece's cross-board motion** (see §10.4) —
+  deferred; a plain state snap is used this round.
 
-## Core architecture: one continuously-recursive scene, camera is a transform over it
+---
 
-### The coordinate composition already exists — this reuses it, doesn't invent it
+# 1. Core architecture: one recursive scene, camera as a transform
 
-`computeTarget` (`rules.ts`) already climbs from a nested board up to its container's own
-board, accumulating a `relativeCoord: Fraction` that expresses "where within the parent's
-one cell does this nested position sit" at each step
-(`divideByInt(addInt(relativeCoord, offset), board.size)`). Rendering needs exactly the
-same composition, run in the opposite direction (root-down instead of nested-up) and
-producing a plain `{x, y, scale}` transform instead of a `Fraction`: **a board's absolute
-position is its container piece's absolute position, offset by the piece's local
-`Location` scaled into one cell of the container's own absolute transform.** This is not
-a new spatial model bolted onto the engine — it's the same "one cell of the parent board
-equals the entire span of the child board" relationship the engine already climbs through
-for movement, walked the other way for drawing.
+## 1.1 Coordinate model
+
+The engine already has the relationship rendering needs:
+
+> one cell of a parent board contains the entire child board.
+
+`computeTarget` (`rules.ts`) already climbs this relationship upward for movement,
+accumulating a `relativeCoord: Fraction` at each step. Rendering walks the same relationship
+downward, from the anchor board outward, producing a plain `{x, y, scale}` transform instead
+of a `Fraction`.
 
 ```ts
-// src/game/render/recursiveTransform.ts (new file)
+// src/game/render/recursiveTransform.ts
 export interface BoardTransform {
   boardId: BoardId
-  originX: number   // this board's (0,0) cell's top-left corner, in root-relative
-                     // "root cell units" (i.e. root's own cellSize == 1 unit)
+  // Top-left corner of this board's (0,0) cell, in the active anchor's units.
+  originX: number
   originY: number
-  scale: number      // size (in root cell units) of ONE cell of THIS board;
-                      // root's own transform has scale === 1
+  // Size of ONE cell of this board, in anchor units. The anchor board's own
+  // transform has scale === 1.
+  scale: number
 }
 
-// Absolute transform of `boardId`, given the piece that owns it sits at `location`
-// within a parent whose own transform is `parentTransform`.
-function childTransform(parentTransform: BoardTransform, location: Location, childBoard: Board): BoardTransform {
+export function childTransform(
+  parentTransform: BoardTransform,
+  location: Location,
+  childBoard: Board,
+): BoardTransform {
+  if (childBoard.size <= 0) {
+    throw new Error(`Invalid board size: ${childBoard.size}`)
+  }
   return {
     boardId: childBoard.id,
     originX: parentTransform.originX + location.x * parentTransform.scale,
@@ -102,328 +195,643 @@ function childTransform(parentTransform: BoardTransform, location: Location, chi
 }
 ```
 
-`root`'s own transform is `{ boardId: 'root', originX: 0, originY: 0, scale: 1 }` — one
-root cell is exactly one unit. Every other board's transform is computed by walking down
-from `root` via `findContainerFor`'s inverse (i.e. for each container piece on the board
-currently being drawn, look up `piece.boardRef`, compute that child board's transform from
-the piece's own `Location` and the current board's transform, and recurse).
+## 1.2 Canonical board position vs. visual clone placement
 
-### The recursive draw function
+Two different concepts, never to be conflated:
+
+- **Canonical position:** where a board really sits in the authored containment tree —
+  found by walking its real owner chain (`boardRef`, via `findContainerFor`) toward the
+  anchor. Every board has **at most one** canonical position under a given anchor (it may
+  have none, if it belongs to the other anchor's tree entirely).
+- **Visual placement:** where a recursive *draw* places a board's content inside a
+  particular cell — a plain container's own `boardRef` board (which is also its canonical
+  position), or a clone's live peek at its main body's board (which is emphatically **not**
+  the peeked board's canonical position — it's a second, independent visual copy).
 
 ```ts
-// src/game/render/CanvasRenderer.ts — replaces the current renderBoard
-export interface RenderBudget {
-  minCellPixels: number   // stop recursing into a board once one of ITS cells would
-                           // render smaller than this many screen pixels (default: 4)
-  maxCellsPerFrame: number // hard cap on total cell-draws across the whole recursive
-                            // tree this frame (default: 4000) — protects against a
-                            // pathological level (grid of containers each containing
-                            // more containers) blowing up draw time regardless of
-                            // per-branch pixel cutoffs
+export function resolveCanonicalBoardTransform(
+  world: World,
+  boardId: BoardId,
+  anchor: 'root' | 'void',
+): BoardTransform | null
+
+export function childTransform(
+  parentTransform: BoardTransform,
+  location: Location,
+  childBoard: Board,
+): BoardTransform
+```
+
+`resolveCanonicalBoardTransform` walks real ownership only — it must never follow
+`cloneOf`. It's what `cameraForPlayer` uses to find the player's one true position; the
+recursive *draw* function uses plain `childTransform` for both canonical descent and clone
+placement, since both are legitimate uses of "place this board inside that cell," just
+starting from different transforms.
+
+## 1.3 Resolving the anchor and walking up to it (new this revision)
+
+Neither prior version of this spec defined *which board* is the `root` anchor's identity
+board, beyond writing the literal string `'root'` as if it were structurally guaranteed to
+exist and be reachable by walking upward from anywhere. As of this session's own
+`docs/superpowers/specs/2026-09-18-parabox-general-cycles.md`, it isn't: a level whose
+containment graph is a pure cycle running through its own start has **no board with zero
+owners at all** — walking "up" via `findContainerFor` from any board on that cycle loops the
+ring forever, with no structural "top" to stop at, the exact same failure shape the
+recursion depth limit (§2.1) exists to guard against on the way *down*.
+
+**The render anchor's identity board is defined identically to `levelSchema.ts`'s own
+`startBoardId`:** the sole board with zero owners, if one exists (the ordinary tree case);
+otherwise, the board the player's `Location` names at the moment the level was loaded (the
+cycle case) — computed once when a level is loaded, not re-derived from live, possibly
+player-relocated state on every frame. The Void anchor's identity board is always
+`VOID_BOARD_ID`, unambiguous.
+
+```ts
+// src/game/render/recursiveTransform.ts
+export function resolveAnchorBoardId(world: World, anchor: 'root' | 'void'): BoardId | null {
+  if (anchor === 'void') return VOID_BOARD_ID in world.boards ? VOID_BOARD_ID : null
+  const ownerCount = new Map<BoardId, number>(Object.keys(world.boards).map((id) => [id, 0]))
+  for (const piece of Object.values(world.pieces)) {
+    if (piece.kind === 'container' && piece.boardRef !== undefined) {
+      ownerCount.set(piece.boardRef, (ownerCount.get(piece.boardRef) ?? 0) + 1)
+    }
+  }
+  const orphan = [...ownerCount.entries()].find(([, count]) => count === 0)
+  if (orphan !== undefined) return orphan[0]
+  return world.locations[PLAYER_ID]?.board ?? null
 }
 
+// Walks from boardId UP to the anchor board via findContainerFor, cycle-safe via a
+// visited set (mirrors computeTarget's own `visited: Set<BoardId>`), then composes
+// childTransform forward from the anchor's identity transform down through the
+// discovered path. Returns null if boardId isn't reachable from this anchor at all
+// (it belongs to the other anchor's tree) or a cycle prevents reaching the anchor
+// board within a bounded number of steps.
+export function resolveCanonicalBoardTransform(
+  world: World,
+  boardId: BoardId,
+  anchor: 'root' | 'void',
+): BoardTransform | null {
+  const anchorBoardId = resolveAnchorBoardId(world, anchor)
+  if (anchorBoardId === null) return null
+
+  const path: { ownerBoardId: BoardId; location: Location; board: Board }[] = []
+  let current = boardId
+  const visited = new Set<BoardId>()
+  while (current !== anchorBoardId) {
+    if (visited.has(current)) return null // cycle that never reaches the anchor board
+    visited.add(current)
+    const ownerId = findContainerFor(world, current)
+    if (ownerId === undefined) return null // no owner and not the anchor: unreachable
+    const ownerLoc = world.locations[ownerId]
+    if (ownerLoc === undefined) return null
+    path.push({ ownerBoardId: ownerLoc.board, location: ownerLoc, board: world.boards[current] })
+    current = ownerLoc.board
+  }
+
+  let transform: BoardTransform = { boardId: anchorBoardId, originX: 0, originY: 0, scale: 1 }
+  for (let i = path.length - 1; i >= 0; i--) {
+    transform = childTransform(transform, path[i].location, path[i].board)
+  }
+  return transform
+}
+```
+
+Note this walk's own cycle guard (`visited`) is a *correctness* mechanism (it must terminate
+so `cameraForPlayer` can run at all every frame), independent of and in addition to the
+recursive *draw's* `maxRecursionDepth` (§2.1), which is a *rendering-cost* backstop for
+content that's allowed to recurse but shouldn't recurse forever. Both are needed; they guard
+different operations (one upward position lookup per frame, vs. a potentially
+many-branches-deep downward draw per frame).
+
+---
+
+# 2. Recursive renderer
+
+## 2.1 Render budget
+
+```ts
+export interface RenderBudget {
+  minCellPixels: number          // default: 4 — stop recursing once a child cell would
+                                  // render smaller than this
+  maxCellsPerFrame: number       // default: 4000 — hard cap on visible cell draws/frame
+  maxRecursionDepth: number      // default: 48 — last-resort stack-safety backstop,
+                                  // independent of pixel size (see below)
+  targetPlayerCellPixels: number // default: 64 — desired on-screen size of the player's
+                                  // current board's cells; drives camera zoom
+}
+```
+
+**Why the depth limit is required in addition to the pixel cutoff:** the pixel-cutoff
+argument only guarantees termination when every recursively-entered board has `size > 1`.
+Nothing in this engine's `Board` type or `levelSchema.ts` enforces that — a self-loop onto a
+`1×1` board never shrinks (`scale / 1 = scale`, forever). Clone can also introduce cycles
+that aren't ordinary `boardRef` parent/child cycles (a clone whose main body is itself deep
+inside another clone's peek). `minCellPixels` is the normal visual cutoff for legibility;
+`maxRecursionDepth` is the non-negotiable stack-safety backstop that holds even when pixel
+size alone would allow more nesting. When the depth limit is hit, the container simply keeps
+its flat fill/marker, exactly like hitting the pixel cutoff.
+
+## 2.2 Pre-index pieces by board
+
+The recursive function must not scan `world.locations` globally once per board-draw call —
+that turns recursion into repeated global scans. Build a per-frame index once:
+
+```ts
+export interface BoardPieceEntry { pieceId: PieceId; location: Location }
+export type PiecesByBoard = Map<BoardId, BoardPieceEntry[]>
+export function indexPiecesByBoard(world: World): PiecesByBoard
+```
+
+## 2.3 Viewport culling, before the cell budget
+
+A large board can contain far more cells than the camera can see at once. If the renderer
+visits cells in row-major order and exhausts `maxCellsPerFrame` before reaching the visible
+region, the screen can appear incomplete even though the actually-visible content is simple.
+For every board: compute its screen-space rectangle first; skip entirely if outside the
+viewport; otherwise derive the visible integer cell range and draw (and budget-count) only
+cells intersecting the viewport; recurse only into container cells whose own rectangle
+intersects the viewport.
+
+```ts
+interface Viewport { width: number; height: number }
+interface ScreenRect { left: number; top: number; right: number; bottom: number }
+```
+
+---
+
+# 3. Recursive draw contract
+
+```ts
 interface DrawContext {
   ctx: CanvasRenderingContext2D
   world: World
-  camera: CameraTransform   // see "Camera" below — maps root-units to screen pixels
+  camera: CameraTransform
+  viewport: Viewport
   budget: RenderBudget
-  cellsDrawnSoFar: { count: number }  // mutable counter shared across the whole recursive call tree
+  piecesByBoard: PiecesByBoard
+  cellsDrawnSoFar: { count: number }
+  recursionDepth: number
+  tintAmount: number    // accumulated clone paleness — 0 = normal, composed via combineTint
+  mirrorH: boolean      // accumulated horizontal mirror — XOR of every fliph ancestor
+  getRenderLocation: (pieceId: PieceId, world: World) => Location | null // animation hook, §10.2
 }
 
-function drawBoardRecursive(
-  dc: DrawContext,
-  board: Board,
-  transform: BoardTransform,
-  paleTint: boolean,       // true when drawing a clone's live peek (see "Clone" below)
-  mirrorH: boolean,        // true when drawing inside a fliph container (see "Flip" below)
-): void {
-  const screenCellSize = transform.scale * dc.camera.pixelsPerRootUnit
-  for (let y = 0; y < board.size; y++) {
-    for (let x = 0; x < board.size; x++) {
-      if (dc.cellsDrawnSoFar.count >= dc.budget.maxCellsPerFrame) return
-      dc.cellsDrawnSoFar.count++
-      const drawX = mirrorH ? board.size - 1 - x : x
-      // ...fillRect at (transform.originX + drawX*transform.scale, ...) mapped through
-      // dc.camera into screen pixels, size screenCellSize×screenCellSize...
-    }
-  }
-  for (const [pieceId, location] of Object.entries(dc.world.locations)) {
-    if (location.board !== board.id) continue
-    const piece = dc.world.pieces[pieceId]
-    // ...draw the piece's own fill at its cell (mirrored the same way as above if
-    // mirrorH)...
-    if (piece.kind === 'container' && screenCellSize >= dc.budget.minCellPixels) {
-      const target = resolveRecursionTarget(dc.world, piece) // see below — handles
-                                                                // boardRef vs cloneOf
-      if (target !== null) {
-        const childT = childTransform(transform, location, dc.world.boards[target.boardId])
-        drawBoardRecursive(dc, dc.world.boards[target.boardId], childT, target.paleTint, mirrorH !== target.mirrorH)
-      }
-    }
-  }
+function drawBoardRecursive(dc: DrawContext, board: Board, transform: BoardTransform): void {
+  if (dc.cellsDrawnSoFar.count >= dc.budget.maxCellsPerFrame) return
+  if (dc.recursionDepth >= dc.budget.maxRecursionDepth) return
+  if (!Number.isFinite(transform.scale) || transform.scale <= 0) return
+
+  const boardRect = boardScreenRect(transform, dc.camera, board.size)
+  if (!intersectsViewport(boardRect, dc.viewport)) return
+
+  // For each visible cell: draw the base cell, then any piece on it.
+  // For a container piece whose recursion target is above the pixel cutoff: recurse
+  // into the target board FIRST (drawBoardRecursive with the composed tint/mirror and
+  // recursionDepth + 1), THEN draw this container's own border/marker on top — so the
+  // marker is never painted over by the nested content.
 }
 ```
 
-`mirrorH !== target.mirrorH` composes correctly for a `fliph` container nested inside
-another `fliph` container (double negative cancels), matching `mirrorHorizontal`'s own
-involution property already relied on in `rules.ts`.
+**Draw order per container cell:** base cell → piece fill → nested board (if permitted) →
+container border/marker. The marker-last rule matters most for `linkedTo`'s edge stripe and
+the cycle-member color ring — nested content fills the whole cell and would otherwise erase
+them.
 
-### `resolveRecursionTarget` — per-mechanic recursion rules
+---
+
+# 4. Recursion target rules
+
+## 4.1 Plain container
 
 ```ts
-function resolveRecursionTarget(world: World, piece: Piece): { boardId: BoardId; paleTint: boolean; mirrorH: boolean } | null {
+return { boardId: piece.boardRef, tintAmount: 0, mirrorH: piece.fliph ?? false }
+```
+
+## 4.2 Clone
+
+A clone (`cloneOf`) is a **visual duplicate of the main body's current board**, not an
+ownership edge.
+
+```ts
+export interface RecursionTarget { boardId: BoardId; tintAmount: number; mirrorH: boolean }
+
+function resolveRecursionTarget(world: World, piece: Piece): RecursionTarget | null {
   if (piece.cloneOf !== undefined) {
-    // A clone has no boardRef of its own — recurse into whatever board the main
-    // body is CURRENTLY on, live, exactly like the user's reference screenshot
-    // (a clone shows the same content the real thing shows, paler). This is a
-    // jump to an arbitrary other point in the tree, not a boardRef descent — the
-    // generic per-branch pixel cutoff and the shared per-frame draw budget are
-    // what keep this safe (a clone of a clone, or a main body that's itself deep
-    // inside a huge structure, just costs more of the shared budget, the same as
-    // any other expensive branch — no special-case cycle guard needed beyond the
-    // budget already required for self-loops).
     const mainBodyLoc = world.locations[piece.cloneOf]
-    if (mainBodyLoc === undefined) return null
-    // Deliberately NOT piece.fliph (the clone's own field): the Flip spec's final
-    // revision established that a clone's own fliph is inert for gameplay — tryEnter's
-    // cloneOf interception returns before into.fliph is ever read, so it has no effect
-    // on an actual entry. Applying it here anyway would render a mirrored peek that
-    // lies about what really happens if the player walks over and enters for real.
-    // The main body's OWN fliph is what actually mirrors its interior, so that's what
-    // the peek uses.
-    return { boardId: mainBodyLoc.board, paleTint: true, mirrorH: world.pieces[piece.cloneOf]?.fliph ?? false }
+    const mainBody = world.pieces[piece.cloneOf]
+    if (mainBodyLoc === undefined || mainBody === undefined) return null
+    return {
+      boardId: mainBodyLoc.board,
+      tintAmount: 0.35,
+      // The clone's OWN fliph is inert for gameplay (tryEnter's cloneOf interception
+      // returns before into.fliph is ever read) — using it here would render a mirrored
+      // peek that lies about what happens on a real entry. The main body's own fliph is
+      // what actually mirrors its interior, so that's what the peek reflects.
+      mirrorH: mainBody.fliph ?? false,
+    }
   }
   if (piece.boardRef === undefined) return null
-  return { boardId: piece.boardRef, paleTint: false, mirrorH: piece.fliph ?? false }
+  return { boardId: piece.boardRef, tintAmount: 0, mirrorH: piece.fliph ?? false }
 }
 ```
 
-A clone recursing into "whatever board the main body is on" needs that board's own
-transform to draw the main body's *neighbors* in their correct relative positions too —
-but this function only returns a `boardId`, not a `Location` within it. The caller
-(`drawBoardRecursive`) draws that whole board via `childTransform`, exactly as it would
-for any container — the fact that this is a *second, independent* placement of the same
-board in the overall recursive tree (once at its real position under `root`, again inside
-every clone pointing at it) is fine: `childTransform` only needs a parent transform and a
-location, and both copies get their own, independently computed. Two clones of the same
-main body simply produce two subtrees with identical *content* but different `originX/Y/scale`.
-
-### Stop conditions
-
-Two independent limits, matching the two failure modes:
-
-1. **Per-branch pixel cutoff** (`minCellPixels`, default 4px): stops a self-loop, a
-   multi-node cycle, or a clone-of-a-clone from recursing forever — once a board's own
-   cells would render below this size, `drawBoardRecursive` isn't called for it; the
-   container just keeps its flat fill color instead. This requires **no cycle-detection
-   code at all** — a self-loop naturally shrinks by `1/board.size` every recursive step
-   (since `childTransform`'s `scale` divides by `childBoard.size` each level), so it
-   *always* terminates in a bounded number of steps for any `board.size > 1`, and the
-   existing `CYCLE_PALETTE` hash-coloring becomes optional polish rather than the only
-   cycle indicator (see "Keep or drop `CYCLE_PALETTE`" below).
-2. **Per-frame total draw budget** (`maxCellsPerFrame`, default 4000): stops a level with
-   many separate expensive branches (e.g. ten containers each with a deep interior, none
-   individually near the pixel cutoff) from adding up to an unbounded frame cost. Checked
-   once per cell-draw, shared via a mutable counter across the whole recursive call tree
-   for one frame; once exhausted, remaining unvisited branches simply don't recurse
-   further this frame (they still show their own flat fill, just not their interior) —
-   never a hard error, always a graceful "less detail this frame."
-
-Both numbers are starting points (comment says so in the interface) — the implementer
-tunes them against real levels during implementation, not a spec-mandated exact value.
-
-### Keep or drop `CYCLE_PALETTE`?
-
-**Keep it**, as a secondary signal layered under the recursive draw, not instead of it.
-Reasoning: the pixel cutoff means a *heavily zoomed-out* self-loop (its own cells already
-near the 4px floor) shows almost no recursive detail — at that zoom level, the distinct
-hash color is the only remaining way to tell "this recurses forever" apart from "this is
-an ordinary container that happens to be small on screen right now." Losing it would
-regress a working, tested piece of existing behavior for a benefit (one less color system)
-that only matters at zoom levels where the recursion is providing the least information
-anyway. `LOCKED_RING_COLOR` and the `∞` marker for Void infinite-destinations are kept for
-the same reason — they're both orthogonal, cheap, already-shipped signals that the new
-recursion doesn't replace or conflict with (see "Two floating islands" for how the ring
-and `∞` marker meet the new backdrop).
-
-## Per-mechanic visual rules (summary table)
-
-| Mechanic | Recursion target | Visual marker |
-|---|---|---|
-| Plain container | own `boardRef` | none beyond the recursion itself |
-| Self-loop / cycle member | own `boardRef` (shrinks toward itself) | `CYCLE_PALETTE` hash color, kept as a secondary signal |
-| Clone (`cloneOf`) | main body's **current** board (live, jumps across the tree) | paler tint (see "Clone tint" below) over whatever color the content would normally have |
-| Flip (`fliph`) | own `boardRef`, drawn horizontally mirrored | the mirrored content itself is the marker — no separate color/icon needed |
-| Transfer (`linkedTo`) | own `boardRef`, unaffected | a distinct-colored border stripe on the shared edge (the edge `linkedEntryCell` maps through) |
-| Void infinite destination | n/a (`infiniteFor`, not a container) | unchanged: colored as the real piece, `∞` marker, pale-slate ring (all pre-existing) |
-| Locked (standing in the Void) | — | unchanged: pale-slate ring (pre-existing) |
-
-### Clone tint
-
-A flat alpha-blend toward white, applied uniformly to every fill color drawn anywhere
-inside a clone's recursive subtree (the clone's own container fill, and every cell/piece
-color inside its recursively-drawn content) — e.g. `mixWithWhite(color, 0.35)`. This reads
-as "paler version of the real thing," matching the reference screenshot, and composes for
-free with the existing color system (self-loop colors, plain piece colors, everything)
-since it's a post-processing step on whatever color would otherwise be used, not a
-separate palette.
-
-### Transfer edge stripe
-
-`Piece.linkedTo` already carries a `direction`-free "which edge" concept implicitly (any
-of the four edges can be the glued one, depending on which direction a piece exits at,
-per `linkedEntryCell`) — for rendering, only the *fact* of being linked needs to show,
-not a specific edge (the level author is free to link containers of any relative size or
-position, and there's no single "this edge always" rule to draw). Simplest faithful
-option: draw a thin distinct-colored full-perimeter border on a `linkedTo` container (and
-on its target, since the link's terminal `location` result is symmetric in effect even
-though `linkedTo` is authored one-directionally) — cheap, unambiguous, doesn't need to
-know which specific edge the player will exit through since that depends on which
-direction they push.
-
-## Two floating islands: `root` and the Void
-
-`root` has no owner (nothing ever sets `boardRef` to `'root'` from outside the level's own
-authored content in a way that would give it a container) — it's always the top of its own
-containment tree, floating in the black backdrop per the reference screenshots. But this
-engine's Void (`VOID_BOARD_ID`) is a **second, structurally disconnected board** —
-synthesized lazily by `ensureInfiniteDestination`, never a descendant of `root` via any
-`boardRef` chain. A camera model of "always recurse from `root`, pan/zoom to find the
-player" has no path to the Void at all: it's not reachable by walking `boardRef` links no
-matter how far you recurse, because nothing on the `root` tree owns it.
-
-**Resolution:** the Void is the second floating island, rendered exactly like `root` is —
-its own recursive tree, `{boardId: 'void', originX: 0, originY: 0, scale: 1}`, floating in
-the same black backdrop art style. The camera has exactly one anchor at a time —
-`root`'s tree or the Void's tree — determined by which one the player (`PLAYER_ID`) is
-currently reachable from (in practice: `isInVoid(world, PLAYER_ID)` picks the Void anchor,
-otherwise `root`). A piece other than the player sent to the Void while the player stays
-on the `root` side is invisible until the anchor switches — unchanged from the current
-shipped renderer, which already only ever draws the player's own current board, so this
-isn't a regression this spec introduces, just a limitation worth naming.
-
-**Switching anchors is the one remaining hard transition** — there is
-no continuous pan/zoom path between two disconnected trees, so it gets its own dedicated
-effect ("fall into darkness": a brief full-screen darken/desaturate + zoom-toward-black,
-then swap the anchor and fade the new tree in) rather than either a jarring instant cut or
-a fabricated pan across unrelated geometry. This is the *only* non-continuous camera
-transition in the whole system — every other transition (entering/leaving a container,
-crossing a `linkedTo` edge, a clone teleport) has a real geometric path through the same
-recursively-rendered tree and gets a real pan/zoom.
-
-## Camera
+**Clone placement uses the clone's own location, never the main body's:**
 
 ```ts
-// src/game/render/camera.ts (new file)
-export interface CameraTransform {
-  // Maps a point in root-units (or void-units, whichever tree is currently anchored)
-  // to screen pixels.
-  centerX: number   // root-unit (or void-unit) x the canvas center is currently looking at
-  centerY: number
-  pixelsPerRootUnit: number  // current zoom level
-  anchor: 'root' | 'void'
-}
-
-// Computes the camera transform that centers the player at a given zoom, by walking
-// the player's actual containment chain (via findContainerFor, root/void-down) to get
-// the player's absolute position in root-units (or void-units) — this is exactly
-// childTransform's accumulation, applied to the player's own Location.
-export function cameraForPlayer(world: World, pixelsPerRootUnit: number): CameraTransform
+const childT = childTransform(transform, cloneOwnLocationOnCurrentBoard, world.boards[target.boardId])
 ```
 
-The camera's `centerX/centerY/pixelsPerRootUnit` are the values that get **tweened**
-frame-to-frame (see "Animation" below) — `cameraForPlayer` computes the *target* transform
-for the current `World` snapshot; the actual rendered transform each frame is an eased
-interpolation toward that target, not a snap. This is what makes "entering a container" a
-zoom instead of a cut: the target camera's `pixelsPerRootUnit` jumps up (the player's new
-containing board has a much larger `scale` in root-units) and the render loop eases toward
-it over a fixed duration rather than applying it instantly.
+**Tint composes, doesn't reset:**
 
-## Animation
+```ts
+function combineTint(parent: number, local: number): number {
+  return 1 - (1 - parent) * (1 - local)
+}
+const nextTint = combineTint(dc.tintAmount, target.tintAmount)
+```
 
-Four distinct animated behaviors, layered on top of the static recursive draw:
+Every fill inside the clone's subtree — at every depth, whether or not the piece at that
+depth is itself a clone — is drawn with the accumulated `dc.tintAmount`, not a fresh
+per-piece value. This is what keeps a clone-of-a-clone, or an ordinary container reached deep
+inside a clone's peek, visibly paler than the "real" version rather than snapping back to
+normal color the moment the current piece isn't itself a clone.
 
-1. **Ordinary piece movement** (push/walk, no board change): the moved piece's screen
-   position tweens from its pre-move to its post-move cell over a short fixed duration
-   (e.g. 120ms, ease-out) instead of snapping. `GameScreen` already has both the
-   pre-move `World` (its own ref, or `GameState.history[history.length - 2]`) and the
-   post-move `World` (`state.current`) available around every `move()` call — the tween
-   interpolates each moved piece's `(x, y)` independently between those two snapshots'
-   `Location` values (only pieces whose `Location` actually changed need tweening; most
-   pieces on the visible board don't move on a given turn).
-2. **Entering/leaving a container**: purely a `cameraForPlayer` target change, eased over
-   a slightly longer duration than an ordinary move (e.g. 250ms) — no special-case code
-   beyond the camera's own interpolation, since the whole point of the continuous scene is
-   that this isn't a distinct kind of event from the camera's perspective.
-3. **Clone teleport / Transfer crossing**: both are cases where the *player's* (or a
-   pushed piece's) `Location.board` jumps to a place that isn't a simple parent/child of
-   where it just was, but which — because both the source and destination are real points
-   in the same `root`-rooted (or Void-rooted) recursive tree — has a real, computable pair
-   of absolute root-unit positions. The camera eases from the source position to the
-   destination position directly (a longer, distinct-feeling pan, e.g. 400ms) rather than
-   the shorter "just zoom" duration used for ordinary containment changes — this is what
-   makes a teleport *read* as "the camera swooped somewhere," not merely a longer zoom.
-4. **Void entry/exit**: the dedicated "fall into darkness" transition from the "Two
-   floating islands" section above — the one non-continuous case.
+**Cross-anchor clones are fine, don't try to re-root them:** a clone's main body can happen
+to be standing in the *other* anchor's tree (e.g. Void-locked, while the clone itself is
+drawn from the `root` anchor). That's allowed — it's a visual placement, not an ownership
+edge, so it never needs `resolveCanonicalBoardTransform` (which is anchor-scoped by
+definition); it just needs plain `childTransform` from wherever the clone's own cell already
+is, using whatever board content `mainBodyLoc.board` currently names, root or void. This
+doesn't connect the two gameplay graphs — it only means the same board data can be visually
+instantiated more than once, from either anchor.
 
-`GameScreen` determines which of these four applies by diffing the pre-move and post-move
-`World`: if `PLAYER_ID`'s `Location.board` is unchanged, it's case 1 (or no camera change
-at all); if changed and the new board is `VOID_BOARD_ID` or the old one was, it's case 4;
-otherwise, it's case 2 or 3 depending on whether the new board is literally the old
-container's `boardRef` / the old board's owner's `boardRef` (a simple containment step) or
-not (anything else — clone or link) — this distinction only affects *which duration/easing
-preset* is used, not whether a path exists, since `cameraForPlayer` computes the correct
-target position either way.
+---
 
-## Files touched (expected shape, not a full plan)
+# 5. Flip (`fliph`)
 
-- **New:** `src/game/render/recursiveTransform.ts` (`childTransform`, `BoardTransform`),
-  `src/game/render/camera.ts` (`CameraTransform`, `cameraForPlayer`, interpolation helper).
-- **Rewritten:** `src/game/render/CanvasRenderer.ts` (`drawBoardRecursive` replaces
-  `renderBoard`; `resolveRecursionTarget`; per-mechanic color/tint/border helpers).
-- **Rewritten:** `src/game/GameScreen.tsx` (drives a `requestAnimationFrame` loop instead
-  of a one-shot `useEffect` redraw per move; tracks pre/post `World` pairs for tweening;
-  computes `cameraForPlayer` targets and eases toward them; the canvas itself likely needs
-  to be a fixed viewport size now rather than resized to match `currentBoard.size` each
-  move, since the camera — not the canvas dimensions — now expresses "which board, how
-  much of it" is visible).
-- **Untouched:** `src/game/engine/**` (this is a pure rendering/camera change — no engine
-  file needs to change; every mechanic this reuses, e.g. `findContainerFor`,
-  `mirrorHorizontal`'s composition property, `linkedEntryCell`'s edge concept, was already
-  built for gameplay resolution and is being read, not modified, by the renderer).
+Content is mirrored, not marked with a separate icon:
 
-## Testing strategy
+```ts
+const drawX = mirrorH ? board.size - 1 - x : x
+```
 
-- **`recursiveTransform.test.ts`**: `childTransform` composition — a two-level and a
-  three-level nesting produce the expected `originX/Y/scale`; a self-loop's own
-  `childTransform` applied to itself shrinks `scale` by exactly `1/board.size` each call
-  (the property the pixel-cutoff argument above depends on — verify it directly rather
-  than just asserting termination).
-- **`camera.test.ts`**: `cameraForPlayer` returns the `root` anchor's identity-composed
-  position for a player standing directly on `root`; returns a correctly-scaled-up
-  position for a player nested two levels deep (hand-computed expected value, same
-  discipline as this session's engine specs); returns the Void anchor when
-  `isInVoid(world, PLAYER_ID)`.
-- **`CanvasRenderer.test.ts`**: existing tests (flat color per kind, requirement overlay,
-  wall vs floor, cycle coloring, lock ring, infinity marker) continue to hold at zero
-  recursion depth (a board with no visible containers, or containers whose screen size is
-  below `minCellPixels`) — these should need minimal changes, since "draw this one board's
-  cells and pieces" is still the base case of the recursive function. New tests: a
-  container whose interior IS above the pixel cutoff triggers a nested `drawBoardRecursive`
-  call (spy/count fillRect calls for the nested board's own cells); a clone renders its
-  main body's actual current content, not its own (nonexistent) `boardRef`; a clone's fill
-  colors are provably paler than the same content's un-cloned colors (compare parsed RGB
-  channels, not just string inequality); a `fliph` container's recursively-drawn interior
-  is mirrored (leftmost real cell renders at the rightmost screen position); a
-  `maxCellsPerFrame` budget of e.g. 5 stops a deep recursion after exactly 5 cell-draws,
-  provably (not just "doesn't crash").
-- **`GameScreen.test.tsx`**: an ordinary push produces intermediate tweened frames between
-  the pre/post positions before settling (mock `requestAnimationFrame`, advance a few
-  frames, assert an in-between rendered position); entering a container changes the camera
-  target without changing which board's data is drawn (the recursive tree already contains
-  it); undo reverts both state and any in-flight animation cleanly.
-- **Manual verification** (per sub-project 2's own precedent — this is not fully
-  automatable for a canvas-rendered, continuously-animated scene): play all three of this
-  session's new demo levels (`11-clone-box`, `12-flip-box`, `13-transfer`) in the actual
-  browser and confirm each one *looks* like what it's testing — this was the user's
-  original complaint motivating this whole spec, and is the real acceptance bar.
+The same mirrored x-coordinate is used for every piece's visual position on that board, not
+just the base cells. Composition is XOR, so nesting a `fliph` container inside another
+cancels correctly:
+
+```ts
+const nextMirrorH = dc.mirrorH !== target.mirrorH
+```
+
+---
+
+# 6. Transfer (`linkedTo`)
+
+`linkedTo` stays a pure gameplay relationship; the renderer only reads it, never infers one
+from geometry or proximity.
+
+## 6.1 Marker rule — corrected from the first draft
+
+A container gets the distinct-colored perimeter border **because its own `linkedTo` field is
+set** — nothing more. It is *not* mirrored onto whatever it points at unless that piece has
+its own `linkedTo` field too. The first draft's claim that a link is "symmetric in effect"
+was wrong (confirmed against the Container Link spec's own one-directional test coverage) —
+drawing a border on an unlinked target would visually claim a relationship that doesn't
+exist in gameplay.
+
+## 6.2 Edge
+
+A full perimeter border is the safe baseline — the renderer doesn't invent a permanent
+"this specific edge" highlight when the gameplay data doesn't encode a single canonical edge
+(a level author can push into a linked container from any direction; `linkedEntryCell`'s
+mapping depends on which edge was actually exited through, not a fixed one). A more specific
+edge highlight is a fine later refinement, not required this round.
+
+---
+
+# 7. Cycle indicators
+
+`CYCLE_PALETTE`, `LOCKED_RING_COLOR`, and the `∞` infinite-destination marker are all kept,
+unchanged, as secondary signals layered under the new recursion — none of them are replaced
+by it. Recursive rendering makes a self-loop structurally visible by literally showing itself
+getting smaller, but at heavy zoom-out the pixel cutoff stops that recursion early, and the
+existing distinct color is the only remaining signal that the container is special at that
+zoom level.
+
+---
+
+# 8. Two floating islands: root and Void
+
+`root`'s tree and the engine's `VOID_BOARD_ID` are structurally disconnected — nothing ever
+owns the Void board. The camera has exactly one active anchor at a time:
+
+```ts
+type CameraAnchor = 'root' | 'void'
+const anchor: CameraAnchor = isInVoid(world, PLAYER_ID) ? 'void' : 'root'
+```
+
+Each anchor's identity board is resolved per §1.3 (not a literal `'root'` string). A
+non-player piece sent to the Void while the player stays on the `root` side is invisible
+until the anchor switches — unchanged from the currently-shipped renderer, which already
+only ever draws the player's own current board, so this isn't a regression, just a named
+limitation.
+
+**Switching anchors is the one remaining hard transition** — no continuous pan/zoom path
+exists between two disconnected trees. Dedicated effect ("fall into darkness"): darken/
+desaturate → zoom toward black → swap the active anchor → initialize the camera around the
+player's new position → fade the new anchor in. This is the *only* non-continuous camera
+transition in the whole system.
+
+---
+
+# 9. Camera
+
+```ts
+export interface CameraTransform {
+  centerX: number            // anchor-unit x the viewport center is looking at
+  centerY: number
+  pixelsPerRootUnit: number  // zoom
+  anchor: CameraAnchor
+}
+```
+
+## 9.1 One explicit world-to-screen mapping
+
+```ts
+function worldToScreen(x: number, y: number, camera: CameraTransform, viewport: Viewport) {
+  return {
+    x: (x - camera.centerX) * camera.pixelsPerRootUnit + viewport.width / 2,
+    y: (y - camera.centerY) * camera.pixelsPerRootUnit + viewport.height / 2,
+  }
+}
+```
+
+Used everywhere a screen coordinate is needed, so no draw call invents its own camera math.
+
+## 9.2 Computing the player's camera target
+
+```ts
+export function cameraForPlayer(world: World, viewport: Viewport, budget: RenderBudget): CameraTransform {
+  const anchor: CameraAnchor = isInVoid(world, PLAYER_ID) ? 'void' : 'root'
+  const playerLoc = world.locations[PLAYER_ID]
+  if (playerLoc === undefined) return cameraFallbackForAnchor(anchor, viewport)
+
+  const boardTransform = resolveCanonicalBoardTransform(world, playerLoc.board, anchor)
+  if (boardTransform === null) return cameraFallbackForAnchor(anchor, viewport)
+
+  const centerX = boardTransform.originX + (playerLoc.x + 0.5) * boardTransform.scale
+  const centerY = boardTransform.originY + (playerLoc.y + 0.5) * boardTransform.scale
+  const targetZoom = budget.targetPlayerCellPixels / boardTransform.scale
+
+  return { anchor, centerX, centerY, pixelsPerRootUnit: clampCameraZoom(targetZoom) }
+}
+```
+
+`targetZoom = desired player-cell pixels / current board-cell scale`: a deeply nested board
+has a smaller anchor-space cell scale, so the camera zooms in further to keep the player's
+local board legible. `clampCameraZoom` enforces explicit min/max bounds so a malformed or
+extremely deep level can't produce an absurd or non-finite zoom. `cameraFallbackForAnchor`
+returns a sane default (anchor's own identity transform, default zoom) for the degrade-safe
+case of a missing player location or an unreachable canonical transform — never `NaN`.
+
+---
+
+# 10. Animation
+
+Four visual cases. State interpolation and camera interpolation are handled separately.
+
+## 10.1 Capture the exact pre-move and post-move `World`
+
+```ts
+const preMoveWorld = state.current
+const moved = state.move(dir)          // GameState.move(dir: Direction): boolean — see
+if (!moved) { /* no-op, nothing to animate */ }
+const postMoveWorld = state.current     // .current getter, not an invented return value
+```
+
+Both reads use `GameState`'s already-public `.current` getter, captured immediately before
+and after the mutating call — no assumption about `history`'s internal shape or indexing.
+Store the exact `{preMoveWorld, postMoveWorld}` pair for the in-flight animation.
+
+## 10.2 Ordinary movement on the same board
+
+For a piece whose `Location.board` is unchanged, interpolate its local `x/y`:
+
+```ts
+function getRenderLocation(pieceId: PieceId, preWorld: World, postWorld: World, t: number): Location | null {
+  // board unchanged case: { board: post.board, x: lerp(pre.x, post.x, t), y: lerp(pre.y, post.y, t) }
+}
+```
+
+If the moved piece is itself a container, its recursively-drawn interior's `childTransform`
+must use this SAME interpolated `Location`, not the snapped post-move one — otherwise the
+container's shell slides smoothly while everything visible inside it jumps instantly to the
+destination. `getRenderLocation` is threaded through `DrawContext` precisely so both the
+piece's own fill and its recursive placement read the identical interpolated value.
+Recommended starting duration: ~120ms, ease-out.
+
+## 10.3 Entering / leaving a container
+
+The player's `Location.board` changing from a parent to its child board does **not** switch
+the rendered scene root — the recursive scene already contains both levels simultaneously.
+Render the post-move world; compute the new `cameraForPlayer` target; ease the camera from
+the old target to the new one; the destination board grows naturally as zoom increases. This
+is a camera transition, not a renderer board swap. Recommended starting duration: ~250ms.
+
+## 10.4 Clone / Transfer crossing (player only, this round)
+
+When the player's board changes to somewhere that isn't a direct containment step, treat it
+as a teleport-style camera move: both source and destination have real, computable
+`resolveCanonicalBoardTransform` positions in the same anchor's recursive scene (once the
+move completes, the destination is canonically reachable — that's what a completed move
+guarantees), so the camera eases directly from one to the other. Recommended starting
+duration: ~400ms — longer than an ordinary containment zoom, so it *reads* as "the camera
+swooped somewhere" rather than merely a longer zoom.
+
+**Non-player pieces:** the same engine mechanics can move a *pushed* piece across boards
+without moving the player. The camera is never driven by a non-player piece. This round, a
+non-player piece's cross-board motion uses a plain state-to-state snap — no ghost-rendered
+source/destination ambiguity is introduced. A full cross-board piece animation is explicitly
+deferred, not silently assumed.
+
+## 10.5 Void entry / exit
+
+The dedicated "fall into darkness" transition from §8 — the one non-continuous case.
+
+---
+
+# 11. Animation state
+
+A small explicit state object, not timing scattered across React effects:
+
+```ts
+interface RenderAnimation {
+  preWorld: World
+  postWorld: World
+  startTimeMs: number
+  durationMs: number
+  kind: 'move' | 'enter-leave' | 'teleport' | 'void-transition'
+  sourceCamera: CameraTransform
+  targetCamera: CameraTransform
+}
+```
+
+The `requestAnimationFrame` loop reads this state each frame; once `t >= 1`, the render
+snapshot becomes the post-move world and the animation state is cleared.
+
+# 12. Camera anchor changes must be explicit
+
+Never interpolate `root` coordinates toward `void` coordinates — they aren't the same
+coordinate space and a lerp between them is meaningless. Whenever
+`sourceCamera.anchor !== targetCamera.anchor`, run the Void transition (§8/§10.5) instead of
+any of the eased camera paths above. Every other animation kind requires source and target
+to share the same anchor.
+
+---
+
+# 13. Canvas and viewport handling
+
+The canvas is a fixed viewport now, not a board-sized bitmap resized per move. `GameScreen`:
+sizes the canvas to the viewport; accounts for device-pixel ratio; redraws every animation
+frame (not just once per move); uses the same logical viewport dimensions for all camera
+math; cancels the `requestAnimationFrame` callback on unmount. A `ResizeObserver` updates the
+viewport when the containing element's size changes. The renderer no longer resizes the
+logical world based on `currentBoard.size`.
+
+---
+
+# 14. Performance and determinism
+
+- **Budget exhaustion priority (recommended, not a hard requirement):** when
+  `maxCellsPerFrame` runs out mid-frame, prefer drawing the player's own canonical
+  containment path first, then branches nearest the player's visible region, then other
+  visible branches, before off-path deep branches — approximated by recursing the active
+  path first, then siblings, rather than depending on arbitrary `Object.entries` order.
+- **No off-screen recursion:** a child board whose screen rectangle is entirely outside the
+  viewport consumes no recursive budget (§2.3).
+- **No global location scans:** `piecesByBoard` is built once per frame (§2.2).
+- **No stack-risk recursion:** `maxRecursionDepth` (§2.1) holds even when pixel size and
+  cell budget would otherwise allow deeper nesting. `resolveCanonicalBoardTransform`'s own
+  upward walk (§1.3) has its own independent cycle guard for the same reason, applied to a
+  different operation (one position lookup per frame vs. a potentially deep downward draw).
+
+---
+
+# 15. Files touched
+
+**New:** `src/game/render/recursiveTransform.ts` (`BoardTransform`, `childTransform`,
+`resolveAnchorBoardId`, `resolveCanonicalBoardTransform`, screen-rect helpers).
+`src/game/render/camera.ts` (`CameraTransform`, `cameraForPlayer`, `worldToScreen`,
+interpolation/easing helpers).
+
+**Rewritten:** `src/game/render/CanvasRenderer.ts` (`drawBoardRecursive`,
+`resolveRecursionTarget`, per-board piece indexing, viewport culling, tint/mirror/link/cycle
+helpers, border-drawn-last ordering). `src/game/GameScreen.tsx` (captures exact pre/post
+`World`; owns `RenderAnimation` state and the `requestAnimationFrame` loop; computes camera
+targets; selects anchor transitions; resizes viewport/canvas).
+
+**Untouched:** `src/game/engine/**` — pure rendering/camera work; every mechanic this reuses
+(`findContainerFor`, `mirrorHorizontal`'s composition property, `linkedEntryCell`'s edge
+concept, `isInVoid`, the general-cycles `startBoardId` concept) was already built for
+gameplay resolution and is only read here, never modified.
+
+---
+
+# 16. Testing strategy
+
+**`recursiveTransform.test.ts`:** two- and three-level nesting produce the expected
+`originX/Y/scale`; `scale` divides by child `board.size`; `resolveAnchorBoardId` returns the
+sole orphan board for a tree level and the player's start board for a pure-cycle level
+(reproduce a fixture from the general-cycles spec's own worked example); a `1×1` self-loop's
+`resolveCanonicalBoardTransform` walk terminates via the visited-set guard rather than
+hanging; invalid board sizes are rejected; canonical transform resolution never follows
+`cloneOf`.
+
+**`camera.test.ts`:** player directly on the anchor board centers on the player's cell
+center; player nested two levels deep gets the expected canonical position; player on a
+pure-cycle level (no orphan board) still resolves correctly via the player's-start-board
+anchor; target zoom follows `targetPlayerCellPixels / boardCellScale`; a Void-standing player
+selects the Void anchor; a missing/unreachable player location uses the defined fallback, not
+`NaN`; `worldToScreen` maps the camera center to the viewport center.
+
+**`CanvasRenderer.test.ts`:** existing base-case tests (flat color per kind, requirement
+overlay, wall vs floor, cycle coloring, lock ring, infinity marker) continue to hold at zero
+recursion depth. New: an above-cutoff container draws its nested board; a below-cutoff
+container keeps its flat fill; viewport culling skips fully off-screen boards;
+`maxCellsPerFrame` is enforced; `maxRecursionDepth` is enforced even for `1×1` recursion
+(distinct from the pixel-cutoff test); a clone displays the main body's current board, not a
+nonexistent `boardRef`; two clones of one main body produce two independent visual
+placements; clone tint is provably paler (compare parsed RGB channels, not just string
+inequality); nested clone tint composes rather than resetting; a clone whose main body is
+Void-locked (cross-anchor) still resolves its live content; `fliph` mirrors both cells and
+pieces consistently; a `linkedTo` container gets the border only when its own field is set,
+never mirrored onto an unlinked target; container borders remain visible above nested
+content (draw-order test); the player's containment-path branches receive budget priority
+when the budget is tight.
+
+**`GameScreen.test.tsx`:** an ordinary move produces intermediate tweened positions before
+settling; moving a container interpolates its recursive interior together with the container
+(not just its shell); the captured pre-move state is the exact `state.current` snapshot
+immediately before `state.move()`, not derived from a history index; entering a container
+changes the camera target without replacing the recursive scene root; clone/Transfer camera
+movement uses the teleport duration; Void entry/exit uses the dedicated anchor transition,
+never a lerp across anchors; undo restores state and cancels/replaces any in-flight
+animation; `requestAnimationFrame` is cancelled on unmount.
+
+**Manual verification** (per sub-project 2's own precedent — not fully automatable for a
+continuously-animated canvas scene): play `11-clone-box`, `12-flip-box`, `13-transfer` in the
+actual browser and confirm each visibly demonstrates its mechanic; also check a self-loop at
+normal zoom, a deep nested chain, a `1×1` self-loop if one is deliberately constructed, a
+level with many containers (budget exercise), a moving container's interior following it, and
+root↔Void transitions. This is the real acceptance bar — the user's original complaint that
+motivated this whole spec.
+
+---
+
+# 17. Implementation order
+
+1. `recursiveTransform.ts` — `BoardTransform`, `childTransform`, `resolveAnchorBoardId`,
+   `resolveCanonicalBoardTransform`, with their own tests (including the pure-cycle and
+   `1×1` cases) passing before anything else starts.
+2. Renderer base — fixed viewport, anchor selection, viewport culling, per-board piece
+   index, recursive container drawing (flat mechanics only — no tint/mirror/link yet).
+3. Mechanic visuals — cycle palette (should already mostly work from step 2), Clone live
+   subtree + tint composition, Flip mirror composition, Transfer border.
+4. Camera — player absolute position via `cameraForPlayer`, zoom formula, `worldToScreen`,
+   interpolation.
+5. Animation — exact pre/post snapshots, same-board interpolation (including a moving
+   container's interior), enter/leave camera zoom, Clone/Transfer camera pan, Void anchor
+   transition.
+6. Cleanup and performance — RAF lifecycle, viewport resize handling, budget priority,
+   manual verification against the three demo levels.
+
+---
+
+# 18. Acceptance criteria
+
+- The game always renders a recursive scene from the active anchor, never "current board
+  only."
+- A container's interior is visible inside its cell whenever its screen cell size is above
+  the recursion cutoff.
+- Recursion is bounded by both the pixel cutoff and the independent recursion-depth limit —
+  a `1×1` self-loop provably terminates.
+- `resolveCanonicalBoardTransform` correctly resolves the player's position on both a normal
+  tree level and a pure-cycle level (no orphan board), and its own upward walk is cycle-safe.
+- Off-screen branches don't consume the visible-cell budget.
+- Clone content follows the main body's current board (live), is visibly paler, and the
+  tint composes correctly across nested clones.
+- Flip mirrors actual content, including nested pieces, and composes correctly (XOR) when
+  nested inside another `fliph` container.
+- A `linkedTo` border appears only on a container whose own field is set — never inferred
+  onto an unlinked target.
+- Entering/leaving a container is a smooth camera transition, not a scene-root swap.
+- Player clone/Transfer movement uses a smooth camera move within the same anchor;
+  non-player cross-board motion uses a plain state snap this round.
+- Root ↔ Void uses the dedicated anchor transition; no animation ever interpolates across
+  anchors.
+- Moving a container animates its recursive interior together with the container itself.
+- Animation is driven by the exact `state.current` snapshot captured immediately before and
+  after `state.move()` — no history-index assumptions.
+- The render loop is cleaned up correctly on unmount.
+- Existing gameplay rules and engine tests remain unchanged (`src/game/engine/**` untouched).
