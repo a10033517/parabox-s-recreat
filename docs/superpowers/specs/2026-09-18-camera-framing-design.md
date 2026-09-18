@@ -115,7 +115,7 @@ const spanUnits = boardSize + 2 * budget.marginCells
 const pixelsPerRootUnit = Math.min(viewport.width, viewport.height) / (spanUnits * anchorTransform.scale)
 ```
 
-This is the case that produces the "root now always shows a margin of Void" behavior —
+This case produces the "root now always shows a margin of Void" behavior —
 previously root filled the screen exactly; now it gets the same treatment as every
 nested level, just measured in its own units instead of a parent's.
 
