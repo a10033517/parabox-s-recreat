@@ -526,6 +526,33 @@ describe('drawBoardRecursive', () => {
     expect(markerDrawn).toBe(true)
   })
 
+  it('I2 regression: the lock ring on a Void-locked container with a real, recursable interior is drawn AFTER the interior\'s own cell fills, so nothing erases it', () => {
+    // A container standing on VOID_BOARD_ID whose boardRef points at a real, non-empty
+    // board — big/close enough that its screen cell stays above the pixel cutoff, so
+    // drawBoardRecursive actually recurses into it. Before the fix, the ring/marker were
+    // drawn BEFORE that recursion, so the interior's own opaque cell fills painted over
+    // (erased) them.
+    const voidBoard = makeFloorBoard('void', 5)
+    const interior = makeFloorBoard('interior', 2)
+    const world = makeWorld(
+      [voidBoard, interior],
+      [{ id: 'lockedBox', kind: 'container', boardRef: 'interior' }],
+      { lockedBox: { board: 'void', x: 2, y: 2 } },
+    )
+    const ctx = mockContext()
+    const callOrder: string[] = []
+    let strokeCalls = 0
+    ctx.fillRect = () => { callOrder.push('fill') }
+    ctx.strokeRect = () => { callOrder.push('stroke'); strokeCalls++ }
+    // cellSize 64 -> lockedBox's own screen cell is 64px (well above the 4px cutoff),
+    // and its interior's cells render at 64/2=32px, also above cutoff -> recursion happens.
+    drawBoardForTest(ctx, voidBoard, world, 64)
+    expect(strokeCalls).toBe(1) // the ring is still drawn at all
+    const ringStrokeIndex = callOrder.indexOf('stroke')
+    const lastFillIndex = callOrder.lastIndexOf('fill') // the interior's own cell fills are the last fills
+    expect(ringStrokeIndex).toBeGreaterThan(lastFillIndex)
+  })
+
   it('an ordinary locked Void piece (no infiniteFor) does not render the infinity marker', () => {
     const voidBoard = makeFloorBoard('void', 5)
     const world = makeWorld([voidBoard], [{ id: 'box1', kind: 'normal' }], { box1: { board: 'void', x: 2, y: 2 } })
@@ -568,6 +595,28 @@ describe('drawBoardRecursive', () => {
     // cellSize 2 -> box's own cell is 2px, below the 4px cutoff -> no nested draw.
     drawBoardForTest(ctx, root, world, 2)
     expect(calls).toBe(5) // 4 root cells + 1 box fill, nothing nested
+  })
+
+  it('I4 regression: minCellPixels is checked against the CHILD\'s own per-cell size, not the parent container\'s cell', () => {
+    // box's own screen cell is comfortably above minCellPixels (64px, from a 2x2 root at
+    // cellSize 64), but its interior is a 20x20 board: dividing 64px by 20 brings the
+    // CHILD's own per-cell size to 3.2px, below the 4px default cutoff. The old (buggy)
+    // parent-only check compared 64px >= 4px and wrongly allowed recursion; the fixed
+    // check must compare 3.2px >= 4px and refuse to recurse, keeping box's flat fill only.
+    const root = makeFloorBoard('root', 2)
+    const inside = makeFloorBoard('inside', 20)
+    const world = makeWorld(
+      [root, inside],
+      [{ id: 'box', kind: 'container', boardRef: 'inside' }],
+      { box: { board: 'root', x: 0, y: 0 } },
+    )
+    const ctx = mockContext()
+    let calls = 0
+    ctx.fillRect = () => { calls++ }
+    // cellSize 64 -> box's own cell is 64px (above cutoff); its 20x20 interior's own
+    // cells would render at 64/20=3.2px (below cutoff).
+    drawBoardForTest(ctx, root, world, 64)
+    expect(calls).toBe(5) // 4 root cells + 1 box fill, nothing nested — recursion refused
   })
 
   it('a viewport-culled board is skipped entirely', () => {
@@ -805,6 +854,44 @@ describe('drawBoardRecursive — Flip', () => {
     const boxCellLeft = 0 // box sits at root (0,0), screen left edge = 0
     const boxCellCenter = boxCellLeft + (64 / 2) / 2 // half of box's own 32px screen cell
     expect(overlayCall.x).toBeGreaterThan(boxCellCenter)
+  })
+
+  it('I1 regression: a container inside a fliph board recurses into its nested content at the SAME mirrored screen position as its own shell', () => {
+    // outer (fliph=false, size 2) contains `box` (fliph=true) at x=0, whose own interior
+    // `boxInside` is size 3 and itself contains `innerBox` at x=0. Mirrored, innerBox's
+    // shell (and its own recursively-drawn interior) must land at x=2 (size-1-0), not x=0.
+    const outer = makeFloorBoard('outer', 2)
+    const boxInside = makeFloorBoard('boxInside', 3)
+    const innerBoxInside = makeFloorBoard('innerBoxInside', 2)
+    setRequirement(innerBoxInside, 0, 0, 'box') // marker inside innerBox's own interior
+    const world = makeWorld(
+      [outer, boxInside, innerBoxInside],
+      [
+        { id: 'box', kind: 'container', boardRef: 'boxInside', fliph: true },
+        { id: 'innerBox', kind: 'container', boardRef: 'innerBoxInside' },
+      ],
+      { box: { board: 'outer', x: 0, y: 0 }, innerBox: { board: 'boxInside', x: 0, y: 0 } },
+    )
+    const ctx = mockContext()
+    const fillCalls: { x: number; style: string }[] = []
+    ctx.fillRect = (x) => { fillCalls.push({ x: x as number, style: ctx.fillStyle as string }) }
+    // cellSize 90 on a 2x2 outer -> box's own screen cell is 90px; box's interior
+    // (boardInside, size 3) cells render at 90/3=30px, innerBox's own interior
+    // (innerBoxInside, size 2) cells render at 30/2=15px — all comfortably above the 4px
+    // cutoff so every level recurses.
+    drawBoardForTest(ctx, outer, world, 90)
+    // box's own cell occupies screen x in [0,90). boxInside is 3 cells wide at 30px each,
+    // so its cell x=0 occupies screen x in [0,30) unmirrored, or [60,90) mirrored (size-1-0=2).
+    // innerBox sits at boxInside (0,0) -> mirrored to boxInside x=2 -> screen x in [60,90).
+    // 'box' draws its own shell first (unmirrored at the outer level, since outer itself
+    // has no fliph), THEN recursion reaches 'innerBox's own shell — the second container
+    // fill in draw order.
+    const innerBoxOwnFill = fillCalls.filter((c) => c.style === '#38bdf8').at(-1)! // PIECE_COLORS.container
+    expect(innerBoxOwnFill.x).toBeGreaterThanOrEqual(60)
+    // innerBox's own recursively-drawn interior (the 'box' requirement overlay marker)
+    // must ALSO land in that same mirrored region, not at the unmirrored x in [0,30).
+    const overlayCall = fillCalls.find((c) => c.style === '#334155')! // REQUIREMENT_OVERLAY.box
+    expect(overlayCall.x).toBeGreaterThanOrEqual(60)
   })
 
   it('control: a non-fliph container is not mirrored', () => {

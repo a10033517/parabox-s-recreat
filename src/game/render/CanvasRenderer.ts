@@ -238,10 +238,35 @@ export function drawBoardRecursive(
     const baseColor = isCycleMember(colorSourceId, dc.world) ? cycleColorFor(colorSourceId) : PIECE_COLORS[colorSource.kind]
     dc.ctx.fillStyle = applyTint(baseColor, tintAmount)
     dc.ctx.fillRect(pieceRect.left, pieceRect.top, screenCellSize, screenCellSize)
+
+    const target = resolveRecursionTarget(dc.world, piece)
+    if (target !== null) {
+      const childBoard = dc.world.boards[target.boardId]
+      // The cutoff is "one CHILD cell would render smaller than minCellPixels" (spec
+      // §2.1), not the current (parent) board's own cell size — screenCellSize here is
+      // this piece's cell on the board being drawn now, but recursing one level deeper
+      // divides it again by childBoard.size (see childTransform's own scale formula), so
+      // that division must happen before the check (final-review I4).
+      if (childBoard !== undefined && screenCellSize / childBoard.size >= dc.budget.minCellPixels) {
+        // Same mirrored x-coordinate used for the piece's own screen position (above)
+        // must also be used for where its nested interior is placed — otherwise a
+        // container's shell and its recursively-drawn content come apart horizontally
+        // whenever mirrorH is true (final-review I1).
+        const childT = childTransform(transform, { ...location, x: mirrorX(location.x) }, childBoard)
+        drawBoardRecursive(
+          dc, childBoard, childT, recursionDepth + 1,
+          combineTint(tintAmount, target.tintAmount),
+          mirrorH !== target.mirrorH,
+        )
+      }
+    }
+
     // A piece "is locked" exactly when it's standing in the Void (see
     // isInVoid in types.ts) — every piece this loop reaches has already been
     // filtered to piecesByBoard's grouping by board.id, so board.id ===
     // VOID_BOARD_ID here means this particular piece is in the Void too.
+    // Drawn AFTER the recursive call above (like the linkedTo border below) so a
+    // recursable interior's own opaque cell fills never paint over it (final-review I2).
     if (board.id === VOID_BOARD_ID) {
       dc.ctx.save()
       dc.ctx.strokeStyle = LOCKED_RING_COLOR
@@ -256,19 +281,6 @@ export function drawBoardRecursive(
         dc.ctx.fillText('∞', pieceRect.left + screenCellSize / 2, pieceRect.top + screenCellSize / 2)
       }
       dc.ctx.restore()
-    }
-
-    const target = resolveRecursionTarget(dc.world, piece)
-    if (target !== null && screenCellSize >= dc.budget.minCellPixels) {
-      const childBoard = dc.world.boards[target.boardId]
-      if (childBoard !== undefined) {
-        const childT = childTransform(transform, location, childBoard)
-        drawBoardRecursive(
-          dc, childBoard, childT, recursionDepth + 1,
-          combineTint(tintAmount, target.tintAmount),
-          mirrorH !== target.mirrorH,
-        )
-      }
     }
 
     if (piece.kind === 'container' && piece.linkedTo !== undefined) {

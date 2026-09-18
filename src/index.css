@@ -106,9 +106,18 @@ canvas {
   max-width: 100%;
   border: 1px solid var(--surface-raised);
   border-radius: 8px;
+  image-rendering: pixelated;
+}
+
+/* Scoped to the game's own canvas only — EditorScreen.tsx's canvas is sized to its
+   board's own bitmap dimensions (CELL_SIZE * board.size) and has no .game-viewport
+   ancestor, so a bare `canvas { width: 100%; height: 100% }` rule here would stretch it
+   and break cellFromEvent's unscaled client-to-cell coordinate math (final-review C2). */
+.game-viewport canvas {
   display: block;
   width: 100%;
   height: 100%;
+  image-rendering: auto;
 }
 
 .level-select ul {

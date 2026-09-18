@@ -36,9 +36,16 @@ export function resolveAnchorBoardId(world: World, anchor: CameraAnchor): BoardI
   if (anchor === 'void') {
     return world.boards[VOID_BOARD_ID] !== undefined ? VOID_BOARD_ID : null
   }
-  const ownerCount = new Map<BoardId, number>(Object.keys(world.boards).map((id) => [id, 0]))
+  // VOID_BOARD_ID excluded from the orphan scan: once any piece falls into the Void,
+  // 'void' is added to world.boards but nothing ever owns it (no container has
+  // boardRef: 'void'), so on a pure-cycle level (every real board already owned) it
+  // would otherwise become the only zero-owner board and hijack the anchor away from
+  // wherever the player actually is (final-review C1).
+  const ownerCount = new Map<BoardId, number>(
+    Object.keys(world.boards).filter((id) => id !== VOID_BOARD_ID).map((id) => [id, 0]),
+  )
   for (const piece of Object.values(world.pieces)) {
-    if (piece.kind === 'container' && piece.boardRef !== undefined) {
+    if (piece.kind === 'container' && piece.boardRef !== undefined && piece.boardRef !== VOID_BOARD_ID) {
       ownerCount.set(piece.boardRef, (ownerCount.get(piece.boardRef) ?? 0) + 1)
     }
   }

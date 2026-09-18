@@ -74,6 +74,35 @@ describe('resolveAnchorBoardId', () => {
     const world = makeWorld([root], [{ id: PLAYER_ID, kind: 'player' }], { [PLAYER_ID]: { board: 'root', x: 0, y: 0 } })
     expect(resolveAnchorBoardId(world, 'void')).toBeNull()
   })
+
+  it('C1 regression: a pure-cycle level still anchors on the player\'s real board once the Void board exists, even though nothing owns it', () => {
+    // Mirrors the shipped 08-two-node-cycle's shape: every real board is owned by some
+    // container (a pure cycle, no zero-owner board at all) — 'yellowPiece' owns 'start',
+    // 'redPiece' owns 'redInterior'. Then, simulating "a piece already fell into the Void
+    // earlier in the playthrough" (ensureInfiniteDestination), VOID_BOARD_ID is present in
+    // world.boards but nothing has a boardRef pointing at it. Before the fix, 'void' was
+    // the only zero-owner board and hijacked the anchor even though the player is on
+    // 'start'.
+    const start = makeFloorBoard('start', 2)
+    const redInterior = makeFloorBoard('redInterior', 1)
+    const voidBoard = makeFloorBoard(VOID_BOARD_ID, 5)
+    const world = makeWorld(
+      [start, redInterior, voidBoard],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'redPiece', kind: 'container', boardRef: 'redInterior' },
+        { id: 'yellowPiece', kind: 'container', boardRef: 'start' },
+        { id: 'void-infinite:someOtherPiece', kind: 'normal', infiniteFor: 'someOtherPiece' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'start', x: 0, y: 0 },
+        redPiece: { board: 'start', x: 1, y: 0 },
+        yellowPiece: { board: 'redInterior', x: 0, y: 0 },
+        'void-infinite:someOtherPiece': { board: VOID_BOARD_ID, x: 2, y: 2 },
+      },
+    )
+    expect(resolveAnchorBoardId(world, 'root')).toBe('start')
+  })
 })
 
 describe('resolveCanonicalBoardTransform', () => {
