@@ -1,11 +1,65 @@
 import { useEffect, useRef, useState } from 'react'
 import { GameState } from './engine/GameState'
-import { Direction, World } from './engine/types'
+import { Direction, Location, PieceId, PLAYER_ID, VOID_BOARD_ID, World } from './engine/types'
 import { DrawContext, DEFAULT_RENDER_BUDGET, drawBoardRecursive, indexPiecesByBoard } from './render/CanvasRenderer'
 import { CameraTransform, Viewport, cameraForPlayer } from './render/camera'
 import { resolveAnchorBoardId } from './render/recursiveTransform'
 import { DPad } from '../ui/DPad'
 import { SwipeLayer } from '../ui/SwipeLayer'
+
+type AnimationKind = 'move' | 'enter-leave' | 'teleport' | 'void-transition'
+
+interface RenderAnimation {
+  preWorld: World
+  postWorld: World
+  startTimeMs: number
+  durationMs: number
+  kind: AnimationKind
+  sourceCamera: CameraTransform
+  targetCamera: CameraTransform
+}
+
+const DURATIONS: Record<AnimationKind, number> = {
+  move: 120,
+  'enter-leave': 250,
+  teleport: 400,
+  'void-transition': 400,
+}
+
+function easeOut(t: number): number {
+  return 1 - (1 - t) * (1 - t)
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t
+}
+
+function isSimpleContainmentStep(world: World, oldBoard: string, newBoard: string): boolean {
+  const newOwner = Object.values(world.pieces).find((p) => p.kind === 'container' && p.boardRef === newBoard)
+  if (newOwner !== undefined && world.locations[newOwner.id]?.board === oldBoard) return true
+  const oldOwner = Object.values(world.pieces).find((p) => p.kind === 'container' && p.boardRef === oldBoard)
+  if (oldOwner !== undefined && world.locations[oldOwner.id]?.board === newBoard) return true
+  return false
+}
+
+function classifyMove(preWorld: World, postWorld: World): AnimationKind {
+  const oldBoard = preWorld.locations[PLAYER_ID]?.board
+  const newBoard = postWorld.locations[PLAYER_ID]?.board
+  if (oldBoard === undefined || newBoard === undefined || oldBoard === newBoard) return 'move'
+  if (oldBoard === VOID_BOARD_ID || newBoard === VOID_BOARD_ID) return 'void-transition'
+  if (isSimpleContainmentStep(postWorld, oldBoard, newBoard)) return 'enter-leave'
+  return 'teleport'
+}
+
+function getRenderLocationFactory(preWorld: World, postWorld: World, t: number) {
+  return (pieceId: PieceId): Location | undefined => {
+    const pre = preWorld.locations[pieceId]
+    const post = postWorld.locations[pieceId]
+    if (post === undefined) return pre
+    if (pre === undefined || pre.board !== post.board) return post
+    return { board: post.board, x: lerp(pre.x, post.x, t), y: lerp(pre.y, post.y, t) }
+  }
+}
 
 export function GameScreen({
   initialWorld,
@@ -25,14 +79,31 @@ export function GameScreen({
   const containerRef = useRef<HTMLDivElement>(null)
   const wonRef = useRef(false)
   const viewportRef = useRef<Viewport>({ width: 320, height: 320 })
+  const animationRef = useRef<RenderAnimation | null>(null)
 
   const handleMove = (direction: Direction) => {
-    if (state.move(direction)) setTick((t) => t + 1)
+    const preMoveWorld = state.current
+    const moved = state.move(direction)
+    if (!moved) return
+    const postMoveWorld = state.current
+    const kind = classifyMove(preMoveWorld, postMoveWorld)
+    const budget = { targetPlayerCellPixels: DEFAULT_RENDER_BUDGET.targetPlayerCellPixels }
+    animationRef.current = {
+      preWorld: preMoveWorld,
+      postWorld: postMoveWorld,
+      startTimeMs: performance.now(),
+      durationMs: DURATIONS[kind],
+      kind,
+      sourceCamera: cameraForPlayer(preMoveWorld, budget),
+      targetCamera: cameraForPlayer(postMoveWorld, budget),
+    }
+    setTick((t) => t + 1)
   }
 
   const handleUndo = () => {
     if (state.undo()) {
       wonRef.current = false
+      animationRef.current = null // cancel any in-flight animation — undo settles instantly
       setTick((t) => t + 1)
     }
   }
@@ -87,10 +158,47 @@ export function GameScreen({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, viewport.width, viewport.height)
 
-      const world = state.current
-      const camera: CameraTransform = cameraForPlayer(world, { targetPlayerCellPixels: DEFAULT_RENDER_BUDGET.targetPlayerCellPixels })
+      const anim = animationRef.current
+      let world = state.current
+      let camera: CameraTransform
+      let dimAlpha = 0 // Void-transition darken overlay, 0..1
+
+      if (anim !== null) {
+        const rawT = (performance.now() - anim.startTimeMs) / anim.durationMs
+        if (rawT >= 1) {
+          animationRef.current = null
+          world = state.current
+          camera = cameraForPlayer(world, { targetPlayerCellPixels: DEFAULT_RENDER_BUDGET.targetPlayerCellPixels })
+        } else {
+          const t = easeOut(Math.max(0, rawT))
+          if (anim.kind === 'void-transition' || anim.sourceCamera.anchor !== anim.targetCamera.anchor) {
+            // Anchors are never interpolated (§12) — two-phase darken/swap/fade instead.
+            if (t < 0.5) {
+              world = anim.preWorld
+              camera = anim.sourceCamera
+              dimAlpha = t / 0.5
+            } else {
+              world = anim.postWorld
+              camera = anim.targetCamera
+              dimAlpha = 1 - (t - 0.5) / 0.5
+            }
+          } else {
+            world = anim.postWorld
+            camera = {
+              anchor: anim.targetCamera.anchor,
+              centerX: lerp(anim.sourceCamera.centerX, anim.targetCamera.centerX, t),
+              centerY: lerp(anim.sourceCamera.centerY, anim.targetCamera.centerY, t),
+              pixelsPerRootUnit: lerp(anim.sourceCamera.pixelsPerRootUnit, anim.targetCamera.pixelsPerRootUnit, t),
+            }
+          }
+        }
+      } else {
+        camera = cameraForPlayer(world, { targetPlayerCellPixels: DEFAULT_RENDER_BUDGET.targetPlayerCellPixels })
+      }
+
       const anchorBoardId = resolveAnchorBoardId(world, camera.anchor)
       if (anchorBoardId !== null && world.boards[anchorBoardId] !== undefined) {
+        const currentAnim = animationRef.current
         const dc: DrawContext = {
           ctx,
           world,
@@ -99,14 +207,27 @@ export function GameScreen({
           budget: DEFAULT_RENDER_BUDGET,
           piecesByBoard: indexPiecesByBoard(world),
           cellsDrawnSoFar: { count: 0 },
+          getRenderLocation:
+            currentAnim !== null && currentAnim.kind === 'move'
+              ? getRenderLocationFactory(currentAnim.preWorld, currentAnim.postWorld, easeOut(Math.max(0, Math.min(1, (performance.now() - currentAnim.startTimeMs) / currentAnim.durationMs))))
+              : undefined,
         }
         drawBoardRecursive(dc, world.boards[anchorBoardId], { boardId: anchorBoardId, originX: 0, originY: 0, scale: 1 }, 0, 0, false)
       }
+
+      if (dimAlpha > 0) {
+        ctx.fillStyle = `rgba(0,0,0,${dimAlpha})`
+        ctx.fillRect(0, 0, viewport.width, viewport.height)
+      }
+
       rafId = requestAnimationFrame(frame)
     }
-    // Draw synchronously once up front — requestAnimationFrame always defers to the
-    // next paint, so without this the canvas would sit at the browser's default
-    // 300x150 size (and show nothing) for one visible frame after every mount.
+    // Call frame() synchronously once on mount, in addition to the RAF scheduling
+    // inside frame() itself for every subsequent tick — found necessary during Task 6:
+    // scheduling the very first call via requestAnimationFrame alone means the canvas
+    // stays at its default/stale size for one frame after every mount (a real visible
+    // flash in production, and what made Task 6's viewport-size test flaky under RTL,
+    // since assertions run before that first deferred RAF callback ever fires).
     frame()
     return () => cancelAnimationFrame(rafId)
   }, [state])

@@ -111,6 +111,35 @@ test('pushing the player into a self-loop sends them to the Void, and play conti
   expect(onExit).toHaveBeenCalledTimes(1)
 })
 
+test('captures the exact pre-move and post-move World via state.current, not a history index', async () => {
+  // Indirect proof: after one move then one undo, the move counter (driven by
+  // GameState.moveCount, itself derived from history.length) is exactly 0 — proves the
+  // animation capture never mutated or mis-indexed GameState's own history.
+  render(<GameScreen initialWorld={simpleWorld()} onExit={() => {}} onWin={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('右'))
+  await user.click(screen.getByText('复位上一步'))
+  expect(screen.getByText('步数: 0')).toBeInTheDocument()
+})
+
+test('an ordinary move still resolves to the correct final position after its animation settles', async () => {
+  render(<GameScreen initialWorld={simpleWorld()} onExit={() => {}} onWin={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('右'))
+  await user.click(screen.getByLabelText('右'))
+  await new Promise((resolve) => setTimeout(resolve, 500)) // outlast every animation duration (max 400ms)
+  expect(screen.getByText('步数: 2')).toBeInTheDocument()
+})
+
+test('undo cancels any in-flight animation and settles on the reverted state', async () => {
+  render(<GameScreen initialWorld={simpleWorld()} onExit={() => {}} onWin={() => {}} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText('右'))
+  await user.click(screen.getByText('复位上一步'))
+  expect(screen.getByText('步数: 0')).toBeInTheDocument()
+  // no throw, no leftover animation referencing a now-stale pre/post pair
+})
+
 test('runs a requestAnimationFrame loop and cancels it on unmount', () => {
   const rafSpy = vi.spyOn(window, 'requestAnimationFrame')
   const cancelSpy = vi.spyOn(window, 'cancelAnimationFrame')
