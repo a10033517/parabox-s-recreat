@@ -98,6 +98,19 @@ describe('parseLevel structural validation', () => {
     expect(() => parseLevel(data)).toThrow(/boardRef/i)
   })
 
+  it('accepts a container piece with cloneOf and no boardRef', () => {
+    const data = serializeLevel(sampleWorld()) as { pieces: Record<string, unknown>; boards: Record<string, unknown> }
+    data.pieces.box1 = { id: 'box1', kind: 'container', cloneOf: 'player' }
+    delete data.boards.inside
+    expect(() => parseLevel(data)).not.toThrow()
+  })
+
+  it('still rejects a container piece with no boardRef when cloneOf is absent', () => {
+    const data = serializeLevel(sampleWorld()) as { pieces: Record<string, { boardRef?: string }> }
+    delete data.pieces.box1.boardRef
+    expect(() => parseLevel(data)).toThrow(/boardRef/i)
+  })
+
   it('rejects a board with a cell of an invalid type', () => {
     const data = serializeLevel(sampleWorld()) as { boards: Record<string, { cells: { type: string }[][] }> }
     data.boards.root.cells[0][0].type = 'lava'

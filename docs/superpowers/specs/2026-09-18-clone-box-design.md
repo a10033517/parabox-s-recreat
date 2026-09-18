@@ -21,10 +21,15 @@ carry an unused `boardRef`. Two changes adopted from that here, both consistent 
    `mainBodyId`, or cared which piece was entering. Noted here for the record, not
    because anything is being changed.
 
-A third point — a clone can carry its own `fliph`, independent of its main body's —
-is covered by the Flip spec (same `Piece.fliph` field, no clone-specific code needed
-since `tryEnter` already checks `into.fliph` on whichever piece was entered, and a
-clone is exactly that piece).
+A third point, corrected after the final whole-branch review of the implementation:
+a clone piece can still carry `fliph` (same `Piece.fliph` field, no schema
+restriction), but it has **no effect** — `tryEnter`'s `cloneOf` interception returns
+from `resolveCloneTeleport` before `into.fliph` is ever read, so the entry-mirroring
+code path is only reached for a piece that falls through to normal container entry,
+which a clone never does. This was wrongly asserted as working in the original
+revision of this note. Whether a flipped clone should instead mirror its
+displacement direction is an open design question for its own round, not something
+this implementation does today.
 
 ## Goal
 

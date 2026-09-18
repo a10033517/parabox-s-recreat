@@ -4,6 +4,26 @@ import {
   inBounds, step, findContainerFor, occupantAt, moveTo, ensureInfiniteDestination, isInVoid, opposite, PLAYER_ID, VOID_BOARD_ID,
 } from './types'
 
+function mirrorHorizontal(dir: Direction): Direction {
+  if (dir === 'left') return 'right'
+  if (dir === 'right') return 'left'
+  return dir
+}
+
+// The four directions' worth of "which cell of a same-size linked board does exiting
+// this cell land on" — opposite edge, matching offset, exactly like exiting any board
+// already lands you on the opposite edge of wherever the climb continues to; this is
+// the same idea applied directly between two linked containers' interiors instead of
+// via the normal owner-climb.
+function linkedEntryCell(size: number, x: number, y: number, dir: Direction): { x: number; y: number } {
+  switch (dir) {
+    case 'right': return { x: 0, y }
+    case 'left':  return { x: size - 1, y }
+    case 'down':  return { x, y: 0 }
+    case 'up':    return { x, y: size - 1 }
+  }
+}
+
 export type MoveTarget =
   | { kind: 'location'; location: Location; relativeCoord: Fraction }
   | { kind: 'infinite'; board: BoardId; ownerId: PieceId }
@@ -39,12 +59,23 @@ export function computeTarget(
 
   const containerId = findContainerFor(world, loc.board)
   if (containerId === undefined) return null
+  const container = world.pieces[containerId]
 
-  const offset = dir === 'up' || dir === 'down' ? loc.x : loc.y
+  if (container.linkedTo !== undefined) {
+    const linked = world.pieces[container.linkedTo]
+    const linkedBoard = linked?.boardRef !== undefined ? world.boards[linked.boardRef] : undefined
+    if (linkedBoard === undefined) return null // malformed link — fail cleanly, don't fall through
+    const cell = linkedEntryCell(board.size, loc.x, loc.y, dir)
+    if (!inBounds(linkedBoard, cell.x, cell.y)) return null // e.g. a size mismatch the author didn't intend
+    return { kind: 'location', location: { board: linked.boardRef as BoardId, x: cell.x, y: cell.y }, relativeCoord }
+  }
+
+  const climbDir = container.fliph ? mirrorHorizontal(dir) : dir
+  const offset = climbDir === 'up' || climbDir === 'down' ? loc.x : loc.y
   const newRelativeCoord = divideByInt(addInt(relativeCoord, offset), board.size)
 
   const containerLoc = world.locations[containerId]
-  return computeTarget(world, containerLoc, dir, newRelativeCoord, visited)
+  return computeTarget(world, containerLoc, climbDir, newRelativeCoord, visited)
 }
 
 export function getEntryCell(
@@ -157,6 +188,40 @@ export function resolveInfiniteExit(
   return moveTo(pushed, pieceId, exitLoc)
 }
 
+// A clone has no real interior in practice: entering it (from either tryEnter call
+// site — the "entered" or "eaten" direction inside resolveBlocked, so this applies to
+// any piece, not just the player) redirects to wherever mainBodyId is CURRENTLY
+// standing, rather than descending into the clone's own boardRef. In practice that
+// cell is occupied by the main body itself, so the common case is displacing it one
+// step further in the same direction (an ordinary push, reusing tryMovePiece exactly
+// like resolveInfiniteExit's Void-exit chain-push); if that push isn't possible, the
+// whole move fails, same as any other blocked move.
+export function resolveCloneTeleport(
+  world: World,
+  pieceId: PieceId,
+  mainBodyId: PieceId,
+  dir: Direction,
+  inMotion: Map<PieceId, Direction>,
+): World | null {
+  const targetLoc = world.locations[mainBodyId]
+  if (targetLoc === undefined) return null
+
+  const occupant = occupantAt(world, targetLoc)
+  // occupant is always mainBodyId (occupantAt never consults world.boards — it's
+  // tautologically standing at its own reported location). The real guard here is
+  // the board-presence check: without it, the push below would crash trying to walk
+  // a nonexistent board — a structurally odd but not unsafe shape (see the
+  // missing-mainBodyId case above), so the entrant just teleports directly there.
+  if (occupant === undefined || world.boards[targetLoc.board] === undefined) {
+    return moveTo(world, pieceId, targetLoc)
+  }
+  if (occupant === pieceId) return null // degenerate: pieceId IS the main body
+
+  const pushed = tryMovePiece(world, occupant, dir, new Map(inMotion).set(pieceId, dir), new Set())
+  if (pushed === null) return null
+  return moveTo(pushed, pieceId, targetLoc)
+}
+
 export function tryEnter(
   world: World,
   pieceId: PieceId,
@@ -169,10 +234,14 @@ export function tryEnter(
   if (beingEntered.has(intoId)) return null
 
   const into: Piece = world.pieces[intoId]
+  if (into.cloneOf !== undefined) {
+    return resolveCloneTeleport(world, pieceId, into.cloneOf, dir, inMotion)
+  }
   if (into.kind !== 'container') return null
 
   const board = world.boards[into.boardRef as string]
-  const { cell, newRelativeCoord } = getEntryCell(board, dir, relativeCoord)
+  const entryDir = into.fliph ? mirrorHorizontal(dir) : dir
+  const { cell, newRelativeCoord } = getEntryCell(board, entryDir, relativeCoord)
   if (cell === null) return null
   if (board.cells[cell.y][cell.x].type === 'wall') return null
 

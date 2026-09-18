@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece, resolveBlocked, resolveInfiniteExit, checkWin } from './rules'
+import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece, resolveBlocked, resolveInfiniteExit, resolveCloneTeleport, checkWin } from './rules'
 import { HALF, makeFraction, ZERO, ONE } from './fraction'
 import { makeFloorBoard, makeWorld, setWall, setRequirement } from './testFixtures'
 import { PLAYER_ID } from './types'
@@ -879,6 +879,113 @@ describe('resolveBlocked — locked pieces push only, never enter or eat, on eit
   })
 })
 
+describe('resolveCloneTeleport — entering a clone redirects to its main body\'s current location', () => {
+  it('teleports the entrant directly there when the main body\'s own board is not registered in the world (degrade-safe fallback, not a reachable "free cell" state)', () => {
+    // occupantAt(world, world.locations[mainBodyId]) is provably always mainBodyId
+    // itself in any valid world — a main body's own cell can never genuinely be
+    // "free". This fixture instead exercises the degrade-safe fallback added for
+    // when mainBodyId's own board isn't registered in `world.boards`: a
+    // structurally odd but not unsafe shape that can't arise from a level
+    // parseLevel accepts, but is handled cleanly rather than crashing.
+    const world = makeWorld(
+      [makeFloorBoard('root', 4)],
+      [{ id: 'A', kind: 'normal' }, { id: 'entrant', kind: 'normal' }],
+      { A: { board: 'somewhereElse', x: 0, y: 0 }, entrant: { board: 'root', x: 2, y: 0 } },
+    )
+    // A is on a board this fixture never declares in `boards` — deliberately: its
+    // own board never needs to be walked, only its Location is read.
+    const result = resolveCloneTeleport(world, 'entrant', 'A', 'right', new Map())
+    expect(result?.locations.entrant).toEqual({ board: 'somewhereElse', x: 0, y: 0 })
+  })
+
+  it('pushes the main body one step further in the entrant\'s direction when its own cell is occupied (the common case — reproduces the confirmed worked example)', () => {
+    const root = makeFloorBoard('root', 4)
+    const world = makeWorld(
+      [root],
+      [
+        { id: 'A', kind: 'container', boardRef: 'root' }, // self-loop main body
+        { id: 'B', kind: 'container', cloneOf: 'A', boardRef: 'root' },
+        { id: 'entrant', kind: 'normal' },
+      ],
+      {
+        A: { board: 'root', x: 0, y: 0 },
+        B: { board: 'root', x: 3, y: 0 },
+        entrant: { board: 'root', x: 2, y: 0 },
+      },
+    )
+    const result = resolveCloneTeleport(world, 'entrant', 'A', 'right', new Map())!
+    expect(result.locations.A).toEqual({ board: 'root', x: 1, y: 0 }) // pushed one step right
+    expect(result.locations.entrant).toEqual({ board: 'root', x: 0, y: 0 }) // takes A's old cell
+  })
+
+  it('fails the whole move when the main body cannot be pushed further', () => {
+    const root = makeFloorBoard('root', 4)
+    const world = makeWorld(
+      [root],
+      [{ id: 'A', kind: 'normal' }, { id: 'entrant', kind: 'normal' }],
+      { A: { board: 'root', x: 0, y: 0 }, entrant: { board: 'root', x: 2, y: 0 } }, // A flush against the left edge
+    )
+    const result = resolveCloneTeleport(world, 'entrant', 'A', 'left', new Map())
+    expect(result).toBeNull()
+    expect(world.locations.A).toEqual({ board: 'root', x: 0, y: 0 }) // untouched
+    expect(world.locations.entrant).toEqual({ board: 'root', x: 2, y: 0 }) // untouched
+  })
+
+  it('fails cleanly (does not throw) when cloneOf names a piece with no location', () => {
+    const world = makeWorld(
+      [makeFloorBoard('root', 2)],
+      [{ id: 'entrant', kind: 'normal' }],
+      { entrant: { board: 'root', x: 0, y: 0 } },
+    )
+    expect(resolveCloneTeleport(world, 'entrant', 'nonexistent', 'right', new Map())).toBeNull()
+  })
+})
+
+describe('tryEnter — a clone redirects before normal container entry', () => {
+  it('an ordinary box (not the player) pushed into a clone triggers the same redirect', () => {
+    // A sits well away from pusher's own row so the push-chain that follows (pusher
+    // -> tries to enter B -> redirects to A -> pushes A) can't loop back onto pusher
+    // itself — hand-traced against the exact resolveBlocked/resolveCloneTeleport
+    // logic before writing this down: pusher ends up at A's OLD location (A's cell,
+    // vacated), A ends up pushed one step further right.
+    const root = makeFloorBoard('root', 4)
+    setWall(root, 3, 1) // directly behind B — push fails, forcing tryEnter
+    const world = makeWorld(
+      [root],
+      [
+        { id: 'A', kind: 'container', boardRef: 'root' },
+        { id: 'B', kind: 'container', cloneOf: 'A' }, // no boardRef needed (Task 1)
+        { id: 'pusher', kind: 'normal' },
+      ],
+      {
+        A: { board: 'root', x: 0, y: 3 },
+        B: { board: 'root', x: 2, y: 1 },
+        pusher: { board: 'root', x: 1, y: 1 },
+      },
+    )
+    const direct = tryMovePiece(world, 'pusher', 'right', new Map(), new Set())!
+    expect(direct.locations.pusher).toEqual({ board: 'root', x: 0, y: 3 }) // A's old cell
+    expect(direct.locations.A).toEqual({ board: 'root', x: 1, y: 3 }) // pushed one step right
+    expect(direct.locations.B).toEqual({ board: 'root', x: 2, y: 1 }) // B itself never moves
+  })
+
+  it('control: entering an ordinary (non-clone) container is unaffected', () => {
+    const root = makeFloorBoard('root', 3)
+    setWall(root, 2, 1)
+    const inside = makeFloorBoard('inside', 3)
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'C', kind: 'container', boardRef: 'inside' },
+      ],
+      { [PLAYER_ID]: { board: 'root', x: 0, y: 1 }, C: { board: 'root', x: 1, y: 1 } },
+    )
+    const next = applyMove(world, 'right')
+    expect(next?.locations[PLAYER_ID].board).toBe('inside') // entered normally, unaffected by Clone
+  })
+})
+
 describe('tryMovePiece — infinite resolution when the Void is full', () => {
   it('fails the whole move cleanly, leaving the pusher and the piece being pushed into infinite untouched', () => {
     const voidCells: { x: number; y: number }[] = [
@@ -917,5 +1024,202 @@ describe('tryMovePiece — infinite resolution when the Void is full', () => {
     )
     const next = applyMove(world, 'left')
     expect(next).toBeNull()
+  })
+})
+
+describe('fliph — entry direction is horizontally mirrored', () => {
+  it('entering a fliph container pushing right computes the same cell as pushing left into an identical non-flipped container', () => {
+    const root = makeFloorBoard('root', 3)
+    // no wall needed: the container sits at the board's edge (x=2 on a size-3
+    // board), so pushing it further right is already out of bounds — the push
+    // fails naturally, forcing entry
+    const insideFlipped = makeFloorBoard('insideFlipped', 4)
+    const insidePlain = makeFloorBoard('insidePlain', 4)
+    const world = makeWorld(
+      [root, insideFlipped, insidePlain],
+      [
+        { id: 'pusher', kind: 'normal' },
+        { id: 'flipped', kind: 'container', boardRef: 'insideFlipped', fliph: true },
+      ],
+      { pusher: { board: 'root', x: 1, y: 1 }, flipped: { board: 'root', x: 2, y: 1 } },
+    )
+    const next = tryMovePiece(world, 'pusher', 'right', new Map(), new Set())
+    expect(next?.locations.pusher).toEqual({ board: 'insideFlipped', x: 3, y: 1 }) // mirrored entry cell — verified: getEntryCell(board,'left',HALF) = (3,1)
+  })
+
+  it('up/down entries are unaffected by fliph', () => {
+    const root = makeFloorBoard('root', 3)
+    setWall(root, 1, 0) // directly behind the container in the push direction (pushing up)
+    const insideFlipped = makeFloorBoard('insideFlipped', 4)
+    const world = makeWorld(
+      [root, insideFlipped],
+      [
+        { id: 'pusher', kind: 'normal' },
+        { id: 'flipped', kind: 'container', boardRef: 'insideFlipped', fliph: true },
+      ],
+      { pusher: { board: 'root', x: 1, y: 2 }, flipped: { board: 'root', x: 1, y: 1 } },
+    )
+    const next = tryMovePiece(world, 'pusher', 'up', new Map(), new Set())
+    expect(next?.locations.pusher).toEqual({ board: 'insideFlipped', x: 2, y: 3 }) // same as a non-flipped 'up' entry — verified: getEntryCell(board,'up',HALF) = (2,3)
+  })
+
+  it('control: entering a non-fliph container is unaffected', () => {
+    const root = makeFloorBoard('root', 3)
+    // no wall needed: the container sits at the board's edge (x=2 on a size-3
+    // board), so pushing it further right is already out of bounds — the push
+    // fails naturally, forcing entry
+    const inside = makeFloorBoard('inside', 4)
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: 'pusher', kind: 'normal' },
+        { id: 'plain', kind: 'container', boardRef: 'inside' },
+      ],
+      { pusher: { board: 'root', x: 1, y: 1 }, plain: { board: 'root', x: 2, y: 1 } },
+    )
+    const next = tryMovePiece(world, 'pusher', 'right', new Map(), new Set())
+    expect(next?.locations.pusher).toEqual({ board: 'inside', x: 0, y: 1 }) // the ORIGINAL (non-mirrored) entry cell
+  })
+})
+
+describe('fliph — exit direction is horizontally mirrored', () => {
+  it('exiting a fliph container continues the climb in the mirrored direction (reproduces the derived example from the spec)', () => {
+    const root = makeFloorBoard('root', 4)
+    const xInterior = makeFloorBoard('Xinterior', 2)
+    const world = makeWorld(
+      [root, xInterior],
+      [{ id: 'X', kind: 'container', boardRef: 'Xinterior', fliph: true }],
+      { X: { board: 'root', x: 1, y: 1 } },
+    )
+    const result = computeTarget(world, { board: 'Xinterior', x: 1, y: 0 }, 'right', HALF)
+    expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 0, y: 1 }, relativeCoord: expect.anything() })
+  })
+
+  it('control: exiting a non-fliph container is unaffected (same fixture, no fliph)', () => {
+    const root = makeFloorBoard('root', 4)
+    const xInterior = makeFloorBoard('Xinterior', 2)
+    const world = makeWorld(
+      [root, xInterior],
+      [{ id: 'X', kind: 'container', boardRef: 'Xinterior' }],
+      { X: { board: 'root', x: 1, y: 1 } },
+    )
+    const result = computeTarget(world, { board: 'Xinterior', x: 1, y: 0 }, 'right', HALF)
+    expect(result).toEqual({ kind: 'location', location: { board: 'root', x: 2, y: 1 }, relativeCoord: expect.anything() })
+  })
+})
+
+describe('linkedTo — exiting a linked container lands at the mirrored-offset cell in the linked container\'s interior', () => {
+  it('reproduces the confirmed example: exiting (3,1) of a 4x4 linked interior pushing right lands at (0,1) of the linked interior', () => {
+    const c1Interior = makeFloorBoard('c1Interior', 4)
+    const c2Interior = makeFloorBoard('c2Interior', 4)
+    const world = makeWorld(
+      [c1Interior, c2Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior' },
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 5, y: 0 } },
+    )
+    const result = computeTarget(world, { board: 'c1Interior', x: 3, y: 1 }, 'right', HALF)
+    expect(result?.kind).toBe('location')
+    expect(result && result.kind === 'location' ? result.location : null).toEqual({ board: 'c2Interior', x: 0, y: 1 })
+  })
+
+  it('all four directions map to the opposite edge at the matching offset', () => {
+    const c1Interior = makeFloorBoard('c1Interior', 4)
+    const c2Interior = makeFloorBoard('c2Interior', 4)
+    const world = makeWorld(
+      [c1Interior, c2Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior' },
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 5, y: 0 } },
+    )
+    const left = computeTarget(world, { board: 'c1Interior', x: 0, y: 2 }, 'left', HALF)
+    const up = computeTarget(world, { board: 'c1Interior', x: 2, y: 0 }, 'up', HALF)
+    const down = computeTarget(world, { board: 'c1Interior', x: 1, y: 3 }, 'down', HALF)
+    expect(left?.kind === 'location' ? left.location : null).toEqual({ board: 'c2Interior', x: 3, y: 2 })
+    expect(up?.kind === 'location' ? up.location : null).toEqual({ board: 'c2Interior', x: 2, y: 3 })
+    expect(down?.kind === 'location' ? down.location : null).toEqual({ board: 'c2Interior', x: 1, y: 0 })
+  })
+
+  it('a one-directional link only affects exiting the linked side — C2 (unlinked) still climbs to its own owner normally', () => {
+    const root = makeFloorBoard('root', 6)
+    const c1Interior = makeFloorBoard('c1Interior', 4)
+    const c2Interior = makeFloorBoard('c2Interior', 4)
+    const world = makeWorld(
+      [root, c1Interior, c2Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior' }, // no linkedTo back
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 2, y: 2 } },
+    )
+    const result = computeTarget(world, { board: 'c2Interior', x: 3, y: 1 }, 'right', HALF)
+    // Normal climb-to-owner: exits toward wherever C2 itself is (root), NOT toward C1.
+    expect(result?.kind).toBe('location')
+    expect(result && result.kind === 'location' ? result.location.board : null).toBe('root')
+  })
+
+  it('a malformed link (target has no boardRef) fails the move rather than falling back to normal climbing', () => {
+    const c1Interior = makeFloorBoard('c1Interior', 4)
+    const world = makeWorld(
+      [c1Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'ghost' },
+        { id: 'ghost', kind: 'normal' }, // exists, but not a container — no boardRef
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, ghost: { board: 'root', x: 9, y: 9 } },
+    )
+    const result = computeTarget(world, { board: 'c1Interior', x: 3, y: 1 }, 'right', HALF)
+    expect(result).toBeNull()
+  })
+
+  it('a size-mismatched link that maps out of bounds fails the move', () => {
+    const c1Interior = makeFloorBoard('c1Interior', 4)
+    const c2InteriorSmaller = makeFloorBoard('c2Interior', 2) // mismatched size
+    const world = makeWorld(
+      [c1Interior, c2InteriorSmaller],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior' },
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 5, y: 0 } },
+    )
+    // Exiting at y=3 (valid in a size-4 board) maps to y=3 in the linked board too
+    // (linkedEntryCell preserves the offset unchanged) — out of bounds for a size-2 board.
+    const result = computeTarget(world, { board: 'c1Interior', x: 3, y: 3 }, 'right', HALF)
+    expect(result).toBeNull()
+  })
+
+  it('a link never triggers infinite-exit detection, even for a shape that would otherwise be a textbook cycle', () => {
+    // C1 and C2 linked to each other, closing what WOULD be an infinite regress if
+    // resolved via the normal climb — but a link resolution is terminal and never
+    // touches `visited`, so this must resolve as an ordinary location, not infinite.
+    const c1Interior = makeFloorBoard('c1Interior', 2)
+    const c2Interior = makeFloorBoard('c2Interior', 2)
+    const world = makeWorld(
+      [c1Interior, c2Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior', linkedTo: 'C1' },
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 5, y: 0 } },
+    )
+    const result = computeTarget(world, { board: 'c1Interior', x: 1, y: 0 }, 'right', HALF)
+    expect(result?.kind).toBe('location')
+  })
+
+  it('control: a container with no linkedTo climbs to its own owner exactly as before', () => {
+    const root = makeFloorBoard('root', 3)
+    const inside = makeFloorBoard('inside', 3)
+    const world = makeWorld(
+      [root, inside],
+      [{ id: 'C', kind: 'container', boardRef: 'inside' }],
+      { C: { board: 'root', x: 1, y: 1 } },
+    )
+    const result = computeTarget(world, { board: 'inside', x: 2, y: 1 }, 'right', HALF)
+    expect(result?.kind === 'location' ? result.location : null).toEqual({ board: 'root', x: 2, y: 1 })
   })
 })
