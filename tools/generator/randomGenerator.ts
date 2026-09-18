@@ -39,10 +39,10 @@ function makeBoard(id: string, size: number, wallDensity: number, rng: () => num
   return { id, size, cells }
 }
 
-// Floor cells with no requirement filter — used when placing a GOAL, which
-// is a cell property and may legitimately coincide with a piece (that
-// piece then incidentally already satisfies the requirement, which is
-// valid, not an error).
+// Every floor cell on a board, with no occupancy/requirement filtering —
+// the raw building block unoccupiedFloorCells filters down from. Not used
+// directly for placement decisions (see unoccupiedFloorCells's own
+// comment for why both pieces and goals need the filtered version).
 function floorCells(board: Board): { x: number; y: number }[] {
   const cells: { x: number; y: number }[] = []
   for (let y = 0; y < board.size; y++) {
@@ -53,14 +53,27 @@ function floorCells(board: Board): { x: number; y: number }[] {
   return cells
 }
 
-// Floor cells with no current piece occupant — used for placing a PIECE
-// (player/box/container), so two pieces don't land on the same cell purely
-// by bad luck. This is a generator-side quality improvement, not a
-// correctness requirement (basicValidator.ts still catches an overlap if
-// one ever slips through), matching the design brief's own §4 Step 4 goal
-// of not generating "obviously illegal overlaps" even before validation.
+// Floor cells with no current piece occupant AND no existing requirement —
+// used for placing BOTH a PIECE (player/box/container: so two pieces don't
+// land on the same cell, and a new piece never spawns already sitting on
+// an earlier box's goal) AND a GOAL (so a goal never lands on a cell some
+// piece already occupies, which would trivially pre-satisfy it — a box
+// spawning on its own designated goal is one instance of this, but a box
+// spawning on any OTHER already-placed piece's cell, or a goal landing on
+// an already-placed different goal's cell, are the same "wasted, does
+// nothing" problem — caught by hand-verifying a shipped level whose
+// container turned out to be pure decoration for exactly this reason).
+// This is a generator-side quality improvement, not a correctness
+// requirement (basicValidator.ts still catches an overlap or a goal/box
+// count mismatch if one ever slips through), matching the design brief's
+// own §4 Step 4 goal of not generating "obviously illegal overlaps" even
+// before validation.
 function unoccupiedFloorCells(world: World, board: Board): { x: number; y: number }[] {
-  return floorCells(board).filter((c) => occupantAt(world, { board: board.id, x: c.x, y: c.y }) === undefined)
+  return floorCells(board).filter(
+    (c) =>
+      occupantAt(world, { board: board.id, x: c.x, y: c.y }) === undefined &&
+      board.cells[c.y][c.x].requirement === undefined,
+  )
 }
 
 interface BoardEntry {
@@ -146,7 +159,10 @@ export function randomGenerate(config: RandomGeneratorConfig, rng: () => number)
       otherBoards.length > 0 && rng() < config.crossBoardGoalProbability
         ? otherBoards[randInt(rng, 0, otherBoards.length - 1)]
         : (boards.find((b) => b.id === homeBoardId) as BoardEntry)
-    const goalCells = floorCells(goalBoardEntry.board)
+    // unoccupiedFloorCells excludes every currently-occupied cell (not
+    // just this box's own) and every already-placed requirement cell —
+    // see its own comment for why both matter here.
+    const goalCells = unoccupiedFloorCells(world, goalBoardEntry.board)
     if (goalCells.length === 0) return null
     const goalCell = goalCells[randInt(rng, 0, goalCells.length - 1)]
     goalBoardEntry.board.cells[goalCell.y][goalCell.x] = { type: 'floor', requirement: 'box' }

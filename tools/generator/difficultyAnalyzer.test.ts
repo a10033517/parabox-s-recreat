@@ -119,6 +119,42 @@ test('nestedBoxRequired is true and maxContainerDepthUsed is 1 when the goal is 
   expect(vector.maxContainerDepthUsed).toBe(1)
 })
 
+test('nestedBoxRequired is false when a container is merely pushed onto a root goal without ever being entered', () => {
+  // Regression test for a real bug caught by hand-verifying a shipped
+  // level: the first nestedBoxRequired implementation froze a container by
+  // walling its cell and DELETING the piece. Here the container itself is
+  // what satisfies the root-level goal (checkWin accepts any non-player
+  // occupant) — deleting it makes the frozen world trivially unsolvable
+  // for a reason having nothing to do with the nested-space mechanic
+  // ever being used. The fix (demote to a plain, un-enterable box in
+  // place) must still let it be pushed onto the goal.
+  const size = 5
+  const cells: Cell[][] = Array.from({ length: size }, () =>
+    Array.from({ length: size }, (): Cell => ({ type: 'wall' })),
+  )
+  for (let x = 1; x <= 3; x++) cells[2][x] = { type: 'floor' }
+  cells[2][3] = { type: 'floor', requirement: 'box' } // root-level goal at the corridor's end
+  const inside = { id: 'inside', size: 3, cells: makeSquareCells(3) }
+  inside.cells[1][1] = { type: 'floor', requirement: 'box' } // decorative: satisfied from t=0
+  const world: World = {
+    boards: { root: { id: 'root', size, cells }, inside },
+    pieces: {
+      [PLAYER_ID]: { id: PLAYER_ID, kind: 'player' },
+      container1: { id: 'container1', kind: 'container', boardRef: 'inside' },
+      decorativeBox: { id: 'decorativeBox', kind: 'normal' },
+    },
+    locations: {
+      [PLAYER_ID]: { board: 'root', x: 1, y: 2 },
+      container1: { board: 'root', x: 2, y: 2 },
+      decorativeBox: { board: 'inside', x: 1, y: 1 },
+    },
+  }
+  const solved = solve(world)!
+  expect(solved.moves).toEqual(['right'])
+  const vector = analyze(world, solved, 5000)
+  expect(vector.nestedBoxRequired).toBe(false)
+})
+
 test('nestedBoxRequired is false when the container is never needed for the solution', () => {
   const size = 6
   const cells = makeSquareCells(size)

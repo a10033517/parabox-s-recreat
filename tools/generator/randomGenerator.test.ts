@@ -81,7 +81,14 @@ test('every generated container is blocked on at least one side (enterable)', ()
 })
 
 test('maxNestingDepth caps how many levels of container nesting are created', () => {
-  const config = baseConfig({ boxCountRange: [6, 6], containerProbability: 1, interiorSizeRange: [3, 3], maxNestingDepth: 1 })
+  // interiorSize 4 (not 3): a 3x3 interior has only 1 floor cell, already
+  // spent on the box itself, leaving no room for a same-board goal now
+  // that goals must avoid every occupied cell (see unoccupiedFloorCells) —
+  // and crossBoardGoalProbability's default can still route a goal to a
+  // DIFFERENT tiny same-sized interior that's equally full, not
+  // necessarily to spacious root. A 4x4 interior (4 floor cells) leaves
+  // room either way.
+  const config = baseConfig({ boxCountRange: [6, 6], containerProbability: 1, interiorSizeRange: [4, 4], maxNestingDepth: 1 })
   const result = randomGenerate(config, Math.random)
   expect(result).not.toBeNull()
   const { world } = result!
@@ -98,6 +105,29 @@ test('maxNestingDepth caps how many levels of container nesting are created', ()
   }
   for (const boardId of Object.keys(world.boards)) {
     expect(depthOf(boardId)).toBeLessThanOrEqual(config.maxNestingDepth)
+  }
+})
+
+test('no box ever spawns already sitting on its own goal cell', () => {
+  // Regression test: goal placement used to draw independently from the
+  // box's own spawn cell, so a box could land on a floor cell that also
+  // becomes its own goal — trivially satisfied from the start, never
+  // needing to move at all. Caught by hand-verifying a shipped level
+  // whose container turned out to be pure decoration for exactly this
+  // reason (the box living inside it started already on its goal). Runs
+  // across many seeds since this is a placement-order interaction, not a
+  // single fixed geometry.
+  const config = baseConfig({ containerProbability: 0.5, crossBoardGoalProbability: 0.3, boxCountRange: [1, 4], interiorSizeRange: [3, 5] })
+  for (let i = 0; i < 100; i++) {
+    const result = randomGenerate(config, Math.random)
+    if (result === null) continue
+    const { world } = result
+    for (const piece of Object.values(world.pieces)) {
+      if (piece.kind !== 'normal') continue
+      const loc = world.locations[piece.id]
+      const cell = world.boards[loc.board].cells[loc.y][loc.x]
+      expect(cell.requirement).not.toBe('box')
+    }
   }
 })
 

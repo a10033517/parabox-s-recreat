@@ -90,24 +90,34 @@ function criticalDecisions(world: World, solved: SolveResult, maxSolverExpandedS
   return decisions
 }
 
-// Mechanic relevance (design spec §7/md §18): seal every container's cell
-// into a wall and remove the container piece itself, but deliberately do
-// NOT delete its interior board or anything inside it — the goal (and any
-// box) that lived there stays in the world, so checkWin still requires it;
-// it simply becomes permanently unreachable now that its only entrance is
-// gone. Deleting the board instead would make its goal cell vanish
-// entirely, which checkWin would misread as "nothing left to satisfy,
-// trivially won" rather than "impossible to reach" — the wrong signal.
+// Mechanic relevance (design spec §7/md §18): demote every container piece
+// to a plain kind:'normal' box IN PLACE — same cell, same push/pull
+// physical presence — rather than walling its cell and deleting it.
+//
+// The wall-and-delete version tried first has a real false-positive bug,
+// caught by hand-playing a shipped level: a container's own ROOT cell can
+// simply be a floor tile the solution's walk happens to cross, with the
+// container's INTERIOR never entered at all. Turning that cell into a
+// wall then blocks the walk for a reason that has nothing to do with the
+// nested-space mechanic — the metric was measuring "does this floor tile
+// need to exist", not "is the container ever entered".
+//
+// Demoting to kind:'normal' instead keeps the cell exactly as walkable/
+// pushable as before (a plain box can still be shoved around like the
+// container could), while making entry categorically impossible —
+// tryEnter's own `into.kind !== 'container'` check now always fails for
+// it. This isolates the one property this metric is supposed to measure.
+// The interior board and its contents are deliberately left untouched —
+// the goal (and any box) that lived there stays in the world, so checkWin
+// still requires it; deleting the board instead would make its goal cell
+// vanish entirely, which checkWin would misread as "nothing left to
+// satisfy, trivially won" rather than "impossible to reach".
 function nestedBoxRequired(world: World, solved: SolveResult, maxSolverExpandedStates: number): boolean {
   const frozen = cloneWorld(world)
   for (const piece of Object.values(world.pieces)) {
     if (piece.kind !== 'container') continue
-    const loc = frozen.locations[piece.id]
-    if (loc === undefined) continue
-    const board = frozen.boards[loc.board]
-    if (board !== undefined) board.cells[loc.y][loc.x] = { type: 'wall' }
-    delete frozen.pieces[piece.id]
-    delete frozen.locations[piece.id]
+    if (frozen.locations[piece.id] === undefined) continue
+    frozen.pieces[piece.id] = { id: piece.id, kind: 'normal' }
   }
   if (checkWin(frozen)) return false
   const frozenSolved = solve(frozen, solved.moves.length + 1, maxSolverExpandedStates)
