@@ -822,6 +822,37 @@ describe('drawBoardRecursive — Flip', () => {
   })
 })
 
+describe('drawBoardRecursive — getRenderLocation override', () => {
+  it('uses getRenderLocation\'s position for both the piece\'s own draw and its recursive placement', () => {
+    const root = makeFloorBoard('root', 4)
+    const inside = makeFloorBoard('inside', 2)
+    const world = makeWorld(
+      [root, inside],
+      [{ id: 'box', kind: 'container', boardRef: 'inside' }],
+      { box: { board: 'root', x: 0, y: 0 } },
+    )
+    const ctx = mockContext()
+    const fillXs: number[] = []
+    ctx.fillRect = (x) => { fillXs.push(x as number) }
+    const dc = {
+      ctx,
+      world,
+      camera: { anchor: 'root' as const, centerX: 2, centerY: 2, pixelsPerRootUnit: 32 },
+      viewport: { width: 128, height: 128 },
+      budget: DEFAULT_RENDER_BUDGET,
+      piecesByBoard: indexPiecesByBoard(world),
+      cellsDrawnSoFar: { count: 0 },
+      // pretend box is actually at x=2 this frame (mid-tween), not its stored x=0
+      getRenderLocation: (pieceId: string) => (pieceId === 'box' ? { board: 'root', x: 2, y: 0 } : world.locations[pieceId]),
+    }
+    drawBoardRecursive(dc, root, { boardId: 'root', originX: 0, originY: 0, scale: 1 }, 0, 0, false)
+    // box's own fill, and its nested board's cells, must appear at screen x >= 2*32=64,
+    // not at x=0 where its stored Location would otherwise place them.
+    const boxOwnFillX = fillXs[16] // 16 root cells, then box's own fill
+    expect(boxOwnFillX).toBeGreaterThanOrEqual(64)
+  })
+})
+
 describe('drawBoardRecursive — Transfer', () => {
   it('draws a border on a container with its own linkedTo set', () => {
     const root = makeFloorBoard('root', 2)

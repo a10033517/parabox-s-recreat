@@ -165,6 +165,7 @@ export interface DrawContext {
   budget: RenderBudget
   piecesByBoard: PiecesByBoard
   cellsDrawnSoFar: { count: number }
+  getRenderLocation?: (pieceId: PieceId) => Location | undefined
 }
 
 export function drawBoardRecursive(
@@ -217,7 +218,8 @@ export function drawBoardRecursive(
   }
 
   const entries = dc.piecesByBoard.get(board.id) ?? []
-  for (const { pieceId, location } of entries) {
+  for (const { pieceId, location: storedLocation } of entries) {
+    const location = dc.getRenderLocation?.(pieceId) ?? storedLocation
     const piece = dc.world.pieces[pieceId]
     const screen = worldToScreen(
       transform.originX + mirrorX(location.x) * transform.scale,
