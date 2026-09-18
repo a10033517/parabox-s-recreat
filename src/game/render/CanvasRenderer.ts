@@ -1,4 +1,5 @@
-import { Board, BoardId, PieceId, PieceKind, World, findContainerFor, VOID_BOARD_ID } from '../engine/types'
+import { Board, BoardId, Location, PieceId, PieceKind, World, findContainerFor, VOID_BOARD_ID } from '../engine/types'
+import { Viewport } from './camera'
 
 const FLOOR_COLOR = '#1e293b'
 const WALL_COLOR = '#0f172a'
@@ -25,6 +26,50 @@ const PIECE_COLORS: Record<PieceKind, string> = {
 const CYCLE_PALETTE = ['#ef4444', '#eab308', '#a855f7', '#14b8a6', '#f97316']
 const LOCKED_RING_COLOR = '#e2e8f0' // pale slate/white — reads as "frozen", stays visually distinct from every PIECE_COLORS and CYCLE_PALETTE entry (all of which are saturated hues), unlike the previous yellow-400 which was a near-miss against CYCLE_PALETTE's yellow-500
 const INFINITY_MARKER_COLOR = '#0f172a' // dark, readable against LOCKED_RING_COLOR's pale fill
+
+export interface RenderBudget {
+  minCellPixels: number
+  maxCellsPerFrame: number
+  maxRecursionDepth: number
+  targetPlayerCellPixels: number
+}
+
+export const DEFAULT_RENDER_BUDGET: RenderBudget = {
+  minCellPixels: 4,
+  maxCellsPerFrame: 4000,
+  maxRecursionDepth: 48,
+  targetPlayerCellPixels: 64,
+}
+
+export interface BoardPieceEntry {
+  pieceId: PieceId
+  location: Location
+}
+export type PiecesByBoard = Map<BoardId, BoardPieceEntry[]>
+
+export function indexPiecesByBoard(world: World): PiecesByBoard {
+  const index: PiecesByBoard = new Map()
+  for (const [pieceId, location] of Object.entries(world.locations)) {
+    const entries = index.get(location.board)
+    if (entries) {
+      entries.push({ pieceId, location })
+    } else {
+      index.set(location.board, [{ pieceId, location }])
+    }
+  }
+  return index
+}
+
+interface ScreenRect {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
+export function intersectsViewport(rect: ScreenRect, viewport: Viewport): boolean {
+  return rect.right > 0 && rect.left < viewport.width && rect.bottom > 0 && rect.top < viewport.height
+}
 
 function isCycleMember(pieceId: PieceId, world: World): boolean {
   const piece = world.pieces[pieceId]

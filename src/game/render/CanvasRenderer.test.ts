@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderBoard } from './CanvasRenderer'
+import { renderBoard, indexPiecesByBoard, DEFAULT_RENDER_BUDGET } from './CanvasRenderer'
 import { makeFloorBoard, makeWorld, setWall, setRequirement } from '../engine/testFixtures'
 import { PLAYER_ID } from '../engine/types'
 
@@ -296,5 +296,37 @@ describe('renderBoard', () => {
     ctx.fillText = (text) => { if (text === '∞') markerDrawn = true }
     renderBoard(ctx, voidBoard, world, 32)
     expect(markerDrawn).toBe(false)
+  })
+})
+
+describe('indexPiecesByBoard', () => {
+  it('groups pieces by their current board', () => {
+    const root = makeFloorBoard('root', 2)
+    const inside = makeFloorBoard('inside', 2)
+    const world = makeWorld(
+      [root, inside],
+      [{ id: PLAYER_ID, kind: 'player' }, { id: 'box1', kind: 'normal' }],
+      { [PLAYER_ID]: { board: 'root', x: 0, y: 0 }, box1: { board: 'inside', x: 1, y: 1 } },
+    )
+    const index = indexPiecesByBoard(world)
+    expect(index.get('root')).toEqual([{ pieceId: PLAYER_ID, location: { board: 'root', x: 0, y: 0 } }])
+    expect(index.get('inside')).toEqual([{ pieceId: 'box1', location: { board: 'inside', x: 1, y: 1 } }])
+  })
+
+  it('returns an empty map for a world with no pieces', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld([root], [], {})
+    expect(indexPiecesByBoard(world).size).toBe(0)
+  })
+})
+
+describe('DEFAULT_RENDER_BUDGET', () => {
+  it('matches the spec\'s exact default values', () => {
+    expect(DEFAULT_RENDER_BUDGET).toEqual({
+      minCellPixels: 4,
+      maxCellsPerFrame: 4000,
+      maxRecursionDepth: 48,
+      targetPlayerCellPixels: 64,
+    })
   })
 })
