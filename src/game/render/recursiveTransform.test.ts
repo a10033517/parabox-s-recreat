@@ -115,7 +115,7 @@ describe('resolveCanonicalBoardTransform', () => {
     // anchor is 'start' (per the resolveAnchorBoardId test above). redInterior is owned
     // by redPiece, which sits on 'start' at (1,0) — one level in.
     expect(resolveCanonicalBoardTransform(world, 'redInterior', 'root')).toEqual({
-      boardId: 'redInterior', originX: 1, originY: 0, scale: 0.5,
+      boardId: 'redInterior', originX: 1, originY: 0, scale: 1, // redInterior is size 1, scale = 1/1
     })
   })
 
