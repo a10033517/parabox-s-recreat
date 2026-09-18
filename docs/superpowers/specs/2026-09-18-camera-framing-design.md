@@ -63,22 +63,35 @@ Redefine `cameraForPlayer`'s targeting formula so that:
 
 At any moment the player is standing on some board `F` (their `Location.board`).
 `findContainerFor(world, F)` (already defined in `engine/types.ts`) returns the piece
-`P` that owns `F` as its interior — `undefined` if `F` has no owner (only true at the
-anchor board itself: root, or the Void board once the player has fallen in).
+`P` that owns `F` as its interior.
+
+**The branch is decided by comparing `F` to the resolved anchor board, not by whether
+`P` is defined.** On an ordinary tree level the anchor board has no owner, so those two
+tests agree. But on a pure-cycle level (no zero-owner board exists at all — see the
+render spec's §1.3 / `resolveAnchorBoardId`), the anchor is the player's own board *at
+level load*, resolved once and cached (`cachedRootAnchorBoardId`) — and that board can
+still have a real structural owner through the cycle. `resolveCanonicalBoardTransform`
+already treats `boardId === anchorBoardId` as the coordinate origin unconditionally,
+short-circuiting before it ever climbs to that owner (see its own implementation: the
+walk loop's condition is `while (current !== anchorBoardId)`, so it never even calls
+`findContainerFor` when `boardId` already equals the anchor). The camera formula must
+mirror that exact short-circuit — `F === anchorBoardId` selects Case 2 regardless of
+`P` — or a pure-cycle level's anchor board would incorrectly zoom out to its
+cycle-owner's parent instead of framing itself.
 
 **This is the whole mechanism for "only reframe on board change":** the camera target
-is now a function of `P` and *P's own position on its parent board* — not of the
-player's own x/y within `F`. Walking around inside `F` doesn't change `P` or its
-position, so the target doesn't change. `classifyMove` already tags an unchanged
-`Location.board` as `'move'`; under the new formula, a `'move'`-kind step now produces
-identical source and target cameras, so its lerp is a correct no-op — no separate
-"freeze unless board changes" gate is needed on top of the formula itself.
+is now a function of `F`'s relationship to the anchor (unchanged ⇒ same case, same `P`,
+same position) — not of the player's own x/y within `F`. Walking around inside `F`
+doesn't change `F` itself, so the target doesn't change. `classifyMove` already tags an
+unchanged `Location.board` as `'move'`; under the new formula, a `'move'`-kind step now
+produces identical source and target cameras, so its lerp is a correct no-op — no
+separate "freeze unless board changes" gate is needed on top of the formula itself.
 
-### Case 1 — the player's board has an owner (`P` defined)
+### Case 1 — `F` is not the anchor board
 
-Let `Parent` be `P`'s own board (`world.locations[P].board`) and `(px, py)` be `P`'s
-position on `Parent`. Resolve `Parent`'s canonical transform the same way the render
-spec already does:
+Let `P = findContainerFor(world, F)`, `Parent` be `P`'s own board
+(`world.locations[P].board`), and `(px, py)` be `P`'s position on `Parent`. Resolve
+`Parent`'s canonical transform the same way the render spec already does:
 
 ```ts
 const parentTransform = resolveCanonicalBoardTransform(world, parentBoardId, anchor, cachedRootAnchorBoardId)
@@ -100,11 +113,17 @@ const spanUnits = 1 + 2 * budget.marginCells          // container's own cell + 
 const pixelsPerRootUnit = Math.min(viewport.width, viewport.height) / (spanUnits * parentTransform.scale)
 ```
 
-### Case 2 — the player's board has no owner (root or Void, `P` undefined)
+If `P` is `undefined` here (no piece owns `F`, yet `F` isn't the anchor board either) or
+`parentTransform` comes back `null`, that's an unreachable/malformed world — fall
+through to the Fallback below, same as today.
 
-`F` is the anchor board itself. There is no parent cell to zoom out to, so the margin
-is applied directly in `F`'s own coordinate units instead of a parent's: show the whole
-board (`0..boardSize`) plus `marginCells` of Void on every side.
+### Case 2 — `F` is the anchor board itself
+
+Root, the Void board once the player has fallen in, or a pure-cycle level's cached
+anchor board (see above — it may still have a structural owner; that's irrelevant
+here). There is no parent cell to zoom out to, so the margin is applied directly in
+`F`'s own coordinate units instead of a parent's: show the whole board (`0..boardSize`)
+plus `marginCells` of Void on every side.
 
 ```ts
 const anchorTransform = resolveCanonicalBoardTransform(world, focusBoardId, anchor, cachedRootAnchorBoardId) // identity: origin 0,0, scale 1
@@ -164,6 +183,12 @@ to every zoom computed above, including the fallback.
   `marginCells` of neighbors visible" regardless of canvas size — the old formula's
   zoom was viewport-independent (a fixed px-per-cell target), which can't make that
   guarantee. Signature: `cameraForFocus(world, viewport, budget, cachedRootAnchorBoardId?)`.
+- **`cameraForFocus` newly imports `resolveAnchorBoardId` from `recursiveTransform.ts`**
+  (already exported there, unchanged) — needed to resolve the anchor board id itself so
+  `F === anchorBoardId` can be tested directly, per the Case 1/Case 2 branch condition
+  above. When `anchor === 'root'` and `cachedRootAnchorBoardId` is provided, use it
+  directly instead of re-deriving, the same way `resolveCanonicalBoardTransform`
+  already does internally.
 - **`CameraBudget` replaces `targetPlayerCellPixels` with `marginCells`.**
   ```ts
   export interface CameraBudget {
@@ -240,6 +265,12 @@ to every zoom computed above, including the fallback.
   - Self-loop case from the worked example above: center lands on the self-loop
     piece's own position on its parent board (not the player's literal position, which
     may differ after entering).
+  - Pure-cycle level (reusing `camera.test.ts`'s existing I3 fixture: `start`/
+    `redInterior` mutually owning each other, no zero-owner board): with the player
+    standing on the cached anchor board itself, the camera frames that board's own full
+    extent (Case 2), *not* a zoomed-out view centered on the piece that structurally
+    owns it through the cycle — proving the branch is decided by `F === anchorBoardId`,
+    not by whether `findContainerFor(F)` is defined.
   - Two calls with the player at different positions on the *same* board (no board
     change) produce identical `CameraTransform`s.
   - Fallback path (missing `playerLoc`, or an unreachable `resolveCanonicalBoardTransform`)
