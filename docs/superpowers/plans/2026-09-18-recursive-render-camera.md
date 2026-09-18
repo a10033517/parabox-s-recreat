@@ -1789,7 +1789,7 @@ Replace `src/game/GameScreen.tsx` entirely:
 ```tsx
 import { useEffect, useRef, useState } from 'react'
 import { GameState } from './engine/GameState'
-import { Direction, PLAYER_ID, World } from './engine/types'
+import { Direction, World } from './engine/types'
 import { DrawContext, DEFAULT_RENDER_BUDGET, drawBoardRecursive, indexPiecesByBoard } from './render/CanvasRenderer'
 import { CameraTransform, Viewport, cameraForPlayer } from './render/camera'
 import { resolveAnchorBoardId } from './render/recursiveTransform'
@@ -1893,7 +1893,13 @@ export function GameScreen({
       }
       rafId = requestAnimationFrame(frame)
     }
-    rafId = requestAnimationFrame(frame)
+    // Call frame() synchronously once on mount, in addition to the RAF scheduling
+    // inside frame() itself for every subsequent tick — scheduling only the very first
+    // call via requestAnimationFrame leaves the canvas at its default/stale size for
+    // one frame after every mount (a real visible flash in production, and it makes any
+    // viewport-size assertion flaky under RTL, since assertions run before that first
+    // deferred RAF callback ever fires).
+    frame()
     return () => cancelAnimationFrame(rafId)
   }, [state])
 
@@ -2343,7 +2349,13 @@ export function GameScreen({
 
       rafId = requestAnimationFrame(frame)
     }
-    rafId = requestAnimationFrame(frame)
+    // Call frame() synchronously once on mount, in addition to the RAF scheduling
+    // inside frame() itself for every subsequent tick — found necessary during Task 6:
+    // scheduling the very first call via requestAnimationFrame alone means the canvas
+    // stays at its default/stale size for one frame after every mount (a real visible
+    // flash in production, and what made Task 6's viewport-size test flaky under RTL,
+    // since assertions run before that first deferred RAF callback ever fires).
+    frame()
     return () => cancelAnimationFrame(rafId)
   }, [state])
 
