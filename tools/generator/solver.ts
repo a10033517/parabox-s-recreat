@@ -1,7 +1,6 @@
 import { applyMove, checkWin } from '../../src/game/engine/rules'
 import { Direction, PLAYER_ID, World } from '../../src/game/engine/types'
 import { canonicalKey } from './canonical'
-import { SeedGroup } from './seed'
 
 const DIRECTIONS: Direction[] = ['up', 'down', 'left', 'right']
 
@@ -10,6 +9,15 @@ export interface SolveResult {
   expandedStates: number
   maxFrontierSize: number
   visitedStates: number
+  // branchingFactors[i] = number of the 4 directions that produced a valid
+  // (non-null) next state when the i-th expanded state was expanded, in
+  // expansion order. Length === expandedStates always. Computed by trying
+  // all 4 directions BEFORE checking any of them for a win or for having
+  // been visited before, so it always reflects the true count of legal
+  // actions from that state — not reduced by which neighbors happen to be
+  // new or which one happens to win. Feeds difficultyAnalyzer.ts's
+  // avgBranching/maxBranching/deadEndRatio.
+  branchingFactors: number[]
 }
 
 // `maxExpandedStates` is a safety cap, not part of the original design
@@ -22,7 +30,7 @@ export interface SolveResult {
 // pure addition for any existing caller that doesn't opt in.
 export function solve(initialWorld: World, maxDepth = 200, maxExpandedStates = Infinity): SolveResult | null {
   if (checkWin(initialWorld)) {
-    return { moves: [], expandedStates: 0, maxFrontierSize: 1, visitedStates: 1 }
+    return { moves: [], expandedStates: 0, maxFrontierSize: 1, visitedStates: 1, branchingFactors: [] }
   }
 
   const visited = new Set<string>([canonicalKey(initialWorld)])
@@ -30,6 +38,7 @@ export function solve(initialWorld: World, maxDepth = 200, maxExpandedStates = I
   let depth = 0
   let expandedStates = 0
   let maxFrontierSize = frontier.length
+  const branchingFactors: number[] = []
 
   while (frontier.length > 0 && depth < maxDepth) {
     maxFrontierSize = Math.max(maxFrontierSize, frontier.length)
@@ -37,15 +46,21 @@ export function solve(initialWorld: World, maxDepth = 200, maxExpandedStates = I
     for (const { world, path } of frontier) {
       if (expandedStates >= maxExpandedStates) return null
       expandedStates++
+
+      const validNexts: { direction: Direction; next: World }[] = []
       for (const direction of DIRECTIONS) {
         const next = applyMove(world, direction)
-        if (!next) continue
+        if (next) validNexts.push({ direction, next })
+      }
+      branchingFactors.push(validNexts.length)
+
+      for (const { direction, next } of validNexts) {
         const key = canonicalKey(next)
         if (visited.has(key)) continue
         visited.add(key)
         const newPath = [...path, direction]
         if (checkWin(next)) {
-          return { moves: newPath, expandedStates, maxFrontierSize, visitedStates: visited.size }
+          return { moves: newPath, expandedStates, maxFrontierSize, visitedStates: visited.size, branchingFactors }
         }
         nextFrontier.push({ world: next, path: newPath })
       }
@@ -165,59 +180,3 @@ export function countEatMoves(world: World, moves: Direction[]): number {
   return count
 }
 
-// `groups` MUST be the surviving groups (see section 4.6's getSurvivingGroups)
-// — a group whose pieces were deleted by pruning has no entry in
-// `current.locations`/`next.locations`, and the `!before || !after` guard
-// below is a second, independent layer of defense (not a substitute for
-// passing the right list): it keeps this function safe even if a future
-// caller forgets to filter first, but callers should still always pass
-// survivors so the metric's semantic scope is correct.
-export function countGroupsUsed(world: World, moves: Direction[], groups: SeedGroup[]): number {
-  const usedGroups = new Set<string>()
-  let current = world
-  for (const direction of moves) {
-    const next = applyMove(current, direction)
-    if (!next) throw new Error('countGroupsUsed received an invalid move for this world')
-    for (const group of groups) {
-      if (usedGroups.has(group.containerId)) continue
-      for (const pieceId of [group.containerId, ...group.boxes.map((box) => box.boxId)]) {
-        const before = current.locations[pieceId]
-        const after = next.locations[pieceId]
-        if (!before || !after) continue
-        if (before.board !== after.board || before.x !== after.x || before.y !== after.y) {
-          usedGroups.add(group.containerId)
-          break
-        }
-      }
-    }
-    current = next
-  }
-  return usedGroups.size
-}
-
-// Counts how many of the seed's filler boxes (see generatorConfig.ts's
-// SeedProfile.fillerBoxCount) actually move at some point during the
-// replayed solution. Filler boxes have no win condition of their own — a
-// solve is never required to touch them — so this is purely a diagnostic
-// measurement of how often they end up genuinely used (matching the user's
-// own stated criterion: "just needs to be usable on the optimal path"),
-// not a difficulty gate.
-export function countFillerBoxesUsed(world: World, moves: Direction[], fillerBoxIds: string[]): number {
-  const usedFillerBoxes = new Set<string>()
-  let current = world
-  for (const direction of moves) {
-    const next = applyMove(current, direction)
-    if (!next) throw new Error('countFillerBoxesUsed received an invalid move for this world')
-    for (const fillerId of fillerBoxIds) {
-      if (usedFillerBoxes.has(fillerId)) continue
-      const before = current.locations[fillerId]
-      const after = next.locations[fillerId]
-      if (!before || !after) continue
-      if (before.board !== after.board || before.x !== after.x || before.y !== after.y) {
-        usedFillerBoxes.add(fillerId)
-      }
-    }
-    current = next
-  }
-  return usedFillerBoxes.size
-}

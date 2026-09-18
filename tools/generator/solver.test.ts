@@ -1,7 +1,6 @@
 import { Cell, World } from '../../src/game/engine/types'
 import { BUILTIN_LEVELS } from '../../src/levels'
-import { countBoxLines, countCrossingMoves, countEatMoves, countFillerBoxesUsed, countGroupsUsed, countPushMoves, solve } from './solver'
-import { SeedGroup } from './seed'
+import { countBoxLines, countCrossingMoves, countEatMoves, countPushMoves, solve } from './solver'
 
 function makeSquareCells(size: number, fill: () => { type: 'floor' | 'wall'; requirement?: 'box' | 'player' }) {
   return Array.from({ length: size }, () => Array.from({ length: size }, fill))
@@ -87,6 +86,74 @@ test('solve finds the shortest path even when a longer alternate route also exis
   // the short one.
   const result = solve(world)
   expect(result!.moves).toEqual(['right', 'right'])
+})
+
+test('branchingFactors has exactly one entry per expanded state, in expansion order', () => {
+  // 1-wide horizontal corridor (row y=2, columns x=1..4), box needs exactly
+  // 2 rightward pushes to reach the goal at (4,2).
+  const size = 6
+  const cells: Cell[][] = Array.from({ length: size }, (_, y) =>
+    Array.from({ length: size }, (_, x): Cell => ({
+      type: y === 2 && x >= 1 && x <= 4 ? 'floor' : 'wall',
+    })),
+  )
+  cells[2][4] = { type: 'floor', requirement: 'box' }
+  const world: World = {
+    boards: { root: { id: 'root', size, cells } },
+    pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
+    locations: { player: { board: 'root', x: 1, y: 2 }, box1: { board: 'root', x: 2, y: 2 } },
+  }
+  const result = solve(world)!
+  expect(result.moves).toEqual(['right', 'right'])
+  expect(result.branchingFactors).toHaveLength(result.expandedStates)
+  // State 0 (player at x=1, box at x=2): 'left' hits the border wall, 'up'/
+  // 'down' hit the corridor's own walls — only 'right' (push) is legal, so
+  // branching is 1. State 1 (player at x=2, box at x=3, after the first
+  // push): 'right' pushes the box onto the goal (the winning move), but
+  // 'left' is ALSO legal (walking back to x=1, now empty) — branching
+  // counts every legal direction regardless of whether BFS re-expands it,
+  // so this state's branching is 2, not 1.
+  expect(result.branchingFactors).toEqual([1, 2])
+})
+
+test('branchingFactors is empty for an already-won world (0 expanded states)', () => {
+  const world: World = {
+    boards: {
+      root: {
+        id: 'root', size: 3,
+        cells: [
+          [{ type: 'floor' }, { type: 'floor' }, { type: 'floor' }],
+          [{ type: 'floor' }, { type: 'floor' }, { type: 'floor', requirement: 'box' }],
+          [{ type: 'floor' }, { type: 'floor' }, { type: 'floor' }],
+        ],
+      },
+    },
+    pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
+    locations: { player: { board: 'root', x: 0, y: 1 }, box1: { board: 'root', x: 2, y: 1 } },
+  }
+  const result = solve(world)!
+  expect(result.branchingFactors).toEqual([])
+})
+
+test('branchingFactors counts all 4 directions independent of visited-state pruning', () => {
+  // Open 5x5 room, box already one push from its goal — the start state
+  // has up to 4 legal directions (bounded by the border), not fewer just
+  // because some neighbors get visited/pruned later in the search.
+  const size = 5
+  const cells: Cell[][] = Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => ({ type: 'floor' as const })),
+  )
+  cells[2][3] = { type: 'floor', requirement: 'box' }
+  const world: World = {
+    boards: { root: { id: 'root', size, cells } },
+    pieces: { player: { id: 'player', kind: 'player' }, box1: { id: 'box1', kind: 'normal' } },
+    locations: { player: { board: 'root', x: 1, y: 2 }, box1: { board: 'root', x: 2, y: 2 } },
+  }
+  const result = solve(world)!
+  // The very first expanded state (the initial world) has 4 legal moves:
+  // up/down/left/right all land on in-bounds floor (row/col 1 and 3 are
+  // clear of the border at size 5).
+  expect(result.branchingFactors[0]).toBe(4)
 })
 
 test('countCrossingMoves returns 0 for a plain push with no board change', () => {
@@ -258,58 +325,6 @@ test('countEatMoves counts a real eat interaction and 0 for a push-only solution
     locations: { player: { board: 'root', x: 0, y: 1 }, box1: { board: 'root', x: 1, y: 1 } },
   }
   expect(countEatMoves(pushOnly, ['right'])).toBe(0)
-})
-
-test('countGroupsUsed counts a group whose container or box moved, and does not throw on a group missing from the world', () => {
-  const eatWorld = makeEatWorld()
-  const realGroup: SeedGroup = {
-    containerId: 'container1', interiorId: 'inside',
-    originalPosition: { x: 2, y: 2 },
-    boxes: [{ boxId: 'box1', originalPosition: { x: 1, y: 1 } }],
-  }
-  const missingGroup: SeedGroup = {
-    containerId: 'ghost', interiorId: 'ghostInside',
-    originalPosition: { x: 0, y: 0 },
-    boxes: [{ boxId: 'ghostBox', originalPosition: { x: 0, y: 0 } }],
-  }
-
-  // Filtered to survivors only — the intended usage.
-  expect(countGroupsUsed(eatWorld, ['right'], [realGroup])).toBe(1)
-
-  // Unfiltered, including a group whose pieces don't exist in this world —
-  // the defensive-guard regression test for the crash the review caught.
-  expect(() => countGroupsUsed(eatWorld, ['right'], [realGroup, missingGroup])).not.toThrow()
-  expect(countGroupsUsed(eatWorld, ['right'], [realGroup, missingGroup])).toBe(1)
-})
-
-test('countGroupsUsed counts a two-box group as used when only the second box moves, and only once when both move', () => {
-  const eatWorld = makeEatWorld()
-  const twoBoxGroup: SeedGroup = {
-    containerId: 'container1', interiorId: 'inside',
-    originalPosition: { x: 2, y: 2 },
-    boxes: [
-      { boxId: 'someOtherBox', originalPosition: { x: 0, y: 0 } }, // never moves in this scenario
-      { boxId: 'box1', originalPosition: { x: 1, y: 1 } }, // this one is eaten by 'right'
-    ],
-  }
-  expect(countGroupsUsed(eatWorld, ['right'], [twoBoxGroup])).toBe(1)
-})
-
-test('countFillerBoxesUsed counts a filler box only if it actually moves, and does not throw for a missing id', () => {
-  const root = { id: 'root', size: 5, cells: makeSquareCells(5, () => ({ type: 'floor' as const })) }
-  const world: World = {
-    boards: { root },
-    pieces: { player: { id: 'player', kind: 'player' }, filler0: { id: 'filler0', kind: 'normal' }, filler1: { id: 'filler1', kind: 'normal' } },
-    locations: {
-      player: { board: 'root', x: 0, y: 2 },
-      filler0: { board: 'root', x: 1, y: 2 }, // in the push path
-      filler1: { board: 'root', x: 4, y: 4 }, // untouched
-    },
-  }
-  expect(countFillerBoxesUsed(world, ['right'], ['filler0', 'filler1'])).toBe(1)
-  // A ghost id with no piece in this world must not throw (defensive guard,
-  // matching countGroupsUsed's own established pattern).
-  expect(() => countFillerBoxesUsed(world, ['right'], ['filler0', 'ghostFiller'])).not.toThrow()
 })
 
 test('every builtin level is solvable', () => {
