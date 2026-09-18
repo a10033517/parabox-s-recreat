@@ -40,6 +40,11 @@ section; section numbers below (`§N`) refer to that spec.
   the sole zero-owner board if one exists, otherwise the player's board at level load —
   never a hardcoded `'root'` string, because a pure-cycle level (see this session's own
   `docs/superpowers/specs/2026-09-18-parabox-general-cycles.md`) has no zero-owner board.
+- **`renderBoard` (the existing flat one-board renderer) is never deleted.** Found during
+  Task 4's execution: `src/editor/EditorScreen.tsx` imports and calls it directly, and
+  the spec's own "editor stays on its current flat renderer" scope decision only makes
+  sense if it keeps existing — this plan never touches `EditorScreen.tsx` at all.
+  `drawBoardRecursive` is added alongside it in the same file, not instead of it.
 
 ---
 
@@ -604,8 +609,9 @@ git commit -m "feat(render): camera transform driven by the player's canonical p
   (Task 4 consumes them).
 
 This task keeps the FILE's existing content (the current `renderBoard`, `isCycleMember`,
-`cycleColorFor`, color constants) untouched for now — Task 4 replaces `renderBoard`. Add
-the new exports alongside the existing ones.
+`cycleColorFor`, color constants) untouched — `renderBoard` stays permanently (see Task 4's
+own note: `src/editor/EditorScreen.tsx` depends on it directly and is out of scope for
+this plan, so it's never deleted). Add the new exports alongside the existing ones.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -737,7 +743,7 @@ git commit -m "feat(render): render budget, piece index, and viewport-culling he
 
 ---
 
-### Task 4: `CanvasRenderer.ts` — `drawBoardRecursive` base case, replaces `renderBoard`
+### Task 4: `CanvasRenderer.ts` — `drawBoardRecursive` base case, added alongside `renderBoard`
 
 **Files:**
 - Modify: `src/game/render/CanvasRenderer.ts`
@@ -762,17 +768,34 @@ git commit -m "feat(render): render budget, piece index, and viewport-culling he
   `piecesByBoard`'s per-board arrays naturally produces. Worth a follow-up once real
   levels expose whether this ever actually starves the player's own visible path in
   practice; not a blocker for this plan's acceptance criteria.
-- **This task deletes `renderBoard` entirely** and rewrites every existing test in
-  `CanvasRenderer.test.ts` to call `drawBoardRecursive` via a small test helper that
-  reproduces `renderBoard`'s old "draw exactly this one board, 1:1, at the canvas origin"
-  behavior — see Step 1's `drawBoardForTest` helper. The *assertions* in the existing
-  tests (rect counts, color comparisons, ring/marker checks) are unchanged; only the call
-  site changes.
+- **`renderBoard` is kept, not deleted.** Corrected during this plan's SDD execution
+  after the implementer found `src/editor/EditorScreen.tsx` also imports and calls
+  `renderBoard` directly — a second consumer this plan never accounted for. The spec's
+  own "Explicitly out of scope" section says the editor "stays on its current flat
+  renderer," which only makes sense if `renderBoard` continues to exist; deleting it
+  would have silently broken the editor with nothing in this plan ever fixing it.
+  `renderBoard` stays byte-for-byte as it already is — a second, permanent, legacy
+  rendering path serving only `EditorScreen.tsx` from here on. `drawBoardRecursive` (and
+  its own new tests) are ADDED alongside it in the same two files, not instead of it —
+  the existing `describe('renderBoard', ...)` test block, and Task 3's
+  `describe('indexPiecesByBoard', ...)`/`describe('DEFAULT_RENDER_BUDGET', ...)`/
+  `'LOCKED_RING_COLOR does not collide...'` tests, all stay in the file untouched,
+  alongside the new `describe('drawBoardRecursive', ...)` block below. A small test
+  helper (`drawBoardForTest`) reproduces `renderBoard`'s old "draw exactly this one
+  board, 1:1, at the canvas origin" framing, so the *new* function's tests read the same
+  way the old ones did — see Step 1.
 
 - [ ] **Step 1: Write the failing tests**
 
-Replace the top of `src/game/render/CanvasRenderer.test.ts` (imports and the `mockContext`
-helper stay; everything from `describe('renderBoard', ...)` onward is rewritten) with:
+Add to `src/game/render/CanvasRenderer.test.ts` (imports, `mockContext`, the existing
+`describe('renderBoard', ...)` block, and Task 3's tests ALL stay exactly as they are —
+this only adds new content). The `import { describe, it, expect } from 'vitest'` and
+`function mockContext() { ... }` shown below already exist in the file (from before this
+plan, and from Task 3) — shown here only for context; do not add a second copy of
+either. Only genuinely new imports (`drawBoardRecursive`, `CameraTransform`, `Viewport`,
+`Board`, and anything else not already imported) need adding, merged into the file's
+existing `./CanvasRenderer` / `./camera` / `../engine/types` import lines rather than as
+new duplicate lines — same discipline as Task 3's own import fix:
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1115,11 +1138,12 @@ describe('drawBoardRecursive', () => {
 - [ ] **Step 2: Run and confirm they fail**
 
 Run: `npx vitest run src/game/render/CanvasRenderer.test.ts`
-Expected: FAIL — `drawBoardRecursive` not exported, `renderBoard` tests removed.
+Expected: FAIL — `drawBoardRecursive` not exported yet.
 
 - [ ] **Step 3: Implement**
 
-Delete `renderBoard` entirely from `src/game/render/CanvasRenderer.ts` and replace it with:
+Add to `src/game/render/CanvasRenderer.ts`, leaving `renderBoard` itself completely
+untouched (it stays, permanently, for `EditorScreen.tsx`'s exclusive use):
 
 ```ts
 export interface DrawContext {
@@ -1260,7 +1284,7 @@ Expected: zero errors.
 
 ```bash
 git add src/game/render/CanvasRenderer.ts src/game/render/CanvasRenderer.test.ts
-git commit -m "feat(render): recursive board drawing replaces the flat one-board renderBoard"
+git commit -m "feat(render): recursive board drawing, added alongside the existing renderBoard"
 ```
 
 ---
