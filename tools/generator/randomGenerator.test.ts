@@ -54,8 +54,17 @@ test('crossBoardGoalProbability 0 places every goal on some box\'s own home boar
 })
 
 test('every generated container is blocked on at least one side (enterable)', () => {
+  // containerProbability 1 with boxCountRange [4,4] can legitimately try to
+  // nest two containers into the same tiny (interiorSize 3 => 1 floor
+  // cell) interior — randomGenerate correctly returns null in that case
+  // (see its own unoccupiedFloorCells guard), same as any other generation
+  // failure the real pipeline discards and retries. Retry here too, rather
+  // than asserting the first Math.random() draw always succeeds.
   const config = baseConfig({ boxCountRange: [4, 4], containerProbability: 1, crossBoardGoalProbability: 0.5, interiorSizeRange: [3, 5] })
-  const result = randomGenerate(config, Math.random)
+  let result: ReturnType<typeof randomGenerate> = null
+  for (let attempt = 0; attempt < 50 && result === null; attempt++) {
+    result = randomGenerate(config, Math.random)
+  }
   expect(result).not.toBeNull()
   const { world } = result!
   for (const piece of Object.values(world.pieces)) {
