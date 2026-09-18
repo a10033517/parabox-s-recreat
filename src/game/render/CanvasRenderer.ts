@@ -1,4 +1,4 @@
-import { Board, BoardId, Location, PieceId, PieceKind, World, findContainerFor, VOID_BOARD_ID } from '../engine/types'
+import { Board, BoardId, Location, Piece, PieceId, PieceKind, World, findContainerFor, VOID_BOARD_ID } from '../engine/types'
 import { CameraTransform, Viewport, worldToScreen } from './camera'
 import { BoardTransform, childTransform } from './recursiveTransform'
 
@@ -256,14 +256,55 @@ export function drawBoardRecursive(
       dc.ctx.restore()
     }
 
-    if (piece.kind === 'container' && piece.boardRef !== undefined && screenCellSize >= dc.budget.minCellPixels) {
-      const childBoard = dc.world.boards[piece.boardRef]
+    const target = resolveRecursionTarget(dc.world, piece)
+    if (target !== null && screenCellSize >= dc.budget.minCellPixels) {
+      const childBoard = dc.world.boards[target.boardId]
       if (childBoard !== undefined) {
         const childT = childTransform(transform, location, childBoard)
-        drawBoardRecursive(dc, childBoard, childT, recursionDepth + 1, tintAmount, mirrorH)
+        drawBoardRecursive(
+          dc, childBoard, childT, recursionDepth + 1,
+          combineTint(tintAmount, target.tintAmount),
+          mirrorH !== target.mirrorH,
+        )
       }
     }
+
+    if (piece.kind === 'container' && piece.linkedTo !== undefined) {
+      dc.ctx.save()
+      dc.ctx.strokeStyle = LINKED_BORDER_COLOR
+      dc.ctx.lineWidth = Math.max(2, screenCellSize / 10)
+      const inset = dc.ctx.lineWidth / 2
+      dc.ctx.strokeRect(pieceRect.left + inset, pieceRect.top + inset, screenCellSize - inset * 2, screenCellSize - inset * 2)
+      dc.ctx.restore()
+    }
   }
+}
+
+export const LINKED_BORDER_COLOR = '#22d3ee' // cyan — distinct from every PIECE_COLORS/CYCLE_PALETTE/LOCKED_RING_COLOR entry
+
+export interface RecursionTarget {
+  boardId: BoardId
+  tintAmount: number
+  mirrorH: boolean
+}
+
+export function resolveRecursionTarget(world: World, piece: Piece): RecursionTarget | null {
+  if (piece.cloneOf !== undefined) {
+    const mainBodyLoc = world.locations[piece.cloneOf]
+    const mainBody = world.pieces[piece.cloneOf]
+    if (mainBodyLoc === undefined || mainBody === undefined) return null
+    // The clone's OWN fliph is inert for gameplay (tryEnter's cloneOf interception
+    // returns before into.fliph is ever read) — using it here would render a mirrored
+    // peek that lies about a real entry. The main body's own fliph is what actually
+    // mirrors its interior.
+    return { boardId: mainBodyLoc.board, tintAmount: 0.35, mirrorH: mainBody.fliph ?? false }
+  }
+  if (piece.boardRef === undefined) return null
+  return { boardId: piece.boardRef, tintAmount: 0, mirrorH: piece.fliph ?? false }
+}
+
+export function combineTint(parent: number, local: number): number {
+  return 1 - (1 - parent) * (1 - local)
 }
 
 // Alpha-blend toward white. amount 0 = unchanged; used for Clone's paler tint.

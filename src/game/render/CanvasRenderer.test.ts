@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderBoard, drawBoardRecursive, indexPiecesByBoard, DEFAULT_RENDER_BUDGET } from './CanvasRenderer'
+import { renderBoard, drawBoardRecursive, indexPiecesByBoard, DEFAULT_RENDER_BUDGET, resolveRecursionTarget, combineTint, LINKED_BORDER_COLOR } from './CanvasRenderer'
 import { CameraTransform, Viewport } from './camera'
 import { makeFloorBoard, makeWorld, setWall, setRequirement } from '../engine/testFixtures'
 import { PLAYER_ID, World, Board } from '../engine/types'
@@ -668,5 +668,221 @@ describe('DEFAULT_RENDER_BUDGET', () => {
       maxRecursionDepth: 48,
       targetPlayerCellPixels: 64,
     })
+  })
+})
+
+describe('resolveRecursionTarget', () => {
+  it('a plain container recurses into its own boardRef, untinted, mirrored per its own fliph', () => {
+    const root = makeFloorBoard('root', 2)
+    const inside = makeFloorBoard('inside', 2)
+    const world = makeWorld([root, inside], [{ id: 'box', kind: 'container', boardRef: 'inside', fliph: true }], { box: { board: 'root', x: 0, y: 0 } })
+    expect(resolveRecursionTarget(world, world.pieces.box)).toEqual({ boardId: 'inside', tintAmount: 0, mirrorH: true })
+  })
+
+  it('a clone recurses into its main body\'s CURRENT board, tinted, mirrored per the MAIN BODY\'s fliph (not its own)', () => {
+    const root = makeFloorBoard('root', 3)
+    const world = makeWorld(
+      [root],
+      [
+        { id: 'mainBody', kind: 'normal', fliph: true },
+        { id: 'clone', kind: 'container', cloneOf: 'mainBody', fliph: false }, // clone's own fliph is inert
+      ],
+      { mainBody: { board: 'root', x: 0, y: 0 }, clone: { board: 'root', x: 2, y: 0 } },
+    )
+    expect(resolveRecursionTarget(world, world.pieces.clone)).toEqual({ boardId: 'root', tintAmount: 0.35, mirrorH: true })
+  })
+
+  it('returns null for a clone whose main body no longer exists', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld([root], [{ id: 'clone', kind: 'container', cloneOf: 'gone' }], { clone: { board: 'root', x: 0, y: 0 } })
+    expect(resolveRecursionTarget(world, world.pieces.clone)).toBeNull()
+  })
+
+  it('returns null for a non-container, non-clone piece', () => {
+    const root = makeFloorBoard('root', 2)
+    const world = makeWorld([root], [{ id: 'box1', kind: 'normal' }], { box1: { board: 'root', x: 0, y: 0 } })
+    expect(resolveRecursionTarget(world, world.pieces.box1)).toBeNull()
+  })
+})
+
+describe('combineTint', () => {
+  it('composes so a second application never fully resets toward zero', () => {
+    const once = combineTint(0, 0.35)
+    const twice = combineTint(once, 0.35)
+    expect(twice).toBeGreaterThan(once)
+  })
+  it('parent tint alone (local 0) is unchanged', () => {
+    expect(combineTint(0.5, 0)).toBeCloseTo(0.5)
+  })
+})
+
+describe('drawBoardRecursive — Clone', () => {
+  it('displays the main body\'s actual current board content, not a nonexistent boardRef', () => {
+    const root = makeFloorBoard('root', 3)
+    const world = makeWorld(
+      [root],
+      [{ id: 'mainBody', kind: 'normal' }, { id: 'clone', kind: 'container', cloneOf: 'mainBody' }],
+      { mainBody: { board: 'root', x: 0, y: 0 }, clone: { board: 'root', x: 2, y: 0 } },
+    )
+    const ctx = mockContext()
+    let calls = 0
+    ctx.fillRect = () => { calls++ }
+    drawBoardForTest(ctx, root, world, 64) // 64px/3 cells ~21px, above cutoff -> clone recurses into root itself
+    // 9 root cells + mainBody fill + clone fill + (clone's recursive peek: another 9
+    // root cells + mainBody fill again, but NOT clone's own fill again since piece
+    // identity inside the peek is still just mainBody/clone at their real root positions)
+    expect(calls).toBeGreaterThan(11) // proves recursion happened, not just the flat clone fill
+  })
+
+  it('a clone\'s recursively-drawn content is provably paler than the same content drawn uncloned', () => {
+    const root = makeFloorBoard('root', 3)
+    const worldWithClone = makeWorld(
+      [root],
+      [{ id: 'mainBody', kind: 'normal' }, { id: 'clone', kind: 'container', cloneOf: 'mainBody' }],
+      { mainBody: { board: 'root', x: 0, y: 0 }, clone: { board: 'root', x: 2, y: 0 } },
+    )
+    const ctx1 = mockContext()
+    const stylesViaClone: string[] = []
+    ctx1.fillRect = () => { stylesViaClone.push(ctx1.fillStyle as string) }
+    drawBoardForTest(ctx1, root, worldWithClone, 64)
+    // The nested peek's floor-cell fills come after the top-level 9 cells + 2 piece
+    // fills (mainBody, clone) — compare one of those nested floor fills against a plain
+    // undyed floor fill.
+    const nestedFloorFill = stylesViaClone[11] // first cell of the recursed peek
+    expect(nestedFloorFill).not.toBe('#1e293b') // FLOOR_COLOR, unmixed
+  })
+
+  it('nested clone tint composes rather than resetting: a plain container reached through a clone stays tinted', () => {
+    // mainBody lives on its OWN separate board ('elsewhere'), away from the clone —
+    // deliberately, so the clone's peek can't loop back into itself (a clone sitting on
+    // the SAME board its own main body occupies would recurse into that board again,
+    // re-encounter the clone piece, and keep going until the pixel cutoff — correct
+    // behavior, but not what this test is isolating). Recursion path: clone (root) ->
+    // peeks at mainBody's location board 'elsewhere' (tint 0.35) -> encounters mainBody
+    // itself there, an ORDINARY container (tint contribution 0) -> recurses into
+    // mainBody's own boardRef 'mainInside' (combined tint stays 0.35, since 0 composed
+    // with 0.35 is 0.35) -> mainInside has no pieces, a clean leaf. Deterministic: 9
+    // root cells + 1 clone fill + 4 elsewhere cells + 1 mainBody fill + 4 mainInside
+    // cells = 19 total fillRect calls, so the last 4 are unambiguously mainInside's.
+    const root = makeFloorBoard('root', 3)
+    const elsewhere = makeFloorBoard('elsewhere', 2)
+    const mainInside = makeFloorBoard('mainInside', 2)
+    const world = makeWorld(
+      [root, elsewhere, mainInside],
+      [
+        { id: 'mainBody', kind: 'container', boardRef: 'mainInside' },
+        { id: 'clone', kind: 'container', cloneOf: 'mainBody' },
+      ],
+      { mainBody: { board: 'elsewhere', x: 0, y: 0 }, clone: { board: 'root', x: 2, y: 0 } },
+    )
+    const ctx = mockContext()
+    const styles: string[] = []
+    ctx.fillRect = () => { styles.push(ctx.fillStyle as string) }
+    drawBoardForTest(ctx, root, world, 64)
+    expect(styles).toHaveLength(19)
+    const innermostMainInsideFill = styles.at(-1) as string
+    expect(innermostMainInsideFill).not.toBe('#1e293b') // FLOOR_COLOR, unmixed — must be tinted
+  })
+})
+
+describe('drawBoardRecursive — Flip', () => {
+  it('mirrors both cells and pieces horizontally inside a fliph container', () => {
+    const root = makeFloorBoard('root', 2)
+    const inside = makeFloorBoard('inside', 2)
+    setRequirement(inside, 0, 0, 'box') // leftmost column has the marker
+    const world = makeWorld(
+      [root, inside],
+      [{ id: 'box', kind: 'container', boardRef: 'inside', fliph: true }],
+      { box: { board: 'root', x: 0, y: 0 } },
+    )
+    const ctx = mockContext()
+    const fillCalls: { x: number; style: string }[] = []
+    ctx.fillRect = (x) => { fillCalls.push({ x: x as number, style: ctx.fillStyle as string }) }
+    drawBoardForTest(ctx, root, world, 64)
+    // Without mirroring, the requirement overlay (0,0) would draw at the LEFT half of
+    // box's own screen cell; mirrored, it must draw at the RIGHT half instead.
+    const overlayCall = fillCalls.find((c) => c.style === '#334155')! // REQUIREMENT_OVERLAY.box
+    const boxCellLeft = 0 // box sits at root (0,0), screen left edge = 0
+    const boxCellCenter = boxCellLeft + (64 / 2) / 2 // half of box's own 32px screen cell
+    expect(overlayCall.x).toBeGreaterThan(boxCellCenter)
+  })
+
+  it('control: a non-fliph container is not mirrored', () => {
+    const root = makeFloorBoard('root', 2)
+    const inside = makeFloorBoard('inside', 2)
+    setRequirement(inside, 0, 0, 'box')
+    const world = makeWorld([root, inside], [{ id: 'box', kind: 'container', boardRef: 'inside' }], { box: { board: 'root', x: 0, y: 0 } })
+    const ctx = mockContext()
+    const fillCalls: { x: number; style: string }[] = []
+    ctx.fillRect = (x) => { fillCalls.push({ x: x as number, style: ctx.fillStyle as string }) }
+    drawBoardForTest(ctx, root, world, 64)
+    const overlayCall = fillCalls.find((c) => c.style === '#334155')! // REQUIREMENT_OVERLAY.box
+    const boxCellCenter = 0 + (64 / 2) / 2
+    expect(overlayCall.x).toBeLessThan(boxCellCenter)
+  })
+})
+
+describe('drawBoardRecursive — Transfer', () => {
+  it('draws a border on a container with its own linkedTo set', () => {
+    const root = makeFloorBoard('root', 2)
+    const c1Interior = makeFloorBoard('c1Interior', 2)
+    const c2Interior = makeFloorBoard('c2Interior', 2)
+    const world = makeWorld(
+      [root, c1Interior, c2Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior' },
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 1, y: 0 } },
+    )
+    const ctx = mockContext()
+    let linkedBorderDrawn = false
+    ctx.strokeRect = () => { if (ctx.strokeStyle === LINKED_BORDER_COLOR) linkedBorderDrawn = true }
+    drawBoardForTest(ctx, root, world, 64)
+    expect(linkedBorderDrawn).toBe(true)
+  })
+
+  it('does NOT draw the border on a target that has no linkedTo of its own', () => {
+    const root = makeFloorBoard('root', 2)
+    const c1Interior = makeFloorBoard('c1Interior', 2)
+    const c2Interior = makeFloorBoard('c2Interior', 2)
+    const world = makeWorld(
+      [root, c1Interior, c2Interior],
+      [
+        { id: 'C1', kind: 'container', boardRef: 'c1Interior' }, // C1 is the "target" here, unlinked itself
+        { id: 'C2', kind: 'container', boardRef: 'c2Interior', linkedTo: 'C1' },
+      ],
+      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 1, y: 0 } },
+    )
+    const ctx = mockContext()
+    let totalStrokeCalls = 0
+    const strokeStylesAtC1: string[] = []
+    // Board size 2 at cellSize 64 means each root cell is 64px wide; C1 sits at root
+    // x=0 (screen x in [0,64)), C2 at root x=1 (screen x in [64,128)).
+    ctx.strokeRect = (x) => {
+      totalStrokeCalls++
+      if ((x as number) < 64) strokeStylesAtC1.push(ctx.strokeStyle as string)
+    }
+    drawBoardForTest(ctx, root, world, 64)
+    expect(totalStrokeCalls).toBe(1) // exactly one border drawn in the whole scene: C2's own
+    expect(strokeStylesAtC1).toHaveLength(0) // none of it is in C1's cell region
+  })
+
+  it('container border is drawn AFTER its nested content, so it is not painted over', () => {
+    const root = makeFloorBoard('root', 2)
+    const inside = makeFloorBoard('inside', 2)
+    const world = makeWorld(
+      [root, inside],
+      [{ id: 'C1', kind: 'container', boardRef: 'inside', linkedTo: 'C1' }], // self-linked is fine for this draw-order check
+      { C1: { board: 'root', x: 0, y: 0 } },
+    )
+    const ctx = mockContext()
+    const callOrder: string[] = []
+    ctx.fillRect = () => { callOrder.push('fill') }
+    ctx.strokeRect = () => { callOrder.push('stroke') }
+    drawBoardForTest(ctx, root, world, 64)
+    const lastFillIndex = callOrder.lastIndexOf('fill')
+    const linkedStrokeIndex = callOrder.indexOf('stroke')
+    expect(linkedStrokeIndex).toBeGreaterThan(lastFillIndex)
   })
 })
