@@ -1,5 +1,6 @@
 import { Board, BoardId, Location, PieceId, PieceKind, World, findContainerFor, VOID_BOARD_ID } from '../engine/types'
-import { Viewport } from './camera'
+import { CameraTransform, Viewport, worldToScreen } from './camera'
+import { BoardTransform, childTransform } from './recursiveTransform'
 
 const FLOOR_COLOR = '#1e293b'
 const WALL_COLOR = '#0f172a'
@@ -67,7 +68,7 @@ interface ScreenRect {
   bottom: number
 }
 
-export function intersectsViewport(rect: ScreenRect, viewport: Viewport): boolean {
+function intersectsViewport(rect: ScreenRect, viewport: Viewport): boolean {
   return rect.right > 0 && rect.left < viewport.width && rect.bottom > 0 && rect.top < viewport.height
 }
 
@@ -94,59 +95,122 @@ function cycleColorFor(pieceId: PieceId): string {
   return CYCLE_PALETTE[hash % CYCLE_PALETTE.length]
 }
 
-export function renderBoard(
-  ctx: CanvasRenderingContext2D,
+export interface DrawContext {
+  ctx: CanvasRenderingContext2D
+  world: World
+  camera: CameraTransform
+  viewport: Viewport
+  budget: RenderBudget
+  piecesByBoard: PiecesByBoard
+  cellsDrawnSoFar: { count: number }
+}
+
+export function drawBoardRecursive(
+  dc: DrawContext,
   board: Board,
-  world: World,
-  cellSize: number,
+  transform: BoardTransform,
+  recursionDepth: number,
+  tintAmount: number,
+  mirrorH: boolean,
 ): void {
+  if (dc.cellsDrawnSoFar.count >= dc.budget.maxCellsPerFrame) return
+  if (recursionDepth >= dc.budget.maxRecursionDepth) return
+  if (!Number.isFinite(transform.scale) || transform.scale <= 0) return
+
+  const screenCellSize = transform.scale * dc.camera.pixelsPerRootUnit
+  const boardTopLeft = worldToScreen(transform.originX, transform.originY, dc.camera, dc.viewport)
+  const boardBottomRight = worldToScreen(
+    transform.originX + board.size * transform.scale,
+    transform.originY + board.size * transform.scale,
+    dc.camera,
+    dc.viewport,
+  )
+  const boardRect: ScreenRect = { left: boardTopLeft.x, top: boardTopLeft.y, right: boardBottomRight.x, bottom: boardBottomRight.y }
+  if (!intersectsViewport(boardRect, dc.viewport)) return
+
+  const mirrorX = (x: number) => (mirrorH ? board.size - 1 - x : x)
+
   for (let y = 0; y < board.size; y++) {
     for (let x = 0; x < board.size; x++) {
-      const cell = board.cells[y][x]
-      ctx.fillStyle = cell.type === 'wall' ? WALL_COLOR : FLOOR_COLOR
-      ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize)
+      const screen = worldToScreen(
+        transform.originX + mirrorX(x) * transform.scale,
+        transform.originY + y * transform.scale,
+        dc.camera,
+        dc.viewport,
+      )
+      const cellRect: ScreenRect = { left: screen.x, top: screen.y, right: screen.x + screenCellSize, bottom: screen.y + screenCellSize }
+      if (!intersectsViewport(cellRect, dc.viewport)) continue
+      if (dc.cellsDrawnSoFar.count >= dc.budget.maxCellsPerFrame) return
+      dc.cellsDrawnSoFar.count++
 
+      const cell = board.cells[y][x]
+      dc.ctx.fillStyle = applyTint(cell.type === 'wall' ? WALL_COLOR : FLOOR_COLOR, tintAmount)
+      dc.ctx.fillRect(cellRect.left, cellRect.top, screenCellSize, screenCellSize)
       if (cell.requirement) {
-        ctx.fillStyle = REQUIREMENT_OVERLAY[cell.requirement]
-        const inset = cellSize / 4
-        ctx.fillRect(x * cellSize + inset, y * cellSize + inset, cellSize - inset * 2, cellSize - inset * 2)
+        dc.ctx.fillStyle = applyTint(REQUIREMENT_OVERLAY[cell.requirement], tintAmount)
+        const inset = screenCellSize / 4
+        dc.ctx.fillRect(cellRect.left + inset, cellRect.top + inset, screenCellSize - inset * 2, screenCellSize - inset * 2)
       }
     }
   }
 
-  for (const [pieceId, location] of Object.entries(world.locations)) {
-    if (location.board !== board.id) continue
-    const piece = world.pieces[pieceId]
+  const entries = dc.piecesByBoard.get(board.id) ?? []
+  for (const { pieceId, location } of entries) {
+    const piece = dc.world.pieces[pieceId]
+    const screen = worldToScreen(
+      transform.originX + mirrorX(location.x) * transform.scale,
+      transform.originY + location.y * transform.scale,
+      dc.camera,
+      dc.viewport,
+    )
+    const pieceRect: ScreenRect = { left: screen.x, top: screen.y, right: screen.x + screenCellSize, bottom: screen.y + screenCellSize }
+    if (!intersectsViewport(pieceRect, dc.viewport)) continue
+
     // An infinite destination (piece.infiniteFor set) has no cycle membership
     // or kind of its own worth rendering — it's colored as whichever real
     // piece it represents.
     const colorSourceId = piece.infiniteFor ?? pieceId
-    const colorSource = piece.infiniteFor !== undefined ? world.pieces[piece.infiniteFor] : piece
-    ctx.fillStyle = isCycleMember(colorSourceId, world) ? cycleColorFor(colorSourceId) : PIECE_COLORS[colorSource.kind]
-    ctx.fillRect(location.x * cellSize, location.y * cellSize, cellSize, cellSize)
+    const colorSource = piece.infiniteFor !== undefined ? dc.world.pieces[piece.infiniteFor] : piece
+    const baseColor = isCycleMember(colorSourceId, dc.world) ? cycleColorFor(colorSourceId) : PIECE_COLORS[colorSource.kind]
+    dc.ctx.fillStyle = applyTint(baseColor, tintAmount)
+    dc.ctx.fillRect(pieceRect.left, pieceRect.top, screenCellSize, screenCellSize)
     // A piece "is locked" exactly when it's standing in the Void (see
     // isInVoid in types.ts) — every piece this loop reaches has already been
-    // filtered to location.board === board.id, so board.id === VOID_BOARD_ID
-    // here means this particular piece is in the Void too.
+    // filtered to piecesByBoard's grouping by board.id, so board.id ===
+    // VOID_BOARD_ID here means this particular piece is in the Void too.
     if (board.id === VOID_BOARD_ID) {
-      ctx.save()
-      ctx.strokeStyle = LOCKED_RING_COLOR
-      ctx.lineWidth = Math.max(2, cellSize / 8)
-      const inset = ctx.lineWidth / 2
-      ctx.strokeRect(
-        location.x * cellSize + inset,
-        location.y * cellSize + inset,
-        cellSize - inset * 2,
-        cellSize - inset * 2,
-      )
+      dc.ctx.save()
+      dc.ctx.strokeStyle = LOCKED_RING_COLOR
+      dc.ctx.lineWidth = Math.max(2, screenCellSize / 8)
+      const ringInset = dc.ctx.lineWidth / 2
+      dc.ctx.strokeRect(pieceRect.left + ringInset, pieceRect.top + ringInset, screenCellSize - ringInset * 2, screenCellSize - ringInset * 2)
       if (piece.infiniteFor !== undefined) {
-        ctx.fillStyle = INFINITY_MARKER_COLOR
-        ctx.font = `${Math.floor(cellSize / 2)}px sans-serif`
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText('∞', location.x * cellSize + cellSize / 2, location.y * cellSize + cellSize / 2)
+        dc.ctx.fillStyle = INFINITY_MARKER_COLOR
+        dc.ctx.font = `${Math.floor(screenCellSize / 2)}px sans-serif`
+        dc.ctx.textAlign = 'center'
+        dc.ctx.textBaseline = 'middle'
+        dc.ctx.fillText('∞', pieceRect.left + screenCellSize / 2, pieceRect.top + screenCellSize / 2)
       }
-      ctx.restore()
+      dc.ctx.restore()
+    }
+
+    if (piece.kind === 'container' && piece.boardRef !== undefined && screenCellSize >= dc.budget.minCellPixels) {
+      const childBoard = dc.world.boards[piece.boardRef]
+      if (childBoard !== undefined) {
+        const childT = childTransform(transform, location, childBoard)
+        drawBoardRecursive(dc, childBoard, childT, recursionDepth + 1, tintAmount, mirrorH)
+      }
     }
   }
+}
+
+// Alpha-blend toward white. amount 0 = unchanged; used for Clone's paler tint.
+function applyTint(hexColor: string, amount: number): string {
+  if (amount <= 0) return hexColor
+  const r = parseInt(hexColor.slice(1, 3), 16)
+  const g = parseInt(hexColor.slice(3, 5), 16)
+  const b = parseInt(hexColor.slice(5, 7), 16)
+  const mix = (channel: number) => Math.round(channel + (255 - channel) * amount)
+  const toHex = (n: number) => n.toString(16).padStart(2, '0')
+  return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`
 }
