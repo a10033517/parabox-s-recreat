@@ -194,6 +194,65 @@ describe('resolveCanonicalBoardTransform', () => {
     expect(resolveCanonicalBoardTransform(world, 'nonexistent', 'root')).toBeNull()
   })
 
+  it('I3 regression: a cachedRootAnchorBoardId keeps a pure-cycle level\'s pre-move and post-move transforms in the same coordinate space', () => {
+    // Same pure-cycle shape as the 'start'/'redInterior' fixture above: yellowPiece owns
+    // 'start', redPiece owns 'redInterior' — no zero-owner board, so resolveAnchorBoardId's
+    // fallback is the player's OWN current board. Pre-move, the player is on 'start'
+    // (anchor resolves to 'start'); post-move (having entered redPiece's container), the
+    // player is on 'redInterior' (anchor would naively resolve to 'redInterior' instead) —
+    // reproducing the exact hazard final-review I3 describes: two World snapshots for one
+    // animated move silently anchoring on two DIFFERENT real boards while both are tagged
+    // anchor: 'root'.
+    const start = makeFloorBoard('start', 2)
+    const redInterior = makeFloorBoard('redInterior', 1)
+    const makePieces = () => [
+      { id: PLAYER_ID, kind: 'player' as const },
+      { id: 'redPiece', kind: 'container' as const, boardRef: 'redInterior' },
+      { id: 'yellowPiece', kind: 'container' as const, boardRef: 'start' },
+    ]
+    const preWorld = makeWorld(
+      [start, redInterior],
+      makePieces(),
+      {
+        [PLAYER_ID]: { board: 'start', x: 0, y: 0 },
+        redPiece: { board: 'start', x: 1, y: 0 },
+        yellowPiece: { board: 'redInterior', x: 0, y: 0 },
+      },
+    )
+    const postWorld = makeWorld(
+      [start, redInterior],
+      makePieces(),
+      {
+        [PLAYER_ID]: { board: 'redInterior', x: 0, y: 0 }, // player has entered redPiece
+        redPiece: { board: 'start', x: 1, y: 0 },
+        yellowPiece: { board: 'redInterior', x: 0, y: 0 },
+      },
+    )
+
+    // Confirms the fixture actually reproduces the hazard: uncached resolution diverges.
+    expect(resolveAnchorBoardId(preWorld, 'root')).toBe('start')
+    expect(resolveAnchorBoardId(postWorld, 'root')).toBe('redInterior')
+
+    // The fix: resolve the anchor ONCE (as GameScreen does, from the level's initial
+    // World at mount) and thread it into every subsequent call, regardless of which
+    // World snapshot is passed in.
+    const cachedRootAnchorBoardId = resolveAnchorBoardId(preWorld, 'root')! // 'start'
+    const preTransform = resolveCanonicalBoardTransform(preWorld, 'start', 'root', cachedRootAnchorBoardId)
+    const postTransform = resolveCanonicalBoardTransform(postWorld, 'start', 'root', cachedRootAnchorBoardId)
+    // Both resolve 'start' itself (the cached anchor) to the identity transform — same
+    // coordinate space, regardless of which World snapshot was passed in.
+    expect(preTransform).toEqual({ boardId: 'start', originX: 0, originY: 0, scale: 1 })
+    expect(postTransform).toEqual({ boardId: 'start', originX: 0, originY: 0, scale: 1 })
+
+    // And 'redInterior' resolves to the SAME position (one cell into 'start', where
+    // redPiece sits) whichever World snapshot supplies it — proving the two snapshots
+    // now compose in one shared coordinate space instead of two independent ones.
+    const preRedInterior = resolveCanonicalBoardTransform(preWorld, 'redInterior', 'root', cachedRootAnchorBoardId)
+    const postRedInterior = resolveCanonicalBoardTransform(postWorld, 'redInterior', 'root', cachedRootAnchorBoardId)
+    expect(preRedInterior).toEqual(postRedInterior)
+    expect(preRedInterior).toEqual({ boardId: 'redInterior', originX: 1, originY: 0, scale: 1 })
+  })
+
   it('a clone pointing at a board does not affect that board\'s own canonical transform', () => {
     // mainBody canonically owns mainInside; a separate clone (cloneOf: mainBody, no
     // boardRef of its own) also exists elsewhere. Resolving mainInside's canonical

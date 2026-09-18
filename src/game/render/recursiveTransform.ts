@@ -63,8 +63,22 @@ export function resolveCanonicalBoardTransform(
   world: World,
   boardId: BoardId,
   anchor: CameraAnchor,
+  // When provided and anchor === 'root', used directly instead of re-deriving the anchor
+  // board from this (possibly mid-move) World snapshot. On a pure-cycle level,
+  // resolveAnchorBoardId's own fallback is the player's CURRENT board, which changes
+  // during the exact move being animated — so the pre-move and post-move World snapshots
+  // can silently resolve to two different anchor boards while both are tagged anchor:
+  // 'root', producing a nonsensical camera lerp across unrelated coordinate spaces
+  // (final-review I3). Callers that resolve the anchor once per level load (GameScreen)
+  // pass that cached id here so every call stays in the same coordinate space.
+  // resolveAnchorBoardId's own logic and tests are unchanged by this — it's still used
+  // for the initial computation, and whenever no cached id is supplied.
+  cachedRootAnchorBoardId?: BoardId,
 ): BoardTransform | null {
-  const anchorBoardId = resolveAnchorBoardId(world, anchor)
+  const anchorBoardId =
+    anchor === 'root' && cachedRootAnchorBoardId !== undefined
+      ? cachedRootAnchorBoardId
+      : resolveAnchorBoardId(world, anchor)
   if (anchorBoardId === null) return null
   if (world.boards[boardId] === undefined) return null
 

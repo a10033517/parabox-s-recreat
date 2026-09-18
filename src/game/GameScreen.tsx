@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { GameState } from './engine/GameState'
-import { Direction, Location, PieceId, PLAYER_ID, VOID_BOARD_ID, World } from './engine/types'
+import { BoardId, Direction, Location, PieceId, PLAYER_ID, VOID_BOARD_ID, World } from './engine/types'
 import { DrawContext, DEFAULT_RENDER_BUDGET, drawBoardRecursive, indexPiecesByBoard } from './render/CanvasRenderer'
 import { CameraTransform, Viewport, cameraForPlayer } from './render/camera'
 import { resolveAnchorBoardId } from './render/recursiveTransform'
 import { DPad } from '../ui/DPad'
 import { SwipeLayer } from '../ui/SwipeLayer'
 
-type AnimationKind = 'move' | 'enter-leave' | 'teleport' | 'void-transition'
+export type AnimationKind = 'move' | 'enter-leave' | 'teleport' | 'void-transition'
 
 interface RenderAnimation {
   preWorld: World
@@ -26,15 +26,19 @@ const DURATIONS: Record<AnimationKind, number> = {
   'void-transition': 400,
 }
 
-function easeOut(t: number): number {
+// Exported (rather than module-private) so the animation layer's own logic can be
+// unit-tested directly against real pre/post World pairs, instead of only indirectly
+// through end-state assertions that would pass against a broken/no-op animation
+// implementation too (final-review I5).
+export function easeOut(t: number): number {
   return 1 - (1 - t) * (1 - t)
 }
 
-function lerp(a: number, b: number, t: number): number {
+export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t
 }
 
-function isSimpleContainmentStep(world: World, oldBoard: string, newBoard: string): boolean {
+export function isSimpleContainmentStep(world: World, oldBoard: string, newBoard: string): boolean {
   const newOwner = Object.values(world.pieces).find((p) => p.kind === 'container' && p.boardRef === newBoard)
   if (newOwner !== undefined && world.locations[newOwner.id]?.board === oldBoard) return true
   const oldOwner = Object.values(world.pieces).find((p) => p.kind === 'container' && p.boardRef === oldBoard)
@@ -42,7 +46,7 @@ function isSimpleContainmentStep(world: World, oldBoard: string, newBoard: strin
   return false
 }
 
-function classifyMove(preWorld: World, postWorld: World): AnimationKind {
+export function classifyMove(preWorld: World, postWorld: World): AnimationKind {
   const oldBoard = preWorld.locations[PLAYER_ID]?.board
   const newBoard = postWorld.locations[PLAYER_ID]?.board
   if (oldBoard === undefined || newBoard === undefined || oldBoard === newBoard) return 'move'
@@ -51,7 +55,7 @@ function classifyMove(preWorld: World, postWorld: World): AnimationKind {
   return 'teleport'
 }
 
-function getRenderLocationFactory(preWorld: World, postWorld: World, t: number) {
+export function getRenderLocationFactory(preWorld: World, postWorld: World, t: number) {
   return (pieceId: PieceId): Location | undefined => {
     const pre = preWorld.locations[pieceId]
     const post = postWorld.locations[pieceId]
@@ -74,6 +78,18 @@ export function GameScreen({
   if (!stateRef.current) stateRef.current = new GameState(initialWorld)
   const state = stateRef.current
 
+  // Resolved ONCE per level load (from the level's initial World, same lazy-init idiom
+  // as stateRef above), never re-derived from live/possibly-player-relocated World
+  // snapshots on every frame or every move — see resolveCanonicalBoardTransform's and
+  // cameraForPlayer's own cachedRootAnchorBoardId doc (final-review I3). Undefined
+  // sentinel distinguishes "not yet computed" from a legitimate null result (an
+  // unreachable/malformed world), so a null result is still cached rather than retried.
+  const rootAnchorBoardIdRef = useRef<BoardId | null | undefined>(undefined)
+  if (rootAnchorBoardIdRef.current === undefined) {
+    rootAnchorBoardIdRef.current = resolveAnchorBoardId(initialWorld, 'root')
+  }
+  const rootAnchorBoardId = rootAnchorBoardIdRef.current ?? undefined
+
   const [, setTick] = useState(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -94,8 +110,8 @@ export function GameScreen({
       startTimeMs: performance.now(),
       durationMs: DURATIONS[kind],
       kind,
-      sourceCamera: cameraForPlayer(preMoveWorld, budget),
-      targetCamera: cameraForPlayer(postMoveWorld, budget),
+      sourceCamera: cameraForPlayer(preMoveWorld, budget, rootAnchorBoardId),
+      targetCamera: cameraForPlayer(postMoveWorld, budget, rootAnchorBoardId),
     }
     setTick((t) => t + 1)
   }
@@ -168,7 +184,7 @@ export function GameScreen({
         if (rawT >= 1) {
           animationRef.current = null
           world = state.current
-          camera = cameraForPlayer(world, { targetPlayerCellPixels: DEFAULT_RENDER_BUDGET.targetPlayerCellPixels })
+          camera = cameraForPlayer(world, { targetPlayerCellPixels: DEFAULT_RENDER_BUDGET.targetPlayerCellPixels }, rootAnchorBoardId)
         } else {
           const t = easeOut(Math.max(0, rawT))
           if (anim.kind === 'void-transition' || anim.sourceCamera.anchor !== anim.targetCamera.anchor) {
@@ -193,10 +209,15 @@ export function GameScreen({
           }
         }
       } else {
-        camera = cameraForPlayer(world, { targetPlayerCellPixels: DEFAULT_RENDER_BUDGET.targetPlayerCellPixels })
+        camera = cameraForPlayer(world, { targetPlayerCellPixels: DEFAULT_RENDER_BUDGET.targetPlayerCellPixels }, rootAnchorBoardId)
       }
 
-      const anchorBoardId = resolveAnchorBoardId(world, camera.anchor)
+      // Same cached anchor id used for the camera above — the Void anchor case is
+      // unaffected (VOID_BOARD_ID is always an unambiguous constant, no caching needed).
+      const anchorBoardId =
+        camera.anchor === 'root' && rootAnchorBoardId !== undefined
+          ? rootAnchorBoardId
+          : resolveAnchorBoardId(world, camera.anchor)
       if (anchorBoardId !== null && world.boards[anchorBoardId] !== undefined) {
         const currentAnim = animationRef.current
         const dc: DrawContext = {

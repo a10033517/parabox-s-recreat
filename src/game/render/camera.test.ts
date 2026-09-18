@@ -97,6 +97,55 @@ describe('cameraForPlayer', () => {
     expect(Number.isFinite(camera.centerX)).toBe(true)
     expect(Number.isFinite(camera.pixelsPerRootUnit)).toBe(true)
   })
+
+  it('I3 regression: a cachedRootAnchorBoardId keeps pre-move and post-move cameras in the same coordinate space on a pure-cycle level', () => {
+    // Same pure-cycle 'start'/'redInterior' shape as recursiveTransform.test.ts's I3
+    // regression: no zero-owner board, so the anchor's fallback is the player's own
+    // current board — which changes as part of the very move being animated (the player
+    // enters redPiece's container). Without a cached anchor id, cameraForPlayer(preWorld)
+    // and cameraForPlayer(postWorld) silently anchor on two different real boards while
+    // both report anchor: 'root'.
+    const start = makeFloorBoard('start', 2)
+    const redInterior = makeFloorBoard('redInterior', 1)
+    const makePieces = () => [
+      { id: PLAYER_ID, kind: 'player' as const },
+      { id: 'redPiece', kind: 'container' as const, boardRef: 'redInterior' },
+      { id: 'yellowPiece', kind: 'container' as const, boardRef: 'start' },
+    ]
+    const preWorld = makeWorld(
+      [start, redInterior], makePieces(),
+      { [PLAYER_ID]: { board: 'start', x: 0, y: 0 }, redPiece: { board: 'start', x: 1, y: 0 }, yellowPiece: { board: 'redInterior', x: 0, y: 0 } },
+    )
+    const postWorld = makeWorld(
+      [start, redInterior], makePieces(),
+      { [PLAYER_ID]: { board: 'redInterior', x: 0, y: 0 }, redPiece: { board: 'start', x: 1, y: 0 }, yellowPiece: { board: 'redInterior', x: 0, y: 0 } },
+    )
+    const budget = { targetPlayerCellPixels: 64 }
+
+    // The cached anchor is resolved once, from the level's initial (pre-move) World —
+    // mirrors GameScreen's own useRef lazy-init from initialWorld.
+    const cachedRootAnchorBoardId = 'start'
+    const preCamera = cameraForPlayer(preWorld, budget, cachedRootAnchorBoardId)
+    const postCamera = cameraForPlayer(postWorld, budget, cachedRootAnchorBoardId)
+    expect(preCamera.anchor).toBe('root')
+    expect(postCamera.anchor).toBe('root')
+    // preWorld: player at 'start' (0,0), scale 1 -> center (0.5, 0.5).
+    expect(preCamera.centerX).toBeCloseTo(0.5)
+    expect(preCamera.centerY).toBeCloseTo(0.5)
+    // postWorld: player at 'redInterior' (0,0); redInterior's canonical transform in the
+    // SAME 'start'-anchored space is originX:1, originY:0, scale:1 (one cell into
+    // 'start', where redPiece sits) -> center (1 + 0.5*1, 0 + 0.5*1) = (1.5, 0.5).
+    expect(postCamera.centerX).toBeCloseTo(1.5)
+    expect(postCamera.centerY).toBeCloseTo(0.5)
+    // Both share one continuous coordinate space, so the move reads as a 1-unit pan
+    // (0.5 -> 1.5), not a snap to an unrelated origin. Without the cache, postCamera
+    // would instead anchor on 'redInterior' itself (identity transform, scale 1), giving
+    // centerX 0.5 again but at a totally different real-world zoom/position (scale would
+    // be 64 there vs 128/0.5 here) — same numbers by coincidence in this fixture's X, but
+    // the zoom level below proves the anchor actually changed.
+    expect(preCamera.pixelsPerRootUnit).toBeCloseTo(64) // scale 1 at 'start'
+    expect(postCamera.pixelsPerRootUnit).toBeCloseTo(64) // still scale 1 in the SAME space
+  })
 })
 
 describe('cameraFallbackForAnchor', () => {

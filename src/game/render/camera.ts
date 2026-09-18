@@ -1,4 +1,4 @@
-import { PLAYER_ID, World, isInVoid } from '../engine/types'
+import { BoardId, PLAYER_ID, World, isInVoid } from '../engine/types'
 import { CameraAnchor, resolveCanonicalBoardTransform } from './recursiveTransform'
 
 export interface Viewport {
@@ -41,12 +41,15 @@ export function cameraFallbackForAnchor(anchor: CameraAnchor, targetPlayerCellPi
   return { anchor, centerX: 0.5, centerY: 0.5, pixelsPerRootUnit: clampCameraZoom(targetPlayerCellPixels) }
 }
 
-export function cameraForPlayer(world: World, budget: CameraBudget): CameraTransform {
+// cachedRootAnchorBoardId: see resolveCanonicalBoardTransform's own doc — thread through
+// the same anchor board id resolved once per level load, so pre-move/post-move cameras
+// computed for one animated move stay in the same coordinate space (final-review I3).
+export function cameraForPlayer(world: World, budget: CameraBudget, cachedRootAnchorBoardId?: BoardId): CameraTransform {
   const anchor: CameraAnchor = isInVoid(world, PLAYER_ID) ? 'void' : 'root'
   const playerLoc = world.locations[PLAYER_ID]
   if (playerLoc === undefined) return cameraFallbackForAnchor(anchor, budget.targetPlayerCellPixels)
 
-  const boardTransform = resolveCanonicalBoardTransform(world, playerLoc.board, anchor)
+  const boardTransform = resolveCanonicalBoardTransform(world, playerLoc.board, anchor, cachedRootAnchorBoardId)
   if (boardTransform === null) return cameraFallbackForAnchor(anchor, budget.targetPlayerCellPixels)
 
   const centerX = boardTransform.originX + (playerLoc.x + 0.5) * boardTransform.scale
