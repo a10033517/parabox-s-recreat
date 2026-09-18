@@ -140,22 +140,36 @@ nested level, just measured in its own units instead of a parent's.
 
 ### Worked example: self-loop (validates against the reference screenshot)
 
-A self-loop box `A` sits on board `R` at `(ax, ay)`, with `A.boardRef === R` (its own
-interior reference is the same board it sits on). Player enters `A`; `Location.board`
-becomes `R` again (entering a direct self-loop doesn't change which board you're on).
+A self-loop `loop` sits on board `Interior` at `(sx, sy)`, with `loop.boardRef ===
+Interior` (its own interior reference is the same board it sits on — see
+`worldEdit.ts`'s `placeSelfLoopBox`, "allocating no new board"). Note a self-loop can
+never sit directly on the true anchor board and still reach Case 1 below — placing one
+directly on the anchor makes the anchor itself the self-loop's own board, so `F ===
+anchorBoardId` and Case 2 applies instead (the anchor's own framing, unaffected by the
+self-loop). For Case 1 to apply, `Interior` must be genuinely nested: some other
+container `outer` (`boardRef: 'Interior'`) sits on `Root` at `(ox, oy)`, and `Root` is
+the true zero-owner anchor. (`worldEdit.test.ts`'s "self-loop inside board-0" fixture is
+exactly this shape.) Player enters `outer`, arrives on `Interior`, then enters `loop` —
+`Location.board` stays `Interior` (a self-loop doesn't change which board you're on).
 
-- `findContainerFor(world, R)` finds `A` (the only piece with `boardRef === R`).
-- `Parent = R`, `(px, py) = (ax, ay)` — `A`'s own position on `R`.
-- `parentTransform = resolveCanonicalBoardTransform(world, R, anchor, cached)`.
-- Camera centers on `A`'s own cell on `R`, zoomed to show `A` plus 1 ring of `R`'s other
-  cells around it.
+- `F = Interior`, which is not the anchor (`Root`) — Case 1 applies.
+- `findContainerFor(world, Interior)` matches both `outer` (`boardRef: Interior`, from
+  `Root`) and `loop` (`boardRef: Interior`, from itself) — an existing ambiguity in
+  `findContainerFor` (first match by object-key/insertion order), not new to this spec.
+  Any level authored the normal way (place the container, then place something inside
+  it) registers `outer` first, so `findContainerFor` returns `outer`.
+- `Parent = Root`, `(px, py)` = `outer`'s own position on `Root`.
+- Camera centers on `outer`'s own cell on `Root`, zoomed to show it plus 1 ring of
+  `Root`'s other cells around it — the container, framed from one level up, regardless
+  of the self-loop nested inside it.
 
-Because `R` is drawn recursively (unchanged from the render spec), `A`'s own cell in
-this shot *also* recursively renders `A`'s interior — which is `R` again — producing
-exactly "see the self-loop box, and next to it, a paler recursive copy of itself,"
-matching the reference screenshot, with no self-loop-specific branch in the new
-formula. The existing recursion-depth/pixel-cutoff budget (render spec §2.1, unchanged)
-still bounds how many further self-similar copies actually get drawn.
+`Interior`'s own recursive draw (unchanged from the render spec) is what makes
+`outer`'s cell show a self-similar interior: `loop` sitting on `Interior` recurses into
+`Interior` again inside its own cell, and so on to the existing recursion-depth/
+pixel-cutoff budget (render spec §2.1, unchanged). The camera formula itself needs no
+self-loop-specific branch — the self-similar look comes entirely from the
+already-shipped recursive renderer, once the camera is simply centered one level
+further out than before.
 
 ### Fallback
 
@@ -262,9 +276,10 @@ to every zoom computed above, including the fallback.
   - Player at root with no owner: center matches the root board's own midpoint; zoom
     matches `viewport-shortSide / (boardSize + 2)`.
   - Player in Void: same shape as root, using the Void board's own size.
-  - Self-loop case from the worked example above: center lands on the self-loop
-    piece's own position on its parent board (not the player's literal position, which
-    may differ after entering).
+  - Self-loop case from the worked example above (`outer`/`Interior`/`loop`): center
+    lands on `outer`'s own position on `Root` — the genuine external container, not the
+    self-loop `loop`'s own self-reference — and not the player's literal position on
+    `Interior`, which may differ after entering.
   - Pure-cycle level (reusing `camera.test.ts`'s existing I3 fixture: `start`/
     `redInterior` mutually owning each other, no zero-owner board): with the player
     standing on the cached anchor board itself, the camera frames that board's own full
