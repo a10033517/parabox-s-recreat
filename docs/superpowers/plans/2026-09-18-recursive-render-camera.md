@@ -309,9 +309,16 @@ export function resolveAnchorBoardId(world: World, anchor: CameraAnchor): BoardI
   if (anchor === 'void') {
     return world.boards[VOID_BOARD_ID] !== undefined ? VOID_BOARD_ID : null
   }
-  const ownerCount = new Map<BoardId, number>(Object.keys(world.boards).map((id) => [id, 0]))
+  // VOID_BOARD_ID excluded from the orphan scan — see the matching comment in the spec
+  // and the final-review ledger entry: once any piece falls into the Void, 'void' is
+  // added to world.boards but nothing ever owns it, so on a pure-cycle level (every real
+  // board already owned) it would otherwise become the only zero-owner board and hijack
+  // the anchor away from wherever the player actually is.
+  const ownerCount = new Map<BoardId, number>(
+    Object.keys(world.boards).filter((id) => id !== VOID_BOARD_ID).map((id) => [id, 0]),
+  )
   for (const piece of Object.values(world.pieces)) {
-    if (piece.kind === 'container' && piece.boardRef !== undefined) {
+    if (piece.kind === 'container' && piece.boardRef !== undefined && piece.boardRef !== VOID_BOARD_ID) {
       ownerCount.set(piece.boardRef, (ownerCount.get(piece.boardRef) ?? 0) + 1)
     }
   }
@@ -1922,10 +1929,17 @@ export function GameScreen({
 ```
 
 In `src/index.css`, add a `.game-viewport` rule (near the existing `.game-screen` block)
-giving the canvas's container an explicit, responsive size, and remove `image-rendering:
-pixelated` from the existing `canvas` rule — that setting hard-edges every pixel, which
-looked right for the old instant-snap grid renderer but fights the new continuously
-panned/zoomed, fractional-pixel-position recursive scene:
+giving the canvas's container an explicit, responsive size. **Do not modify the bare
+`canvas` selector's sizing** — `EditorScreen.tsx` has its own `<canvas>`, sized to its
+board's own bitmap dimensions (`CELL_SIZE * board.size`), and a bare `canvas { width:
+100%; height: 100% }` would stretch it and break its unscaled client-to-cell coordinate
+math in `cellFromEvent` (this exact mistake was found and fixed during this plan's final
+whole-branch review — jsdom does no layout, so no test can catch a CSS-only regression
+like this; it only shows up in a real browser). Scope the new sizing rule to `.game-
+viewport canvas` specifically, and turn off pixelation only there too — the editor's
+canvas keeps its existing `image-rendering: pixelated` look (hard-edged, right for its
+instant-snap grid); only the game's continuously panned/zoomed, fractional-pixel-position
+canvas needs it off:
 
 ```css
 .game-viewport {
@@ -1938,15 +1952,20 @@ canvas {
   max-width: 100%;
   border: 1px solid var(--surface-raised);
   border-radius: 8px;
+  image-rendering: pixelated;
+}
+
+.game-viewport canvas {
   display: block;
   width: 100%;
   height: 100%;
+  image-rendering: auto;
 }
 ```
 
-(Remove the old `image-rendering: pixelated;` line from the existing `canvas` rule when
-making this edit — don't leave both a `width:100%` block-level and the old rule present
-twice.)
+(The bare `canvas` rule's `image-rendering: pixelated` line stays — it's what the editor's
+canvas keeps using. Only the new `.game-viewport canvas` rule overrides it off. Do not
+add `width`/`height` to the bare `canvas` rule at all; that's what broke the editor.)
 
 - [ ] **Step 4: Run and confirm they pass**
 

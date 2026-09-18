@@ -250,9 +250,22 @@ player-relocated state on every frame. The Void anchor's identity board is alway
 // src/game/render/recursiveTransform.ts
 export function resolveAnchorBoardId(world: World, anchor: 'root' | 'void'): BoardId | null {
   if (anchor === 'void') return VOID_BOARD_ID in world.boards ? VOID_BOARD_ID : null
-  const ownerCount = new Map<BoardId, number>(Object.keys(world.boards).map((id) => [id, 0]))
+  // VOID_BOARD_ID is EXCLUDED from the orphan scan below — corrected after the final
+  // whole-branch review found the original version missed this. ensureInfiniteDestination
+  // (types.ts) adds a 'void' entry to world.boards the moment any piece falls in, but
+  // nothing ever owns it (no container can legally have boardRef: 'void' — levelSchema
+  // rejects authoring it). On a tree level that's harmless (a real board is still the
+  // sole orphan). On a PURE-CYCLE level — where every real board already has exactly one
+  // owner, by definition of the mechanic — 'void' becomes the only zero-owner board the
+  // moment it's synthesized, and the unfiltered scan below would silently swap the root
+  // anchor to it even though the player is standing nowhere near the Void. Every shipped
+  // level whose core mechanic IS falling into the Void (06-self-loop, 08-two-node-cycle,
+  // 09-cycle-branch) hits this the instant that mechanic fires in normal play.
+  const ownerCount = new Map<BoardId, number>(
+    Object.keys(world.boards).filter((id) => id !== VOID_BOARD_ID).map((id) => [id, 0]),
+  )
   for (const piece of Object.values(world.pieces)) {
-    if (piece.kind === 'container' && piece.boardRef !== undefined) {
+    if (piece.kind === 'container' && piece.boardRef !== undefined && piece.boardRef !== VOID_BOARD_ID) {
       ownerCount.set(piece.boardRef, (ownerCount.get(piece.boardRef) ?? 0) + 1)
     }
   }
