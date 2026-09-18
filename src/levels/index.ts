@@ -11,6 +11,9 @@ import level07 from './builtin/07-loop-eats-container.json?raw'
 import level08 from './builtin/08-two-node-cycle.json?raw'
 import level09 from './builtin/09-cycle-branch.json?raw'
 import level10 from './builtin/10-void-storage.json?raw'
+import level11 from './builtin/11-clone-box.json?raw'
+import level12 from './builtin/12-flip-box.json?raw'
+import level13 from './builtin/13-transfer.json?raw'
 
 export interface LevelMeta {
   id: string
@@ -29,6 +32,9 @@ export const BUILTIN_LEVELS: LevelMeta[] = [
   { id: '08-two-node-cycle', name: '双节点循环', world: parseLevel(JSON.parse(level08)) },
   { id: '09-cycle-branch', name: '循环与分支', world: parseLevel(JSON.parse(level09)) },
   { id: '10-void-storage', name: '虚空仓库', world: parseLevel(JSON.parse(level10)) },
+  { id: '11-clone-box', name: '分身箱子', world: parseLevel(JSON.parse(level11)) },
+  { id: '12-flip-box', name: '翻转箱子', world: parseLevel(JSON.parse(level12)) },
+  { id: '13-transfer', name: '容器传送', world: parseLevel(JSON.parse(level13)) },
 ]
 
 const generatedModules = import.meta.glob('./builtin/generated/*.json', {

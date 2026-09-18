@@ -6,7 +6,7 @@ import { solve } from '../../tools/generator/solver'
 
 describe('BUILTIN_LEVELS', () => {
   it('has one entry per shipped level file, each parsing to an unsolved world', () => {
-    expect(BUILTIN_LEVELS).toHaveLength(10)
+    expect(BUILTIN_LEVELS).toHaveLength(13)
     for (const level of BUILTIN_LEVELS) {
       expect(level.world.locations[PLAYER_ID]).toBeDefined()
       expect(checkWin(level.world)).toBe(false)
@@ -25,6 +25,9 @@ describe('BUILTIN_LEVELS', () => {
       '08-two-node-cycle',
       '09-cycle-branch',
       '10-void-storage',
+      '11-clone-box',
+      '12-flip-box',
+      '13-transfer',
     ])
   })
 })

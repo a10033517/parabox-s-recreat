@@ -1,0 +1,44 @@
+{
+  "boards": {
+    "root": {
+      "id": "root",
+      "size": 4,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    },
+    "c1interior": {
+      "id": "c1interior",
+      "size": 4,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    },
+    "c2interior": {
+      "id": "c2interior",
+      "size": 4,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor", "requirement": "player" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    }
+  },
+  "pieces": {
+    "player": { "id": "player", "kind": "player" },
+    "boxC1": { "id": "boxC1", "kind": "container", "boardRef": "c1interior", "linkedTo": "boxC2" },
+    "boxC2": { "id": "boxC2", "kind": "container", "boardRef": "c2interior" }
+  },
+  "locations": {
+    "player": { "board": "root", "x": 2, "y": 0 },
+    "boxC1": { "board": "root", "x": 3, "y": 0 },
+    "boxC2": { "board": "root", "x": 3, "y": 3 }
+  }
+}
