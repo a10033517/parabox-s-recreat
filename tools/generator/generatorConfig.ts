@@ -68,9 +68,21 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
     medium: { solutionLength: { min: 10 } },
     hard: { solutionLength: { min: 20 }, criticalDecisions: { min: 18 } },
   },
-  hardCandidatePoolSize: 60,
+  // Lowered from 60/5000 after the real generate:levels run made clear
+  // those numbers (carried over from the old reverse-walk pipeline without
+  // re-checking) don't fit this pipeline's actual per-candidate cost: a
+  // hard-tier candidate's analyze() does up to ~3*solutionLength extra
+  // bounded solve() calls (criticalDecisions) plus one more full re-solve
+  // (nestedBoxRequired) — for solutionLength up to the diagnostic's own
+  // observed max of 47, that's a genuinely expensive candidate, and the
+  // main loop never early-exits once easy/medium are full (it keeps
+  // hunting for the hard pool target right up to maxAttempts regardless).
+  // 15 still gives selectDiverseTopN's greedy diversity selection 3x
+  // oversupply against the 5 actually shipped per tier, at a fraction of
+  // the wall-clock cost.
+  hardCandidatePoolSize: 15,
   diversityWeight: 10,
-  maxAttempts: 5000,
+  maxAttempts: 3000,
 }
 
 assertRange(GENERATOR_CONFIG.generator.widthRange, 'generator.widthRange')
