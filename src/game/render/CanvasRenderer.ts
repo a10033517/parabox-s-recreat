@@ -95,6 +95,68 @@ function cycleColorFor(pieceId: PieceId): string {
   return CYCLE_PALETTE[hash % CYCLE_PALETTE.length]
 }
 
+// Legacy flat renderer: draws exactly one board, 1:1, at the canvas origin — no
+// recursion, no camera/viewport. Kept permanently for EditorScreen.tsx's board
+// preview, which the spec's "Explicitly out of scope" section keeps on this simpler
+// path rather than adopting the camera-driven recursive renderer. GameScreen.tsx is
+// the one switching to drawBoardRecursive (Task 6).
+export function renderBoard(
+  ctx: CanvasRenderingContext2D,
+  board: Board,
+  world: World,
+  cellSize: number,
+): void {
+  for (let y = 0; y < board.size; y++) {
+    for (let x = 0; x < board.size; x++) {
+      const cell = board.cells[y][x]
+      ctx.fillStyle = cell.type === 'wall' ? WALL_COLOR : FLOOR_COLOR
+      ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize)
+
+      if (cell.requirement) {
+        ctx.fillStyle = REQUIREMENT_OVERLAY[cell.requirement]
+        const inset = cellSize / 4
+        ctx.fillRect(x * cellSize + inset, y * cellSize + inset, cellSize - inset * 2, cellSize - inset * 2)
+      }
+    }
+  }
+
+  for (const [pieceId, location] of Object.entries(world.locations)) {
+    if (location.board !== board.id) continue
+    const piece = world.pieces[pieceId]
+    // An infinite destination (piece.infiniteFor set) has no cycle membership
+    // or kind of its own worth rendering — it's colored as whichever real
+    // piece it represents.
+    const colorSourceId = piece.infiniteFor ?? pieceId
+    const colorSource = piece.infiniteFor !== undefined ? world.pieces[piece.infiniteFor] : piece
+    ctx.fillStyle = isCycleMember(colorSourceId, world) ? cycleColorFor(colorSourceId) : PIECE_COLORS[colorSource.kind]
+    ctx.fillRect(location.x * cellSize, location.y * cellSize, cellSize, cellSize)
+    // A piece "is locked" exactly when it's standing in the Void (see
+    // isInVoid in types.ts) — every piece this loop reaches has already been
+    // filtered to location.board === board.id, so board.id === VOID_BOARD_ID
+    // here means this particular piece is in the Void too.
+    if (board.id === VOID_BOARD_ID) {
+      ctx.save()
+      ctx.strokeStyle = LOCKED_RING_COLOR
+      ctx.lineWidth = Math.max(2, cellSize / 8)
+      const inset = ctx.lineWidth / 2
+      ctx.strokeRect(
+        location.x * cellSize + inset,
+        location.y * cellSize + inset,
+        cellSize - inset * 2,
+        cellSize - inset * 2,
+      )
+      if (piece.infiniteFor !== undefined) {
+        ctx.fillStyle = INFINITY_MARKER_COLOR
+        ctx.font = `${Math.floor(cellSize / 2)}px sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('∞', location.x * cellSize + cellSize / 2, location.y * cellSize + cellSize / 2)
+      }
+      ctx.restore()
+    }
+  }
+}
+
 export interface DrawContext {
   ctx: CanvasRenderingContext2D
   world: World
