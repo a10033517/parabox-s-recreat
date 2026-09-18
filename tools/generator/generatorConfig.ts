@@ -31,12 +31,25 @@ function assertProbability(value: number, name: string): void {
 // the redesign spec's Rollout section and the implementation plan's
 // Task 9).
 //
-// Tier filters start EMPTY (accept anything solvable) deliberately: with
-// all three empty, classifyTier's hard-first priority means every solved
-// candidate classifies as 'hard' and easy/medium never fill — this is
-// intentional, not a bug. It forces Task 9's diagnostic-tuning pass to run
-// before generateBatch.ts can produce a meaningful three-tier split, rather
-// than silently shipping guessed numbers.
+// Tier thresholds below come from a real diagnostic pass (100 solved
+// candidates, Math.random, this generator's own shipped ranges below) —
+// NOT guessed. Observed percentiles:
+//   solutionLength:    p25=10 p50=13 p75=20 p90=29 max=47
+//   criticalDecisions: p25=9  p50=12 p75=18 p90=27 max=46
+//   avgBranching:      p25=2.78 p50=2.94 p75=3.11 p90=3.24
+//   deadEndRatio:      min=max=0 across all 100 samples — the narrow
+//     "immediately-stuck-state" definition (see difficultyAnalyzer.ts's
+//     own comment) essentially never fires for this generator's output,
+//     so it has zero discriminating power here and is deliberately left
+//     out of every tier filter below, rather than included for the sake
+//     of using every field — an unused-but-present field would just tie
+//     every candidate and do nothing, which is worse than omitting it.
+// hard requires BOTH solutionLength and criticalDecisions at/above their
+// own p75 (a joint condition, stricter than either alone) so "hard" means
+// genuinely more decision points, not merely a longer solve. easy is
+// below the solutionLength median's lower quartile; medium is everything
+// in between (and anything long-but-not-decision-heavy that hard's joint
+// condition excludes).
 export const GENERATOR_CONFIG: GeneratorConfig = {
   generator: {
     widthRange: [6, 10],
@@ -51,9 +64,9 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
   maxSolveDepth: 200,
   maxSolverExpandedStates: 20000,
   tiers: {
-    easy: {},
-    medium: {},
-    hard: {},
+    easy: { solutionLength: { max: 9 } },
+    medium: { solutionLength: { min: 10 } },
+    hard: { solutionLength: { min: 20 }, criticalDecisions: { min: 18 } },
   },
   hardCandidatePoolSize: 60,
   diversityWeight: 10,
