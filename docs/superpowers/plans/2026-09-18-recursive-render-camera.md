@@ -40,6 +40,11 @@ section; section numbers below (`§N`) refer to that spec.
   the sole zero-owner board if one exists, otherwise the player's board at level load —
   never a hardcoded `'root'` string, because a pure-cycle level (see this session's own
   `docs/superpowers/specs/2026-09-18-parabox-general-cycles.md`) has no zero-owner board.
+- **`renderBoard` (the existing flat one-board renderer) is never deleted.** Found during
+  Task 4's execution: `src/editor/EditorScreen.tsx` imports and calls it directly, and
+  the spec's own "editor stays on its current flat renderer" scope decision only makes
+  sense if it keeps existing — this plan never touches `EditorScreen.tsx` at all.
+  `drawBoardRecursive` is added alongside it in the same file, not instead of it.
 
 ---
 
@@ -304,9 +309,16 @@ export function resolveAnchorBoardId(world: World, anchor: CameraAnchor): BoardI
   if (anchor === 'void') {
     return world.boards[VOID_BOARD_ID] !== undefined ? VOID_BOARD_ID : null
   }
-  const ownerCount = new Map<BoardId, number>(Object.keys(world.boards).map((id) => [id, 0]))
+  // VOID_BOARD_ID excluded from the orphan scan — see the matching comment in the spec
+  // and the final-review ledger entry: once any piece falls into the Void, 'void' is
+  // added to world.boards but nothing ever owns it, so on a pure-cycle level (every real
+  // board already owned) it would otherwise become the only zero-owner board and hijack
+  // the anchor away from wherever the player actually is.
+  const ownerCount = new Map<BoardId, number>(
+    Object.keys(world.boards).filter((id) => id !== VOID_BOARD_ID).map((id) => [id, 0]),
+  )
   for (const piece of Object.values(world.pieces)) {
-    if (piece.kind === 'container' && piece.boardRef !== undefined) {
+    if (piece.kind === 'container' && piece.boardRef !== undefined && piece.boardRef !== VOID_BOARD_ID) {
       ownerCount.set(piece.boardRef, (ownerCount.get(piece.boardRef) ?? 0) + 1)
     }
   }
@@ -604,8 +616,9 @@ git commit -m "feat(render): camera transform driven by the player's canonical p
   (Task 4 consumes them).
 
 This task keeps the FILE's existing content (the current `renderBoard`, `isCycleMember`,
-`cycleColorFor`, color constants) untouched for now — Task 4 replaces `renderBoard`. Add
-the new exports alongside the existing ones.
+`cycleColorFor`, color constants) untouched — `renderBoard` stays permanently (see Task 4's
+own note: `src/editor/EditorScreen.tsx` depends on it directly and is out of scope for
+this plan, so it's never deleted). Add the new exports alongside the existing ones.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -737,7 +750,7 @@ git commit -m "feat(render): render budget, piece index, and viewport-culling he
 
 ---
 
-### Task 4: `CanvasRenderer.ts` — `drawBoardRecursive` base case, replaces `renderBoard`
+### Task 4: `CanvasRenderer.ts` — `drawBoardRecursive` base case, added alongside `renderBoard`
 
 **Files:**
 - Modify: `src/game/render/CanvasRenderer.ts`
@@ -762,17 +775,34 @@ git commit -m "feat(render): render budget, piece index, and viewport-culling he
   `piecesByBoard`'s per-board arrays naturally produces. Worth a follow-up once real
   levels expose whether this ever actually starves the player's own visible path in
   practice; not a blocker for this plan's acceptance criteria.
-- **This task deletes `renderBoard` entirely** and rewrites every existing test in
-  `CanvasRenderer.test.ts` to call `drawBoardRecursive` via a small test helper that
-  reproduces `renderBoard`'s old "draw exactly this one board, 1:1, at the canvas origin"
-  behavior — see Step 1's `drawBoardForTest` helper. The *assertions* in the existing
-  tests (rect counts, color comparisons, ring/marker checks) are unchanged; only the call
-  site changes.
+- **`renderBoard` is kept, not deleted.** Corrected during this plan's SDD execution
+  after the implementer found `src/editor/EditorScreen.tsx` also imports and calls
+  `renderBoard` directly — a second consumer this plan never accounted for. The spec's
+  own "Explicitly out of scope" section says the editor "stays on its current flat
+  renderer," which only makes sense if `renderBoard` continues to exist; deleting it
+  would have silently broken the editor with nothing in this plan ever fixing it.
+  `renderBoard` stays byte-for-byte as it already is — a second, permanent, legacy
+  rendering path serving only `EditorScreen.tsx` from here on. `drawBoardRecursive` (and
+  its own new tests) are ADDED alongside it in the same two files, not instead of it —
+  the existing `describe('renderBoard', ...)` test block, and Task 3's
+  `describe('indexPiecesByBoard', ...)`/`describe('DEFAULT_RENDER_BUDGET', ...)`/
+  `'LOCKED_RING_COLOR does not collide...'` tests, all stay in the file untouched,
+  alongside the new `describe('drawBoardRecursive', ...)` block below. A small test
+  helper (`drawBoardForTest`) reproduces `renderBoard`'s old "draw exactly this one
+  board, 1:1, at the canvas origin" framing, so the *new* function's tests read the same
+  way the old ones did — see Step 1.
 
 - [ ] **Step 1: Write the failing tests**
 
-Replace the top of `src/game/render/CanvasRenderer.test.ts` (imports and the `mockContext`
-helper stay; everything from `describe('renderBoard', ...)` onward is rewritten) with:
+Add to `src/game/render/CanvasRenderer.test.ts` (imports, `mockContext`, the existing
+`describe('renderBoard', ...)` block, and Task 3's tests ALL stay exactly as they are —
+this only adds new content). The `import { describe, it, expect } from 'vitest'` and
+`function mockContext() { ... }` shown below already exist in the file (from before this
+plan, and from Task 3) — shown here only for context; do not add a second copy of
+either. Only genuinely new imports (`drawBoardRecursive`, `CameraTransform`, `Viewport`,
+`Board`, and anything else not already imported) need adding, merged into the file's
+existing `./CanvasRenderer` / `./camera` / `../engine/types` import lines rather than as
+new duplicate lines — same discipline as Task 3's own import fix:
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1115,11 +1145,12 @@ describe('drawBoardRecursive', () => {
 - [ ] **Step 2: Run and confirm they fail**
 
 Run: `npx vitest run src/game/render/CanvasRenderer.test.ts`
-Expected: FAIL — `drawBoardRecursive` not exported, `renderBoard` tests removed.
+Expected: FAIL — `drawBoardRecursive` not exported yet.
 
 - [ ] **Step 3: Implement**
 
-Delete `renderBoard` entirely from `src/game/render/CanvasRenderer.ts` and replace it with:
+Add to `src/game/render/CanvasRenderer.ts`, leaving `renderBoard` itself completely
+untouched (it stays, permanently, for `EditorScreen.tsx`'s exclusive use):
 
 ```ts
 export interface DrawContext {
@@ -1260,7 +1291,7 @@ Expected: zero errors.
 
 ```bash
 git add src/game/render/CanvasRenderer.ts src/game/render/CanvasRenderer.test.ts
-git commit -m "feat(render): recursive board drawing replaces the flat one-board renderBoard"
+git commit -m "feat(render): recursive board drawing, added alongside the existing renderBoard"
 ```
 
 ---
@@ -1765,7 +1796,7 @@ Replace `src/game/GameScreen.tsx` entirely:
 ```tsx
 import { useEffect, useRef, useState } from 'react'
 import { GameState } from './engine/GameState'
-import { Direction, PLAYER_ID, World } from './engine/types'
+import { Direction, World } from './engine/types'
 import { DrawContext, DEFAULT_RENDER_BUDGET, drawBoardRecursive, indexPiecesByBoard } from './render/CanvasRenderer'
 import { CameraTransform, Viewport, cameraForPlayer } from './render/camera'
 import { resolveAnchorBoardId } from './render/recursiveTransform'
@@ -1869,7 +1900,13 @@ export function GameScreen({
       }
       rafId = requestAnimationFrame(frame)
     }
-    rafId = requestAnimationFrame(frame)
+    // Call frame() synchronously once on mount, in addition to the RAF scheduling
+    // inside frame() itself for every subsequent tick — scheduling only the very first
+    // call via requestAnimationFrame leaves the canvas at its default/stale size for
+    // one frame after every mount (a real visible flash in production, and it makes any
+    // viewport-size assertion flaky under RTL, since assertions run before that first
+    // deferred RAF callback ever fires).
+    frame()
     return () => cancelAnimationFrame(rafId)
   }, [state])
 
@@ -1892,10 +1929,17 @@ export function GameScreen({
 ```
 
 In `src/index.css`, add a `.game-viewport` rule (near the existing `.game-screen` block)
-giving the canvas's container an explicit, responsive size, and remove `image-rendering:
-pixelated` from the existing `canvas` rule — that setting hard-edges every pixel, which
-looked right for the old instant-snap grid renderer but fights the new continuously
-panned/zoomed, fractional-pixel-position recursive scene:
+giving the canvas's container an explicit, responsive size. **Do not modify the bare
+`canvas` selector's sizing** — `EditorScreen.tsx` has its own `<canvas>`, sized to its
+board's own bitmap dimensions (`CELL_SIZE * board.size`), and a bare `canvas { width:
+100%; height: 100% }` would stretch it and break its unscaled client-to-cell coordinate
+math in `cellFromEvent` (this exact mistake was found and fixed during this plan's final
+whole-branch review — jsdom does no layout, so no test can catch a CSS-only regression
+like this; it only shows up in a real browser). Scope the new sizing rule to `.game-
+viewport canvas` specifically, and turn off pixelation only there too — the editor's
+canvas keeps its existing `image-rendering: pixelated` look (hard-edged, right for its
+instant-snap grid); only the game's continuously panned/zoomed, fractional-pixel-position
+canvas needs it off:
 
 ```css
 .game-viewport {
@@ -1908,15 +1952,20 @@ canvas {
   max-width: 100%;
   border: 1px solid var(--surface-raised);
   border-radius: 8px;
+  image-rendering: pixelated;
+}
+
+.game-viewport canvas {
   display: block;
   width: 100%;
   height: 100%;
+  image-rendering: auto;
 }
 ```
 
-(Remove the old `image-rendering: pixelated;` line from the existing `canvas` rule when
-making this edit — don't leave both a `width:100%` block-level and the old rule present
-twice.)
+(The bare `canvas` rule's `image-rendering: pixelated` line stays — it's what the editor's
+canvas keeps using. Only the new `.game-viewport canvas` rule overrides it off. Do not
+add `width`/`height` to the bare `canvas` rule at all; that's what broke the editor.)
 
 - [ ] **Step 4: Run and confirm they pass**
 
@@ -2319,7 +2368,13 @@ export function GameScreen({
 
       rafId = requestAnimationFrame(frame)
     }
-    rafId = requestAnimationFrame(frame)
+    // Call frame() synchronously once on mount, in addition to the RAF scheduling
+    // inside frame() itself for every subsequent tick — found necessary during Task 6:
+    // scheduling the very first call via requestAnimationFrame alone means the canvas
+    // stays at its default/stale size for one frame after every mount (a real visible
+    // flash in production, and what made Task 6's viewport-size test flaky under RTL,
+    // since assertions run before that first deferred RAF callback ever fires).
+    frame()
     return () => cancelAnimationFrame(rafId)
   }, [state])
 
