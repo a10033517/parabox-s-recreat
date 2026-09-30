@@ -92,9 +92,22 @@ describe('parseLevel structural validation', () => {
     expect(() => parseLevel(data)).toThrow(/kind/i)
   })
 
-  it('rejects a non-container piece that has a boardRef', () => {
+  it('rejects a normal (solid) piece that has a boardRef', () => {
     const data = serializeLevel(sampleWorld()) as { pieces: Record<string, unknown> }
+    data.pieces.box1 = { id: 'box1', kind: 'normal', boardRef: 'inside' }
+    expect(() => parseLevel(data)).toThrow(/boardRef/i)
+  })
+
+  it('accepts a player that is itself a box (player with an interior board)', () => {
+    const data = serializeLevel(sampleWorld()) as { pieces: Record<string, unknown> }
+    data.pieces.box1 = { id: 'box1', kind: 'normal' }
     data.pieces[PLAYER_ID] = { id: PLAYER_ID, kind: 'player', boardRef: 'inside' }
+    expect(parseLevel(data).pieces[PLAYER_ID].boardRef).toBe('inside')
+  })
+
+  it('rejects a player whose boardRef does not exist', () => {
+    const data = serializeLevel(sampleWorld()) as { pieces: Record<string, unknown> }
+    data.pieces[PLAYER_ID] = { id: PLAYER_ID, kind: 'player', boardRef: 'nope' }
     expect(() => parseLevel(data)).toThrow(/boardRef/i)
   })
 
@@ -143,12 +156,14 @@ describe('parseLevel structural validation', () => {
 })
 
 describe('parseLevel board-ownership validation', () => {
-  it('rejects two containers referencing the same board', () => {
+  it('accepts two Ref instances sharing one definition', () => {
     const data = serializeLevel(sampleWorld()) as {
       pieces: Record<string, unknown>
+      locations: Record<string, unknown>
     }
     data.pieces.box2 = { id: 'box2', kind: 'container', boardRef: 'inside' }
-    expect(() => parseLevel(data)).toThrow(/owner/i)
+    data.locations.box2 = { board: 'root', x: 1, y: 1 }
+    expect(() => parseLevel(data)).not.toThrow()
   })
 
   it('rejects a non-root board referenced by zero containers', () => {
@@ -203,7 +218,7 @@ describe('parseLevel board-ownership validation', () => {
     expect(parseLevel(data)).toEqual(world)
   })
 
-  it('rejects a self-referencing container that shares a board with a separate external owner', () => {
+  it('accepts a self-referencing Ref that shares a definition with an external Ref (canonical-owner rule applies on exit)', () => {
     // Once self-references count normally, board y has TWO owners here — d
     // (external, on root) and loopBox (self-referencing y itself) — which
     // is exactly as invalid as any other over-owned board. This is the
@@ -225,7 +240,7 @@ describe('parseLevel board-ownership validation', () => {
       },
     )
     const data = serializeLevel(world)
-    expect(() => parseLevel(data)).toThrow(/owner/i)
+    expect(() => parseLevel(data)).not.toThrow()
   })
 
   it('rejects a mutual two-board containment cycle', () => {
@@ -373,5 +388,49 @@ describe('parseLevel board-ownership validation', () => {
     const data = serializeLevel(world) as { locations: Record<string, { board: string }> }
     data.locations[PLAYER_ID].board = 'nonexistent'
     expect(() => parseLevel(data)).toThrow(/starting board/i)
+  })
+})
+
+describe('attemptOrder', () => {
+  it('round-trips a valid permutation through serialize/parse', () => {
+    const world = sampleWorld()
+    world.attemptOrder = ['enter', 'eat', 'push']
+    expect(parseLevel(JSON.parse(JSON.stringify(serializeLevel(world)))).attemptOrder).toEqual(['enter', 'eat', 'push'])
+  })
+
+  it('is optional', () => {
+    expect(parseLevel(serializeLevel(sampleWorld())).attemptOrder).toBeUndefined()
+  })
+
+  it('rejects anything that is not a permutation of push/enter/eat', () => {
+    for (const bad of [['push', 'enter'], ['push', 'push', 'eat'], ['push', 'enter', 'possess'], 'push']) {
+      const data = { ...(serializeLevel(sampleWorld()) as object), attemptOrder: bad }
+      expect(() => parseLevel(data)).toThrow(/attemptOrder/)
+    }
+  })
+})
+
+describe('official Ref / Block fields are stored raw, with validation only', () => {
+  it('round-trips infexit / infenter / degree / infenterid / zoomfactor / floatinspace untouched', () => {
+    const world = sampleWorld()
+    world.boards.root.zoomFactor = 0.5
+    world.boards.root.floatInSpace = false
+    world.pieces.extra = { id: 'extra', kind: 'normal', infExit: true, infExitNum: 2, infEnter: true, infEnterNum: 3, infEnterId: 7 }
+    world.locations.extra = { board: 'inside', x: 0, y: 0 }
+    const back = parseLevel(JSON.parse(JSON.stringify(serializeLevel(world))))
+    expect(back.boards.root.zoomFactor).toBe(0.5)
+    expect(back.pieces.extra).toEqual({ id: 'extra', kind: 'normal', infExit: true, infExitNum: 2, infEnter: true, infEnterNum: 3, infEnterId: 7 })
+  })
+
+  it('rejects malformed values', () => {
+    const bad = (mutate: (d: { boards: Record<string, Record<string, unknown>>; pieces: Record<string, Record<string, unknown>> }) => void) => {
+      const d = serializeLevel(sampleWorld()) as never
+      mutate(d)
+      expect(() => parseLevel(d)).toThrow()
+    }
+    bad((d) => { d.boards.root.zoomFactor = 0 })
+    bad((d) => { d.boards.root.floatInSpace = 'yes' })
+    bad((d) => { d.pieces[PLAYER_ID].infExitNum = 1.5 })
+    bad((d) => { d.pieces[PLAYER_ID].infEnter = 1 })
   })
 })
