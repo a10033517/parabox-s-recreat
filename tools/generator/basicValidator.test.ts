@@ -1,5 +1,5 @@
 import { Board, Cell, PLAYER_ID, World } from '../../src/game/engine/types'
-import { basicValidate } from './basicValidator'
+import { basicValidate, CORE_ONLY_POLICY } from './basicValidator'
 
 function emptyBoard(id: string, size: number): Board {
   const cells: Cell[][] = Array.from({ length: size }, (_, y) =>
@@ -107,4 +107,26 @@ test('rejects a container with open floor on all 4 sides (never enterable)', () 
   world.locations.container1 = { board: 'root', x: 2, y: 2 }
   world.locations[PLAYER_ID] = { board: 'root', x: 1, y: 1 }
   expect(basicValidate(world, 2).valid).toBe(false)
+})
+
+test('CORE_ONLY_POLICY accepts disconnected floor and unbalanced goals (generation heuristics, not rules)', () => {
+  const world = baseWorld()
+  world.boards.root.cells[2][1] = { type: 'wall' }
+  world.boards.root.cells[2][3] = { type: 'wall' }
+  world.boards.root.cells[1][2] = { type: 'wall' }
+  world.boards.root.cells[3][2] = { type: 'wall' }
+  world.boards.root.cells[1][1] = { type: 'floor', requirement: 'box' }
+  expect(basicValidate(world, 2).valid).toBe(false)
+  expect(basicValidate(world, 2, CORE_ONLY_POLICY)).toEqual({ valid: true })
+})
+
+test('CORE_ONLY_POLICY accepts an open-sided container and a shared interior', () => {
+  const world = baseWorld()
+  world.boards.inner = emptyBoard('inner', 3)
+  world.pieces.c1 = { id: 'c1', kind: 'container', boardRef: 'inner' }
+  world.pieces.c2 = { id: 'c2', kind: 'container', boardRef: 'inner' }
+  world.locations.c1 = { board: 'root', x: 2, y: 1 }
+  world.locations.c2 = { board: 'root', x: 1, y: 2 }
+  expect(basicValidate(world, 2).valid).toBe(false)
+  expect(basicValidate(world, 2, CORE_ONLY_POLICY)).toEqual({ valid: true })
 })

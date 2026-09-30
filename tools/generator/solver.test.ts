@@ -333,3 +333,22 @@ test('every builtin level is solvable', () => {
     expect(result, `level ${level.id} should be solvable`).not.toBeNull()
   }
 })
+
+import { solveDetailed } from './solver'
+
+test('solveDetailed distinguishes EXPANSION_CAP and DEPTH_CAP from UNSOLVABLE', () => {
+  const floor = () => Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => ({ type: 'floor' as const })))
+  const cells = floor()
+  cells[3][3] = { type: 'floor', requirement: 'player' } as never
+  const open = { boards: { root: { id: 'root', size: 4, cells } }, pieces: { player: { id: 'player', kind: 'player' as const } }, locations: { player: { board: 'root', x: 0, y: 0 } } }
+  expect(solveDetailed(open, 200).status).toBe('SOLVED')
+  expect(solveDetailed(open, 200, 2).status).toBe('EXPANSION_CAP')
+  expect(solveDetailed(open, 2).status).toBe('DEPTH_CAP')
+
+  const walled: Cell[][] = floor()
+  walled[3][3] = { type: 'floor', requirement: 'player' } as never
+  walled[0][1] = { type: 'wall' }
+  walled[1][0] = { type: 'wall' }
+  const stuck = { ...open, boards: { root: { id: 'root', size: 4, cells: walled } } }
+  expect(solveDetailed(stuck, 200).status).toBe('UNSOLVABLE')
+})

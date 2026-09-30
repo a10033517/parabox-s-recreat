@@ -1,6 +1,6 @@
 import { applyMove, checkWin } from '../../src/game/engine/rules'
 import { Direction, PLAYER_ID, World } from '../../src/game/engine/types'
-import { canonicalKey } from './canonical'
+import { stateKey } from './canonical'
 
 const DIRECTIONS: Direction[] = ['up', 'down', 'left', 'right']
 
@@ -28,12 +28,25 @@ export interface SolveResult {
 // candidate this expensive to solve is simply rejected as unsolvable-within-
 // budget rather than hanging the process. Default is Infinity so this is a
 // pure addition for any existing caller that doesn't opt in.
+// UNSOLVABLE is only reported when the whole reachable state space was
+// exhausted. EXPANSION_CAP / DEPTH_CAP mean "not proven either way".
+export type SolveStatus = 'SOLVED' | 'UNSOLVABLE' | 'EXPANSION_CAP' | 'DEPTH_CAP'
+
+export type DetailedSolve =
+  | { status: 'SOLVED'; result: SolveResult }
+  | { status: 'UNSOLVABLE' | 'EXPANSION_CAP' | 'DEPTH_CAP' }
+
 export function solve(initialWorld: World, maxDepth = 200, maxExpandedStates = Infinity): SolveResult | null {
+  const detailed = solveDetailed(initialWorld, maxDepth, maxExpandedStates)
+  return detailed.status === 'SOLVED' ? detailed.result : null
+}
+
+export function solveDetailed(initialWorld: World, maxDepth = 200, maxExpandedStates = Infinity): DetailedSolve {
   if (checkWin(initialWorld)) {
-    return { moves: [], expandedStates: 0, maxFrontierSize: 1, visitedStates: 1, branchingFactors: [] }
+    return { status: 'SOLVED', result: { moves: [], expandedStates: 0, maxFrontierSize: 1, visitedStates: 1, branchingFactors: [] } }
   }
 
-  const visited = new Set<string>([canonicalKey(initialWorld)])
+  const visited = new Set<string>([stateKey(initialWorld)])
   let frontier: { world: World; path: Direction[] }[] = [{ world: initialWorld, path: [] }]
   let depth = 0
   let expandedStates = 0
@@ -44,7 +57,7 @@ export function solve(initialWorld: World, maxDepth = 200, maxExpandedStates = I
     maxFrontierSize = Math.max(maxFrontierSize, frontier.length)
     const nextFrontier: typeof frontier = []
     for (const { world, path } of frontier) {
-      if (expandedStates >= maxExpandedStates) return null
+      if (expandedStates >= maxExpandedStates) return { status: 'EXPANSION_CAP' }
       expandedStates++
 
       const validNexts: { direction: Direction; next: World }[] = []
@@ -55,12 +68,12 @@ export function solve(initialWorld: World, maxDepth = 200, maxExpandedStates = I
       branchingFactors.push(validNexts.length)
 
       for (const { direction, next } of validNexts) {
-        const key = canonicalKey(next)
+        const key = stateKey(next)
         if (visited.has(key)) continue
         visited.add(key)
         const newPath = [...path, direction]
         if (checkWin(next)) {
-          return { moves: newPath, expandedStates, maxFrontierSize, visitedStates: visited.size, branchingFactors }
+          return { status: 'SOLVED', result: { moves: newPath, expandedStates, maxFrontierSize, visitedStates: visited.size, branchingFactors } }
         }
         nextFrontier.push({ world: next, path: newPath })
       }
@@ -68,7 +81,7 @@ export function solve(initialWorld: World, maxDepth = 200, maxExpandedStates = I
     frontier = nextFrontier
     depth++
   }
-  return null
+  return { status: frontier.length === 0 ? 'UNSOLVABLE' : 'DEPTH_CAP' }
 }
 
 export function countCrossingMoves(world: World, moves: Direction[]): number {

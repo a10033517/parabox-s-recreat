@@ -112,7 +112,7 @@ function criticalDecisions(world: World, solved: SolveResult, maxSolverExpandedS
 // still requires it; deleting the board instead would make its goal cell
 // vanish entirely, which checkWin would misread as "nothing left to
 // satisfy, trivially won" rather than "impossible to reach".
-function nestedBoxRequired(world: World, solved: SolveResult, maxSolverExpandedStates: number): boolean {
+export function nestedBoxRequired(world: World, solved: SolveResult, maxSolverExpandedStates: number): boolean {
   const frozen = cloneWorld(world)
   for (const piece of Object.values(world.pieces)) {
     if (piece.kind !== 'container') continue

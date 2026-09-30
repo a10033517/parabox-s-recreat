@@ -2,6 +2,33 @@ import { Board, BoardId, Cell, PLAYER_ID, World, findContainerFor, inBounds } fr
 
 export type ValidationResult = { valid: true } | { valid: false; reason: string }
 
+// Core validity (overlap, bounds, walls, one player, resolvable boardRef,
+// root unreferenced, every board reaches root) is always checked. These are
+// GENERATION POLICY, not Patrick's Parabox rules — the official game has no
+// requirement that floors be connected, that a container touch a wall, that
+// goals equal boxes, or that an interior have exactly one owner (references
+// and self-containment are core to it). Each can be turned off individually.
+export interface ValidatorPolicy {
+  requireConnectedFloor: boolean
+  requireBalancedGoals: boolean
+  requireSingleOwner: boolean
+  requireContainerBlocked: boolean
+}
+
+export const GENERATOR_POLICY: ValidatorPolicy = {
+  requireConnectedFloor: true,
+  requireBalancedGoals: true,
+  requireSingleOwner: true,
+  requireContainerBlocked: true,
+}
+
+export const CORE_ONLY_POLICY: ValidatorPolicy = {
+  requireConnectedFloor: false,
+  requireBalancedGoals: false,
+  requireSingleOwner: false,
+  requireContainerBlocked: false,
+}
+
 function floodFillFloorCount(board: Board): number {
   const size = board.size
   const seen: boolean[][] = Array.from({ length: size }, () => new Array(size).fill(false))
@@ -41,7 +68,11 @@ function countCellsWhere(board: Board, predicate: (cell: Cell) => boolean): numb
 // invariant), so this doesn't need the more general "figure out which
 // board is ownerless" logic that levelSchema.ts's parseLevel uses for
 // arbitrary hand-authored input.
-export function basicValidate(world: World, maxNestingDepth: number): ValidationResult {
+export function basicValidate(
+  world: World,
+  maxNestingDepth: number,
+  policy: ValidatorPolicy = GENERATOR_POLICY,
+): ValidationResult {
   const seenCells = new Set<string>()
   for (const [pieceId, loc] of Object.entries(world.locations)) {
     const board = world.boards[loc.board]
@@ -74,7 +105,7 @@ export function basicValidate(world: World, maxNestingDepth: number): Validation
     goalCount += countCellsWhere(board, (cell) => cell.requirement === 'box')
   }
   const boxCount = Object.values(world.pieces).filter((p) => p.kind === 'normal').length
-  if (goalCount !== boxCount) {
+  if (policy.requireBalancedGoals && goalCount !== boxCount) {
     return { valid: false, reason: `goal count (${goalCount}) does not match box count (${boxCount})` }
   }
 
@@ -83,7 +114,7 @@ export function basicValidate(world: World, maxNestingDepth: number): Validation
     if (totalFloor === 0) {
       return { valid: false, reason: `board "${boardId}" has no floor cells at all` }
     }
-    const reachable = floodFillFloorCount(board)
+    const reachable = policy.requireConnectedFloor ? floodFillFloorCount(board) : totalFloor
     if (reachable !== totalFloor) {
       return {
         valid: false,
@@ -106,8 +137,8 @@ export function basicValidate(world: World, maxNestingDepth: number): Validation
       if (count !== 0) return { valid: false, reason: 'root board must not be referenced by any container' }
       continue
     }
-    if (count !== 1) {
-      return { valid: false, reason: `board "${boardId}" has ${count} owning containers, expected exactly 1` }
+    if (policy.requireSingleOwner ? count !== 1 : count === 0) {
+      return { valid: false, reason: `board "${boardId}" has ${count} owning containers, expected ${policy.requireSingleOwner ? 'exactly 1' : 'at least 1'}` }
     }
   }
 
@@ -136,7 +167,7 @@ export function basicValidate(world: World, maxNestingDepth: number): Validation
     }
   }
 
-  for (const piece of Object.values(world.pieces)) {
+  if (policy.requireContainerBlocked) for (const piece of Object.values(world.pieces)) {
     if (piece.kind !== 'container') continue
     const loc = world.locations[piece.id]
     const board = world.boards[loc.board]

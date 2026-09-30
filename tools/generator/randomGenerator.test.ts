@@ -37,7 +37,7 @@ test('containerProbability 0 never creates a container piece', () => {
 })
 
 test('crossBoardGoalProbability 0 places every goal on some box\'s own home board', () => {
-  const config = baseConfig({ containerProbability: 0.5, crossBoardGoalProbability: 0, interiorSizeRange: [4, 4] })
+  const config = baseConfig({ containerProbability: 0.5, crossBoardGoalProbability: 0, interiorSizeRange: [5, 5] })
   const result = randomGenerate(config, Math.random)
   expect(result).not.toBeNull()
   const { world } = result!
@@ -88,7 +88,7 @@ test('maxNestingDepth caps how many levels of container nesting are created', ()
   // DIFFERENT tiny same-sized interior that's equally full, not
   // necessarily to spacious root. A 4x4 interior (4 floor cells) leaves
   // room either way.
-  const config = baseConfig({ boxCountRange: [6, 6], containerProbability: 1, interiorSizeRange: [4, 4], maxNestingDepth: 1 })
+  const config = baseConfig({ boxCountRange: [6, 6], containerProbability: 1, interiorSizeRange: [5, 5], maxNestingDepth: 1 })
   const result = randomGenerate(config, Math.random)
   expect(result).not.toBeNull()
   const { world } = result!
@@ -139,4 +139,24 @@ test('the player piece exists on a floor cell of the root board', () => {
   const loc = world.locations.player
   expect(loc.board).toBe('root')
   expect(world.boards.root.cells[loc.y][loc.x].type).toBe('floor')
+})
+
+test('interior boards open the center of every side, so a container can actually be entered and left', () => {
+  const config = baseConfig({ boxCountRange: [1, 1], containerProbability: 1, interiorSizeRange: [3, 5] })
+  let checked = 0
+  for (let attempt = 0; attempt < 200 && checked < 10; attempt++) {
+    const result = randomGenerate(config, Math.random)
+    if (!result) continue
+    for (const board of Object.values(result.world.boards)) {
+      if (board.id === 'root') continue
+      const mid = (board.size - 1) / 2
+      expect(board.size % 2).toBe(1)
+      expect(board.cells[mid][0].type).toBe('floor')
+      expect(board.cells[mid][board.size - 1].type).toBe('floor')
+      expect(board.cells[0][mid].type).toBe('floor')
+      expect(board.cells[board.size - 1][mid].type).toBe('floor')
+      checked++
+    }
+  }
+  expect(checked).toBeGreaterThan(0)
 })

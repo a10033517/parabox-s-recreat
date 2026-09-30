@@ -28,11 +28,21 @@ function randFloat(rng: () => number, min: number, max: number): number {
   return min + rng() * (max - min)
 }
 
-function makeBoard(id: string, size: number, wallDensity: number, rng: () => number): Board {
+// Root boards are sealed by a wall border. INTERIOR boards must not be: entering a
+// container drops the piece on the interior's edge cell at the CENTER of the side it came
+// from (getEntryCell), and leaving climbs out through an edge cell — so a fully walled
+// interior can never be entered or exited, and its container becomes inert decoration
+// (found by diagnostic: 0 of the sampled solvable levels that had a container needed it).
+// An interior therefore keeps its border walls except the center cell of each side.
+// `size` must be odd so that center is a single well-defined cell.
+function makeBoard(id: string, size: number, wallDensity: number, rng: () => number, openCenters = false): Board {
+  const mid = (size - 1) / 2
   const cells: Cell[][] = Array.from({ length: size }, (_, y) =>
     Array.from({ length: size }, (_, x): Cell => {
       const isBorder = x === 0 || y === 0 || x === size - 1 || y === size - 1
+      if (openCenters && isBorder && (x === mid || y === mid)) return { type: 'floor' }
       if (isBorder) return { type: 'wall' }
+      if (openCenters && (x === mid || y === mid)) return { type: 'floor' } // keep the lanes from the openings clear
       return { type: rng() < wallDensity ? 'wall' : 'floor' }
     }),
   )
@@ -127,9 +137,12 @@ export function randomGenerate(config: RandomGeneratorConfig, rng: () => number)
         parent.board.cells[behind.y][behind.x] = { type: 'wall' }
       } // else: the board edge already blocks it, nothing to do
 
-      const interiorSize = randInt(rng, config.interiorSizeRange[0], config.interiorSizeRange[1])
+      const oddSizes: number[] = []
+      for (let s = config.interiorSizeRange[0]; s <= config.interiorSizeRange[1]; s++) if (s % 2 === 1) oddSizes.push(s)
+      if (oddSizes.length === 0) return null
+      const interiorSize = oddSizes[randInt(rng, 0, oddSizes.length - 1)]
       const interiorId = `interior${interiorCounter++}`
-      const interior = makeBoard(interiorId, interiorSize, wallDensity, rng)
+      const interior = makeBoard(interiorId, interiorSize, wallDensity, rng, true)
       world.boards[interiorId] = interior
       boards.push({ id: interiorId, board: interior, depth: parent.depth + 1 })
 

@@ -1,3 +1,4 @@
+import { GENERATOR_POLICY } from './basicValidator'
 import { checkWin } from '../../src/game/engine/rules'
 import { parseLevel } from '../../src/game/engine/levelSchema'
 import { canonicalKey } from './canonical'
@@ -28,6 +29,7 @@ function testConfig(overrides: Partial<GeneratorConfig> = {}): GeneratorConfig {
       boxCountRange: [1, 2], containerProbability: 0.2, crossBoardGoalProbability: 0.2,
       interiorSizeRange: [3, 3], maxNestingDepth: 1,
     },
+    validatorPolicy: GENERATOR_POLICY,
     maxSolveDepth: 100,
     maxSolverExpandedStates: 20000,
     tiers: { easy: {}, medium: {}, hard: {} },
@@ -73,6 +75,7 @@ test('batch stats account for every attempt', () => {
     result.stats.discardedInvalid +
     result.stats.discardedAlreadySolved +
     result.stats.discardedUnsolvable +
+    result.stats.discardedSearchCap +
     result.stats.discardedDuplicate +
     result.stats.discardedTierFull +
     result.stats.discardedTierReject +

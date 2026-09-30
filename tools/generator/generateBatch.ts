@@ -9,7 +9,8 @@ import { basicValidate } from './basicValidator'
 import { DifficultyVector, analyze } from './difficultyAnalyzer'
 import { Tier, classifyTier } from './filter'
 import { canonicalKey } from './canonical'
-import { solve } from './solver'
+import { solveDetailed } from './solver'
+import { validateInfiniteEnter } from './infiniteEnterValidator'
 import { GENERATOR_CONFIG, GeneratorConfig } from './generatorConfig'
 
 export type { Tier }
@@ -25,7 +26,9 @@ export interface BatchStats {
   discardedGenerationFailed: number
   discardedInvalid: number
   discardedAlreadySolved: number
-  discardedUnsolvable: number
+  discardedUnsolvable: number // search exhausted: proven unsolvable
+  discardedSearchCap: number // expansion/depth cap hit: NOT proven unsolvable
+  discardedNoInfiniteEnter: number // infiniteEnterRequired and the solution does not depend on one
   discardedDuplicate: number
   discardedTierFull: number
   discardedTierReject: number
@@ -105,7 +108,7 @@ export function generateLevelBatch(
   const hardPoolTarget = config.hardCandidatePoolSize
   const stats: BatchStats = {
     attempts: 0, discardedGenerationFailed: 0, discardedInvalid: 0,
-    discardedAlreadySolved: 0, discardedUnsolvable: 0, discardedDuplicate: 0,
+    discardedAlreadySolved: 0, discardedUnsolvable: 0, discardedSearchCap: 0, discardedNoInfiniteEnter: 0, discardedDuplicate: 0,
     discardedTierFull: 0, discardedTierReject: 0,
   }
 
@@ -118,7 +121,7 @@ export function generateLevelBatch(
     if (!generated) { stats.discardedGenerationFailed++; continue }
     const { world } = generated
 
-    const validation = basicValidate(world, config.generator.maxNestingDepth)
+    const validation = basicValidate(world, config.generator.maxNestingDepth, config.validatorPolicy)
     if (!validation.valid) { stats.discardedInvalid++; continue }
 
     if (checkWin(world)) { stats.discardedAlreadySolved++; continue }
@@ -126,8 +129,16 @@ export function generateLevelBatch(
     const levelKey = canonicalKey(world)
     if (seenLevels.has(levelKey)) { stats.discardedDuplicate++; continue }
 
-    const solved = solve(world, config.maxSolveDepth, config.maxSolverExpandedStates)
-    if (!solved || solved.moves.length === 0) { stats.discardedUnsolvable++; continue }
+    const detailed = solveDetailed(world, config.maxSolveDepth, config.maxSolverExpandedStates)
+    if (detailed.status === 'UNSOLVABLE') { stats.discardedUnsolvable++; continue }
+    if (detailed.status !== 'SOLVED') { stats.discardedSearchCap++; continue }
+    const solved = detailed.result
+    if (solved.moves.length === 0) { stats.discardedUnsolvable++; continue }
+
+    if (config.infiniteEnterRequired === true) {
+      const ie = validateInfiniteEnter(world, true, config.maxSolveDepth, config.maxSolverExpandedStates)
+      if (!ie.valid) { stats.discardedNoInfiniteEnter++; continue }
+    }
 
     const vector = analyze(world, solved, config.maxSolverExpandedStates)
     const tier = classifyTier(vector, config.tiers)
@@ -177,6 +188,7 @@ function main() {
       `invalid=${batch.stats.discardedInvalid} ` +
       `alreadySolved=${batch.stats.discardedAlreadySolved} ` +
       `unsolvable=${batch.stats.discardedUnsolvable} ` +
+      `searchCap=${batch.stats.discardedSearchCap} ` +
       `duplicate=${batch.stats.discardedDuplicate} ` +
       `tierFull=${batch.stats.discardedTierFull} ` +
       `tierReject=${batch.stats.discardedTierReject})`,

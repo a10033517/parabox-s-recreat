@@ -1,14 +1,19 @@
 import { RandomGeneratorConfig } from './randomGenerator'
 import { DifficultyFilter } from './filter'
+import { ValidatorPolicy, GENERATOR_POLICY } from './basicValidator'
 
 export interface GeneratorConfig {
   generator: RandomGeneratorConfig
+  validatorPolicy: ValidatorPolicy // generation heuristics, not official rules
   maxSolveDepth: number
   maxSolverExpandedStates: number
   tiers: { easy: DifficultyFilter; medium: DifficultyFilter; hard: DifficultyFilter }
   hardCandidatePoolSize: number
   diversityWeight: number
   maxAttempts: number
+  // Generator constraint (not a command to create an ε): reject candidates whose solution
+  // does not really depend on an Infinite Enter. Default off.
+  infiniteEnterRequired?: boolean
 }
 
 function assertRange(range: [number, number], name: string): void {
@@ -61,6 +66,7 @@ export const GENERATOR_CONFIG: GeneratorConfig = {
     interiorSizeRange: [3, 5],
     maxNestingDepth: 2,
   },
+  validatorPolicy: GENERATOR_POLICY,
   maxSolveDepth: 200,
   maxSolverExpandedStates: 20000,
   tiers: {
