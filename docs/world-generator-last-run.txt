@@ -1,0 +1,13 @@
+generating 10 worlds, 10 at a time
+wall: accepted 30/144 in 6s, shipped 20, lengths 12-37 [13, 13, 15, 12, 16, 14, 13, 17, 14, 18, 17, 15, 16, 17, 28, 24, 26, 22, 28, 37], rejected {"notNecessary":5,"unused":6,"unsolved":40,"tooShort":63}
+possess: accepted 30/140 in 11s, shipped 20, lengths 11-31 [17, 16, 14, 11, 14, 14, 13, 16, 15, 14, 18, 15, 22, 19, 19, 19, 20, 17, 24, 31], rejected {"notNecessary":11,"tooShort":60,"unsolved":29,"unused":10}
+intro: accepted 30/267 in 158s, shipped 20, lengths 24-58 [24, 24, 28, 28, 36, 25, 32, 30, 31, 33, 29, 32, 32, 32, 32, 37, 34, 38, 44, 58], rejected {"unsolved":227,"generation":7,"tooShort":3}
+empty: accepted 30/689 in 808s, shipped 20, lengths 22-71 [22, 24, 24, 25, 26, 30, 25, 25, 27, 27, 29, 29, 38, 39, 45, 46, 55, 63, 70, 71], rejected {"unsolved":557,"unused":71,"tooShort":11,"notNecessary":20}
+enter: accepted 30/602 in 1306s, shipped 20, lengths 18-50 [19, 21, 23, 22, 23, 19, 18, 21, 21, 21, 23, 29, 25, 29, 35, 29, 29, 39, 32, 50], rejected {"unsolved":522,"notNecessary":27,"ablationUnproven":3,"unused":16,"tooShort":4}
+clone: accepted 30/633 in 1513s, shipped 20, lengths 19-48 [19, 31, 22, 31, 26, 27, 28, 38, 23, 34, 36, 35, 33, 36, 32, 37, 38, 38, 36, 48], rejected {"unsolved":478,"notNecessary":54,"tooShort":14,"generation":10,"unused":39,"ablationUnproven":8}
+flip: accepted 30/2479 in 1950s, shipped 20, lengths 20-68 [20, 24, 22, 30, 23, 25, 33, 26, 33, 36, 31, 32, 30, 34, 33, 50, 50, 52, 62, 68], rejected {"unsolved":2194,"generation":39,"notNecessary":193,"ablationUnproven":7,"tooShort":6,"unused":10}
+infinite-exit: accepted 30/1449 in 2287s, shipped 20, lengths 21-48 [22, 21, 21, 27, 21, 24, 21, 24, 28, 27, 29, 37, 29, 39, 31, 42, 33, 38, 44, 48], rejected {"unsolved":1028,"unused":321,"notNecessary":34,"tooShort":34,"ablationUnproven":2}
+reference: accepted 30/962 in 2765s, shipped 20, lengths 20-51 [21, 24, 20, 23, 24, 26, 26, 22, 22, 24, 32, 37, 31, 27, 31, 32, 32, 38, 48, 51], rejected {"notNecessary":129,"unsolved":726,"ablationUnproven":24,"generation":41,"unused":5,"tooShort":7}
+eat: accepted 28/2736 in 3000s, shipped 20, lengths 20-73 [20, 22, 23, 22, 25, 25, 27, 35, 31, 29, 27, 29, 32, 30, 37, 51, 41, 51, 56, 73], rejected {"unsolved":2450,"unused":200,"notNecessary":39,"ablationUnproven":13,"tooShort":6}
+done in 50.0 min; manifest rebuilt
+EXIT 0
