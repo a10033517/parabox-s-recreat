@@ -7,13 +7,30 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "generate:levels": "tsx tools/generator/generateBatch.ts"
+    "generate:levels": "tsx tools/generator/generateBatch.ts",
+    "generate:infinite-enter": "tsx tools/generator/infiniteEnterArchetype.ts",
+    "generate:differential": "tsx tools/differential/generate.ts",
+    "build:app": "tsc -b && vite build --mode app",
+    "cap:sync": "npm run build:app && cap sync",
+    "android:apk": "npm run cap:sync && node tools/gradle.mjs assembleDebug",
+    "android:open": "cap open android",
+    "ios:open": "cap open ios",
+    "generate:worlds": "tsx tools/generator/worlds/generateAll.ts",
+    "editor": "vite --config vite.editor.config.ts"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@testing-library/user-event": "^14.5.2",

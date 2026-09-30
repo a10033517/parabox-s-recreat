@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Parabox Tribute</string>
+    <string name="title_activity_main">Parabox Tribute</string>
+    <string name="package_name">com.zivchen.paraboxtribute</string>
+    <string name="custom_url_scheme">com.zivchen.paraboxtribute</string>
+</resources>
