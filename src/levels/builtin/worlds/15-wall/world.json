@@ -1,0 +1,943 @@
+{
+  "id": "wall",
+  "order": 15,
+  "name": "墙壁 Wall",
+  "signature": "possess_wall",
+  "levels": [
+    {
+      "file": "15-wall/01.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000139,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 13,
+          "expandedStates": 291,
+          "moves": [
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "down"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/02.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000044,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 13,
+          "expandedStates": 309,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "up",
+            "right",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "up"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/03.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000017,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 15,
+          "expandedStates": 273,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "left",
+            "up",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/04.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000004,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 12,
+          "expandedStates": 570,
+          "moves": [
+            "up",
+            "up",
+            "left",
+            "down",
+            "right",
+            "up",
+            "left",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/05.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000046,
+        "structure": {
+          "boards": 1,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 16,
+          "expandedStates": 243,
+          "moves": [
+            "right",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/06.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000003,
+        "structure": {
+          "boards": 1,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 14,
+          "expandedStates": 429,
+          "moves": [
+            "left",
+            "left",
+            "down",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "up",
+            "right",
+            "down",
+            "up",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/07.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000111,
+        "structure": {
+          "boards": 1,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 13,
+          "expandedStates": 655,
+          "moves": [
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "up",
+            "right",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/08.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000064,
+        "structure": {
+          "boards": 1,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 17,
+          "expandedStates": 414,
+          "moves": [
+            "down",
+            "left",
+            "down",
+            "left",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/09.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000023,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 14,
+          "expandedStates": 1005,
+          "moves": [
+            "up",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "left"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/10.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000047,
+        "structure": {
+          "boards": 1,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 18,
+          "expandedStates": 423,
+          "moves": [
+            "right",
+            "right",
+            "down",
+            "left",
+            "up",
+            "right",
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "left",
+            "down",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/11.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000080,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 17,
+          "expandedStates": 552,
+          "moves": [
+            "down",
+            "down",
+            "up",
+            "right",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/12.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000067,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 15,
+          "expandedStates": 974,
+          "moves": [
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "down",
+            "right",
+            "down",
+            "left",
+            "up",
+            "up",
+            "left"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/13.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000068,
+        "structure": {
+          "boards": 1,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 16,
+          "expandedStates": 1855,
+          "moves": [
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/14.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000020,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 17,
+          "expandedStates": 1613,
+          "moves": [
+            "right",
+            "right",
+            "down",
+            "down",
+            "right",
+            "up",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "up",
+            "left",
+            "right",
+            "right",
+            "down"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/15.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000081,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 28,
+          "expandedStates": 316,
+          "moves": [
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "left",
+            "up",
+            "left",
+            "down",
+            "right",
+            "down",
+            "left",
+            "up",
+            "left",
+            "down",
+            "right",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "up",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/16.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000143,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 24,
+          "expandedStates": 876,
+          "moves": [
+            "down",
+            "left",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "left",
+            "down",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "left",
+            "up",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/17.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000074,
+        "structure": {
+          "boards": 1,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 26,
+          "expandedStates": 774,
+          "moves": [
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/18.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000115,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 22,
+          "expandedStates": 17903,
+          "moves": [
+            "up",
+            "up",
+            "left",
+            "down",
+            "right",
+            "down",
+            "left",
+            "up",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "right",
+            "up",
+            "left",
+            "up",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/19.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000130,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 28,
+          "expandedStates": 7585,
+          "moves": [
+            "down",
+            "right",
+            "right",
+            "up",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "right",
+            "up",
+            "right",
+            "down",
+            "up",
+            "left",
+            "up",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "15-wall/20.json",
+      "record": {
+        "world": "wall",
+        "signatureMechanic": "possess_wall",
+        "seed": 15000010,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 37,
+          "expandedStates": 1219,
+          "moves": [
+            "up",
+            "up",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "right",
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left"
+          ]
+        },
+        "usage": {
+          "possess_wall": true
+        },
+        "necessity": {
+          "possess_wall": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    }
+  ]
+}

@@ -1,5 +1,7 @@
+import { readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { BUILTIN_LEVELS, CUSTOM_LEVEL_ID_PREFIX, loadCustomLevels, loadGeneratedLevels, parseGeneratedModules } from './index'
+import { BUILTIN_LEVELS, CUSTOM_LEVEL_ID_PREFIX, loadCommunitySampleLevels, loadCustomLevels, loadGeneratedLevels, parseGeneratedModules } from './index'
 import { checkWin } from '../game/engine/rules'
 import { PLAYER_ID } from '../game/engine/types'
 import { solve } from '../../tools/generator/solver'
@@ -89,6 +91,25 @@ describe('loadGeneratedLevels', () => {
       const solution = solve(level.world, 150)
       expect(solution, `level ${level.id} should be solvable`).not.toBeNull()
     }
+  })
+})
+
+describe('loadCommunitySampleLevels', () => {
+  // NOT asserted solvable here: one of these (iiexit_intro) is known to blow up this project's
+  // BFS solver's memory (see docs/engine-official-audit.md) — that's a solver-budget limit, not
+  // proof the level itself is unplayable, so it isn't run through solve() in an automated test.
+  it('loads all nine committed community sample levels (seven third-party + iiexit_void3 + player_box_eat), each unsolved, with a "[社群]" name prefix', () => {
+    const levels = loadCommunitySampleLevels()
+    // Some samples are local-only (third-party, not in the public repo): count what is present.
+    const present = readdirSync(join(__dirname, 'builtin/community-samples')).filter((f) => f.endsWith('.json')).length
+    expect(levels).toHaveLength(present)
+    expect(levels.length).toBeGreaterThan(0)
+    for (const level of levels) {
+      expect(level.name.startsWith('[社群] ')).toBe(true)
+      expect(level.world.locations[PLAYER_ID]).toBeDefined()
+      expect(checkWin(level.world)).toBe(false)
+    }
+    expect(new Set(levels.map((l) => l.id)).size).toBe(levels.length)
   })
 })
 

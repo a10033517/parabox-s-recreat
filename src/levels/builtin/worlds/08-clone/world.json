@@ -1,0 +1,1216 @@
+{
+  "id": "clone",
+  "order": 8,
+  "name": "分身 Clone",
+  "signature": "clone",
+  "levels": [
+    {
+      "file": "08-clone/01.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000422,
+        "structure": {
+          "boards": 2,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 19,
+          "expandedStates": 27099,
+          "moves": [
+            "down",
+            "down",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/02.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000610,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 31,
+          "expandedStates": 4386,
+          "moves": [
+            "down",
+            "left",
+            "left",
+            "right",
+            "down",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "left",
+            "down"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/03.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000287,
+        "structure": {
+          "boards": 2,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 22,
+          "expandedStates": 35947,
+          "moves": [
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "right",
+            "up"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/04.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000477,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 31,
+          "expandedStates": 6066,
+          "moves": [
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "up",
+            "right",
+            "down",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/05.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000553,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 26,
+          "expandedStates": 22181,
+          "moves": [
+            "down",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/06.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000514,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 27,
+          "expandedStates": 21311,
+          "moves": [
+            "up",
+            "down",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/07.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000295,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 28,
+          "expandedStates": 24652,
+          "moves": [
+            "right",
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "up"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/08.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000458,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 38,
+          "expandedStates": 2479,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "right",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "right",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/09.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000328,
+        "structure": {
+          "boards": 2,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 23,
+          "expandedStates": 101027,
+          "moves": [
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "right",
+            "up",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "right",
+            "up",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/10.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000065,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 34,
+          "expandedStates": 15569,
+          "moves": [
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "right",
+            "left",
+            "right",
+            "left",
+            "down",
+            "down",
+            "down",
+            "up",
+            "down",
+            "down",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "left",
+            "left",
+            "right",
+            "down",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/11.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000095,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 36,
+          "expandedStates": 14991,
+          "moves": [
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/12.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000105,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 35,
+          "expandedStates": 24622,
+          "moves": [
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "up",
+            "up",
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "up",
+            "right",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/13.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000558,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 33,
+          "expandedStates": 41985,
+          "moves": [
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/14.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000486,
+        "structure": {
+          "boards": 2,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 36,
+          "expandedStates": 30827,
+          "moves": [
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "down",
+            "right",
+            "up",
+            "down",
+            "left",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/15.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000632,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 32,
+          "expandedStates": 86982,
+          "moves": [
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "right",
+            "left",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/16.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000292,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 37,
+          "expandedStates": 32073,
+          "moves": [
+            "up",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "up",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/17.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000206,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 38,
+          "expandedStates": 29726,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "down",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/18.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000270,
+        "structure": {
+          "boards": 2,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 38,
+          "expandedStates": 41513,
+          "moves": [
+            "down",
+            "down",
+            "left",
+            "left",
+            "down",
+            "down",
+            "up",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/19.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000511,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 36,
+          "expandedStates": 92813,
+          "moves": [
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "08-clone/20.json",
+      "record": {
+        "world": "clone",
+        "signatureMechanic": "clone",
+        "seed": 8000490,
+        "structure": {
+          "boards": 2,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 48,
+          "expandedStates": 51213,
+          "moves": [
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right"
+          ]
+        },
+        "usage": {
+          "clone": true
+        },
+        "necessity": {
+          "clone": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    }
+  ]
+}

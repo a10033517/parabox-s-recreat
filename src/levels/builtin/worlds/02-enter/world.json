@@ -1,0 +1,1096 @@
+{
+  "id": "enter",
+  "order": 2,
+  "name": "进入 Enter",
+  "signature": "1_loop_recursion",
+  "levels": [
+    {
+      "file": "02-enter/01.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000367,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 19,
+          "expandedStates": 13431,
+          "moves": [
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "right",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/02.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000337,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 21,
+          "expandedStates": 12595,
+          "moves": [
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "right",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/03.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000544,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 23,
+          "expandedStates": 8419,
+          "moves": [
+            "right",
+            "down",
+            "up",
+            "right",
+            "up",
+            "down",
+            "left",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "down",
+            "left",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "right",
+            "down"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/04.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000176,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 22,
+          "expandedStates": 11675,
+          "moves": [
+            "right",
+            "right",
+            "down",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "up"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/05.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000060,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 23,
+          "expandedStates": 11767,
+          "moves": [
+            "left",
+            "left",
+            "up",
+            "up",
+            "down",
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "left"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/06.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000386,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 19,
+          "expandedStates": 29708,
+          "moves": [
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "right",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "right",
+            "left",
+            "down",
+            "down",
+            "up"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/07.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000287,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 18,
+          "expandedStates": 66054,
+          "moves": [
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "down",
+            "up",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/08.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000232,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 21,
+          "expandedStates": 36133,
+          "moves": [
+            "up",
+            "left",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/09.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000473,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 21,
+          "expandedStates": 40182,
+          "moves": [
+            "left",
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "right",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "up",
+            "right",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/10.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000246,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 21,
+          "expandedStates": 59459,
+          "moves": [
+            "up",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "left",
+            "down",
+            "down",
+            "left",
+            "up",
+            "right",
+            "up",
+            "left",
+            "down",
+            "down",
+            "left",
+            "up",
+            "down",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/11.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000239,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 23,
+          "expandedStates": 52448,
+          "moves": [
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "down",
+            "right",
+            "down",
+            "left",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/12.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000126,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 29,
+          "expandedStates": 13570,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/13.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000193,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 25,
+          "expandedStates": 35413,
+          "moves": [
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "down",
+            "down",
+            "left",
+            "right",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/14.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000311,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 29,
+          "expandedStates": 61949,
+          "moves": [
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "up",
+            "up",
+            "left",
+            "left",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "right"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/15.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000252,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 35,
+          "expandedStates": 16476,
+          "moves": [
+            "down",
+            "down",
+            "right",
+            "right",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/16.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000099,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 29,
+          "expandedStates": 108755,
+          "moves": [
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "down",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "down",
+            "up",
+            "up",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/17.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000601,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 29,
+          "expandedStates": 119526,
+          "moves": [
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/18.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000166,
+        "structure": {
+          "boards": 1,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 39,
+          "expandedStates": 12423,
+          "moves": [
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "right",
+            "down",
+            "left",
+            "left",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/19.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000105,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 32,
+          "expandedStates": 112144,
+          "moves": [
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "left",
+            "left",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "left",
+            "down",
+            "left",
+            "down",
+            "right",
+            "up",
+            "right",
+            "down",
+            "down",
+            "right",
+            "down",
+            "right",
+            "right",
+            "down",
+            "left",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "02-enter/20.json",
+      "record": {
+        "world": "enter",
+        "signatureMechanic": "1_loop_recursion",
+        "seed": 2000371,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 50,
+          "expandedStates": 43937,
+          "moves": [
+            "down",
+            "right",
+            "right",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "down",
+            "right",
+            "down",
+            "down",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "down",
+            "up",
+            "right",
+            "right",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "down",
+            "left",
+            "down",
+            "up",
+            "right"
+          ]
+        },
+        "usage": {
+          "1_loop_recursion": true
+        },
+        "necessity": {
+          "1_loop_recursion": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    }
+  ]
+}
