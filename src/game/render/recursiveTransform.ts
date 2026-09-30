@@ -1,4 +1,4 @@
-import { Board, BoardId, Location, PLAYER_ID, VOID_BOARD_ID, World, findContainerFor } from '../engine/types'
+import { Board, BoardId, Location, PLAYER_ID, PieceId, VOID_BOARD_ID, World, findContainerFor, hasInterior } from '../engine/types'
 
 export interface BoardTransform {
   boardId: BoardId
@@ -8,6 +8,9 @@ export interface BoardTransform {
   // Size of ONE cell of this board, in anchor units. The anchor board's own
   // transform has scale === 1.
   scale: number
+  // Set when this board is drawn mirrored (it sits inside an odd number of fliph boxes on
+  // the way down from the anchor): its column x is drawn at size-1-x.
+  mirrorH?: boolean
 }
 
 export function childTransform(
@@ -45,7 +48,7 @@ export function resolveAnchorBoardId(world: World, anchor: CameraAnchor): BoardI
     Object.keys(world.boards).filter((id) => id !== VOID_BOARD_ID).map((id) => [id, 0]),
   )
   for (const piece of Object.values(world.pieces)) {
-    if (piece.kind === 'container' && piece.boardRef !== undefined && piece.boardRef !== VOID_BOARD_ID) {
+    if ((piece.kind === 'container' || piece.kind === 'player') && piece.boardRef !== undefined && piece.boardRef !== VOID_BOARD_ID) {
       ownerCount.set(piece.boardRef, (ownerCount.get(piece.boardRef) ?? 0) + 1)
     }
   }
@@ -54,11 +57,57 @@ export function resolveAnchorBoardId(world: World, anchor: CameraAnchor): BoardI
   return world.locations[PLAYER_ID]?.board ?? null
 }
 
-// Walks from boardId UP to the anchor board via findContainerFor (mirroring
-// computeTarget's own upward climb in rules.ts), cycle-safe via a visited set, then
-// composes childTransform forward from the anchor's identity transform down through the
-// discovered path. Returns null if boardId isn't reachable from this anchor at all, or a
-// cycle prevents reaching the anchor board.
+// The chain of owners that leads from boardId up to the anchor board — the path along which the
+// renderer, drawing down from the anchor, actually shows this board. The canonical exit
+// (findContainerFor) is preferred at every step, but when it cannot reach the anchor (e.g. a
+// box whose exitblock Ref sits inside its own interior, as in file_format_example — climbing
+// through it only loops) another instance that does reach it is used. Null if none does.
+export function ownerPathToAnchor(world: World, boardId: BoardId, anchorBoardId: BoardId): PieceId[] | null {
+  const visited = new Set<BoardId>()
+  const search = (board: BoardId): PieceId[] | null => {
+    if (board === anchorBoardId) return []
+    if (visited.has(board)) return null
+    visited.add(board)
+    const canonical = findContainerFor(world, board)
+    const owners = Object.values(world.pieces)
+      .filter((p) => hasInterior(p) && p.cloneOf === undefined && p.boardRef === board && world.locations[p.id] !== undefined)
+      .map((p) => p.id)
+      .sort((a, b) => (a === canonical ? -1 : b === canonical ? 1 : a.localeCompare(b)))
+    for (const ownerId of owners) {
+      const rest = search(world.locations[ownerId].board)
+      if (rest !== null) return [ownerId, ...rest]
+    }
+    return null
+  }
+  return search(boardId)
+}
+
+// boardId's transform in anchorBoardId's units, following ownerPathToAnchor down from the
+// anchor and mirroring inside fliph owners exactly as drawBoardRecursive does.
+export function boardTransformInAnchor(world: World, boardId: BoardId, anchorBoardId: BoardId): BoardTransform | null {
+  if (world.boards[boardId] === undefined || world.boards[anchorBoardId] === undefined) return null
+  const path = ownerPathToAnchor(world, boardId, anchorBoardId)
+  if (path === null) return null
+  let originX = 0
+  let originY = 0
+  let scale = 1
+  let mirror = false
+  for (let i = path.length - 1; i >= 0; i--) {
+    const owner = world.pieces[path[i]]
+    const ownerLoc = world.locations[owner.id]
+    const parentSize = world.boards[ownerLoc.board].size
+    const x = mirror ? parentSize - 1 - ownerLoc.x : ownerLoc.x
+    originX += x * scale
+    originY += ownerLoc.y * scale
+    scale /= world.boards[owner.boardRef as BoardId].size
+    mirror = mirror !== (owner.fliph === true)
+  }
+  const transform: BoardTransform = { boardId, originX, originY, scale }
+  if (mirror) transform.mirrorH = true
+  return transform
+}
+
+// boardId's transform relative to the camera anchor (see boardTransformInAnchor).
 export function resolveCanonicalBoardTransform(
   world: World,
   boardId: BoardId,
@@ -71,8 +120,6 @@ export function resolveCanonicalBoardTransform(
   // 'root', producing a nonsensical camera lerp across unrelated coordinate spaces
   // (final-review I3). Callers that resolve the anchor once per level load (GameScreen)
   // pass that cached id here so every call stays in the same coordinate space.
-  // resolveAnchorBoardId's own logic and tests are unchanged by this — it's still used
-  // for the initial computation, and whenever no cached id is supplied.
   cachedRootAnchorBoardId?: BoardId,
 ): BoardTransform | null {
   const anchorBoardId =
@@ -80,25 +127,42 @@ export function resolveCanonicalBoardTransform(
       ? cachedRootAnchorBoardId
       : resolveAnchorBoardId(world, anchor)
   if (anchorBoardId === null) return null
-  if (world.boards[boardId] === undefined) return null
+  return boardTransformInAnchor(world, boardId, anchorBoardId)
+}
 
-  const path: { location: Location; board: Board }[] = []
-  let current = boardId
-  const visited = new Set<BoardId>()
-  while (current !== anchorBoardId) {
-    if (visited.has(current)) return null
-    visited.add(current)
-    const ownerId = findContainerFor(world, current)
-    if (ownerId === undefined) return null
-    const ownerLoc = world.locations[ownerId]
-    if (ownerLoc === undefined) return null
-    path.push({ location: ownerLoc, board: world.boards[current] })
-    current = ownerLoc.board
-  }
-
+// Where drawing starts. The camera's margin shows a little of what lies OUTSIDE the anchor
+// board; when that board is itself inside a box (a self-loop / cycle level — e.g. the root of
+// iiexit_intro sits inside its own self-loop box), that outside is the box's surroundings on
+// its own board, not empty space. So drawing starts up to `maxLevels` owners further out,
+// scaled so the owner's cell covers exactly the anchor board's extent — the anchor board then
+// lands at the identity transform as before, and every camera coordinate stays valid.
+// A tree root (no owner) and the Void are drawn from themselves, as before. An owner with
+// fliph is not climbed: drawing through it would mirror the anchor board itself.
+// locate: where a piece is drawn right now (mid-move animation); when the owner itself is
+// moving, the outer ring then glides with it instead of jumping at the end of the move.
+export function resolveDrawRoot(
+  world: World,
+  anchorBoardId: BoardId,
+  maxLevels = 2,
+  locate?: (pieceId: PieceId) => Location | undefined,
+): BoardTransform {
   let transform: BoardTransform = { boardId: anchorBoardId, originX: 0, originY: 0, scale: 1 }
-  for (let i = path.length - 1; i >= 0; i--) {
-    transform = childTransform(transform, path[i].location, path[i].board)
+  for (let level = 0; level < maxLevels; level++) {
+    const board = world.boards[transform.boardId]
+    if (board === undefined || transform.boardId === VOID_BOARD_ID) break
+    const ownerId = findContainerFor(world, transform.boardId)
+    if (ownerId === undefined) break
+    const owner = world.pieces[ownerId]
+    const ownerLoc = locate?.(ownerId) ?? world.locations[ownerId]
+    if (owner === undefined || ownerLoc === undefined || owner.fliph === true) break
+    if (world.boards[ownerLoc.board] === undefined || ownerLoc.board === VOID_BOARD_ID) break
+    const scale = transform.scale * board.size
+    transform = {
+      boardId: ownerLoc.board,
+      originX: transform.originX - ownerLoc.x * scale,
+      originY: transform.originY - ownerLoc.y * scale,
+      scale,
+    }
   }
   return transform
 }

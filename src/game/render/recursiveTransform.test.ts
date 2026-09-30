@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { childTransform, resolveAnchorBoardId, resolveCanonicalBoardTransform } from './recursiveTransform'
+import { childTransform, resolveAnchorBoardId, resolveCanonicalBoardTransform, resolveDrawRoot } from './recursiveTransform'
 import { makeFloorBoard, makeWorld } from '../engine/testFixtures'
 import { PLAYER_ID, VOID_BOARD_ID } from '../engine/types'
 
@@ -277,5 +277,50 @@ describe('resolveCanonicalBoardTransform', () => {
     expect(resolveCanonicalBoardTransform(world, 'mainInside', 'root')).toEqual({
       boardId: 'mainInside', originX: 1, originY: 1, scale: 0.5, // mainInside is size 2
     })
+  })
+})
+
+describe('resolveDrawRoot', () => {
+  it('a tree root (no owner) is drawn from itself', () => {
+    const world = makeWorld([makeFloorBoard('root', 3)], [], {})
+    expect(resolveDrawRoot(world, 'root')).toEqual({ boardId: 'root', originX: 0, originY: 0, scale: 1 })
+  })
+
+  it('a self-loop root is drawn from its own box one (and two) levels out, so the box cell covers the board exactly', () => {
+    const world = makeWorld(
+      [makeFloorBoard('b0', 5)],
+      [{ id: 'loop', kind: 'container', boardRef: 'b0' }],
+      { loop: { board: 'b0', x: 1, y: 3 } },
+    )
+    const one = resolveDrawRoot(world, 'b0', 1)
+    expect(one).toEqual({ boardId: 'b0', originX: -5, originY: -15, scale: 5 })
+    // The loop cell in that outer copy spans exactly [0, 5) x [0, 5): the anchor board itself.
+    expect(one.originX + 1 * one.scale).toBe(0)
+    expect(one.originY + 3 * one.scale).toBe(0)
+    const two = resolveDrawRoot(world, 'b0', 2)
+    expect(two.scale).toBe(25)
+    expect(two.originX + 1 * two.scale).toBe(one.originX)
+  })
+
+  it('does not climb through a fliph owner', () => {
+    const world = makeWorld(
+      [makeFloorBoard('b0', 5)],
+      [{ id: 'loop', kind: 'container', boardRef: 'b0', fliph: true }],
+      { loop: { board: 'b0', x: 1, y: 3 } },
+    )
+    expect(resolveDrawRoot(world, 'b0').scale).toBe(1)
+  })
+})
+
+describe('resolveDrawRoot while the owner is moving', () => {
+  it('uses the in-between position of the owner, so the outer ring glides with it', () => {
+    const world = makeWorld(
+      [makeFloorBoard('b0', 5)],
+      [{ id: 'loop', kind: 'container', boardRef: 'b0' }],
+      { loop: { board: 'b0', x: 1, y: 3 } },
+    )
+    const halfway = resolveDrawRoot(world, 'b0', 1, (id) => (id === 'loop' ? { board: 'b0', x: 1.5, y: 3 } : undefined))
+    expect(halfway.originX).toBeCloseTo(-7.5) // between -5 (x=1) and -10 (x=2)
+    expect(halfway.originY).toBeCloseTo(-15)
   })
 })

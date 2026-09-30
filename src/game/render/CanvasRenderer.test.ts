@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderBoard, drawBoardRecursive, indexPiecesByBoard, DEFAULT_RENDER_BUDGET, resolveRecursionTarget, combineTint, LINKED_BORDER_COLOR } from './CanvasRenderer'
+import { renderBoard, drawBoardRecursive, indexPiecesByBoard, DEFAULT_RENDER_BUDGET, resolveRecursionTarget, combineTint, LINKED_BORDER_COLOR, FLOOR_COLOR, isCloneInstance } from './CanvasRenderer'
 import { CameraTransform, Viewport } from './camera'
 import { makeFloorBoard, makeWorld, setWall, setRequirement } from '../engine/testFixtures'
 import { PLAYER_ID, World, Board } from '../engine/types'
@@ -17,6 +17,7 @@ function mockContext() {
     textAlign: '',
     textBaseline: '',
     fillText: () => {},
+    beginPath: () => {}, rect: () => {}, arc: () => {}, moveTo: () => {}, fill: () => {},
   } as unknown as CanvasRenderingContext2D
 }
 
@@ -148,8 +149,8 @@ describe('renderBoard', () => {
     const yellowPieceColor = insideStyles[1] // 1 cell draw (size 1), then yellowPiece
 
     expect(redPieceColor).not.toBe(yellowPieceColor)
-    expect(redPieceColor).not.toBe('#38bdf8') // neither is the plain container color
-    expect(yellowPieceColor).not.toBe('#38bdf8')
+    expect(redPieceColor).not.toBe('#3d9bff') // neither is the plain container color
+    expect(yellowPieceColor).not.toBe('#3d9bff')
   })
 
   it('does not color an ordinary container that merely owns an unrelated board, even when a real cycle exists on the same board', () => {
@@ -171,8 +172,8 @@ describe('renderBoard', () => {
     ctx.fillRect = () => { styles.push(ctx.fillStyle as string) }
     renderBoard(ctx, root, world, 32)
     // 9 cell draws (3x3), then loopBox, then obstacleContainer
-    expect(styles[10]).toBe('#38bdf8') // obstacleContainer: plain container color
-    expect(styles[9]).not.toBe('#38bdf8') // loopBox: cycle color
+    expect(styles[10]).toBe('#3d9bff') // obstacleContainer: plain container color
+    expect(styles[9]).not.toBe('#3d9bff') // loopBox: cycle color
   })
 
   it('draws a gold ring around a locked piece', () => {
@@ -193,6 +194,41 @@ describe('renderBoard', () => {
       if (ctx.strokeStyle === '#e2e8f0') sawPaleSlateStroke = true
     }
     renderBoard(ctx, voidBoard, world, 32)
+    expect(strokeCalls).toBe(1)
+    expect(sawPaleSlateStroke).toBe(true)
+  })
+
+  it('keeps the lock ring thin when the camera is zoomed into a Void piece, so it never hides the player inside', () => {
+    // User-reported (2026-09-24): a self-loop box pushed into the Void with the player still in
+    // it is drawn hundreds of pixels wide; a cellSize/8 ring grew thick enough to cover the
+    // player's edge row.
+    const voidBoard = makeFloorBoard('void', 5)
+    const world = makeWorld([voidBoard], [{ id: 'box1', kind: 'normal' }], { box1: { board: 'void', x: 2, y: 2 } })
+    const ctx = mockContext()
+    const widths: number[] = []
+    ctx.strokeRect = () => { widths.push(ctx.lineWidth) }
+    renderBoard(ctx, voidBoard, world, 432)
+    expect(widths.length).toBe(1)
+    expect(widths[0]).toBeLessThanOrEqual(4) // no thicker than the ordinary piece outline
+  })
+
+  it('draws the same gold ring around an infExit-flagged ∞ box even on an ordinary (non-Void) board', () => {
+    // Confirmed by direct user correction (2026-09-22): an ∞ box can only be exited or pushed,
+    // never entered, wherever it stands — not only while physically in the Void.
+    const root = makeFloorBoard('root', 3)
+    const world = makeWorld(
+      [root],
+      [{ id: 'infBox', kind: 'container', boardRef: 'root', infExit: true }],
+      { infBox: { board: 'root', x: 1, y: 1 } },
+    )
+    const ctx = mockContext()
+    let strokeCalls = 0
+    let sawPaleSlateStroke = false
+    ctx.strokeRect = () => {
+      strokeCalls++
+      if (ctx.strokeStyle === '#e2e8f0') sawPaleSlateStroke = true
+    }
+    renderBoard(ctx, root, world, 32)
     expect(strokeCalls).toBe(1)
     expect(sawPaleSlateStroke).toBe(true)
   })
@@ -231,7 +267,7 @@ describe('renderBoard', () => {
     ctx.fillRect = () => { fillStyleAtPieceDraw = ctx.fillStyle as string }
     ctx.strokeRect = () => { strokeCalls++ }
     renderBoard(ctx, voidBoard, world, 32)
-    expect(fillStyleAtPieceDraw).toBe('#38bdf8') // plain container color — no longer a cycle member once voided
+    expect(fillStyleAtPieceDraw).toBe('#3d9bff') // plain container color — no longer a cycle member once voided
     expect(strokeCalls).toBe(1) // still gets the ring
   })
 
@@ -267,8 +303,8 @@ describe('renderBoard', () => {
     expect(restoreCalls).toBe(2) // one save/restore pair per locked piece — neither shared nor skipped
     // pieceFillStyles also records the 25 floor-cell fills before the two
     // piece fills — only the last two entries are the pieces themselves.
-    expect(pieceFillStyles.at(-2)).toBe('#f59e0b') // locked1: plain 'normal' color
-    expect(pieceFillStyles.at(-1)).toBe('#38bdf8') // locked2: plain 'container' color, unaffected by locked1's ring
+    expect(pieceFillStyles.at(-2)).toBe('#ffb236') // locked1: plain 'normal' color
+    expect(pieceFillStyles.at(-1)).toBe('#3d9bff') // locked2: plain 'container' color, unaffected by locked1's ring
   })
 
   it('LOCKED_RING_COLOR does not collide with any known piece or cycle color', () => {
@@ -278,8 +314,8 @@ describe('renderBoard', () => {
     // perceptual similarity, e.g. the yellow-400/yellow-500 pair this replaces —
     // that required a human/reviewer judgment call, not an automatable check.)
     const knownPieceAndCycleColors = [
-      '#f59e0b', '#38bdf8', '#f472b6', // PIECE_COLORS
-      '#ef4444', '#eab308', '#a855f7', '#14b8a6', '#f97316', // CYCLE_PALETTE
+      '#ffb236', '#3d9bff', '#c4006f', // PIECE_COLORS
+      '#e8433f', '#e6c229', '#9b5de5', '#1fb5a3', '#ff7a2f', // CYCLE_PALETTE
     ]
     const LOCKED_RING_COLOR = '#e2e8f0'
     expect(knownPieceAndCycleColors).not.toContain(LOCKED_RING_COLOR)
@@ -305,7 +341,7 @@ describe('renderBoard', () => {
     ctx.fillRect = () => { destinationFillStyle = ctx.fillStyle as string }
     ctx.fillText = (text) => { if (text === '∞') markerDrawn = true }
     renderBoard(ctx, voidBoard, world, 32)
-    expect(destinationFillStyle).not.toBe('#38bdf8') // realOwner's cycle color, not the plain container color
+    expect(destinationFillStyle).not.toBe('#3d9bff') // realOwner's cycle color, not the plain container color
     expect(markerDrawn).toBe(true)
   })
 
@@ -407,8 +443,8 @@ describe('drawBoardRecursive', () => {
     const yellowPieceColor = insideStyles[1]
 
     expect(redPieceColor).not.toBe(yellowPieceColor)
-    expect(redPieceColor).not.toBe('#38bdf8')
-    expect(yellowPieceColor).not.toBe('#38bdf8')
+    expect(redPieceColor).not.toBe('#3d9bff')
+    expect(yellowPieceColor).not.toBe('#3d9bff')
   })
 
   it('does not color an ordinary container that merely owns an unrelated board, even when a real cycle exists on the same board', () => {
@@ -444,8 +480,8 @@ describe('drawBoardRecursive', () => {
       cellsDrawnSoFar: { count: 0 },
     }
     drawBoardRecursive(dc, root, { boardId: root.id, originX: 0, originY: 0, scale: 1 }, 0, 0, false)
-    expect(styles[10]).toBe('#38bdf8')
-    expect(styles[9]).not.toBe('#38bdf8')
+    expect(styles[10]).toBe('#3d9bff')
+    expect(styles[9]).not.toBe('#3d9bff')
   })
 
   it('draws a gold ring around a locked piece', () => {
@@ -459,6 +495,28 @@ describe('drawBoardRecursive', () => {
       if (ctx.strokeStyle === '#e2e8f0') sawPaleSlateStroke = true
     }
     drawBoardForTest(ctx, voidBoard, world, 32)
+    expect(strokeCalls).toBe(1)
+    expect(sawPaleSlateStroke).toBe(true)
+  })
+
+  it('draws the same gold ring around an infExit-flagged ∞ box even on an ordinary (non-Void) board', () => {
+    // A non-self-referencing interior (not pointing back at root) so the ring is drawn exactly
+    // once, not once per recursive copy of a self-loop.
+    const root = makeFloorBoard('root', 3)
+    const inside = makeFloorBoard('inside', 2)
+    const world = makeWorld(
+      [root, inside],
+      [{ id: 'infBox', kind: 'container', boardRef: 'inside', infExit: true }],
+      { infBox: { board: 'root', x: 1, y: 1 } },
+    )
+    const ctx = mockContext()
+    let strokeCalls = 0
+    let sawPaleSlateStroke = false
+    ctx.strokeRect = () => {
+      strokeCalls++
+      if (ctx.strokeStyle === '#e2e8f0') sawPaleSlateStroke = true
+    }
+    drawBoardForTest(ctx, root, world, 32)
     expect(strokeCalls).toBe(1)
     expect(sawPaleSlateStroke).toBe(true)
   })
@@ -482,7 +540,7 @@ describe('drawBoardRecursive', () => {
     ctx.fillRect = () => { fillStyleAtPieceDraw = ctx.fillStyle as string }
     ctx.strokeRect = () => { strokeCalls++ }
     drawBoardForTest(ctx, voidBoard, world, 32)
-    expect(fillStyleAtPieceDraw).toBe('#38bdf8')
+    expect(fillStyleAtPieceDraw).toBe('#3d9bff')
     expect(strokeCalls).toBe(1)
   })
 
@@ -504,8 +562,8 @@ describe('drawBoardRecursive', () => {
     drawBoardForTest(ctx, voidBoard, world, 32)
     expect(saveCalls).toBe(2)
     expect(restoreCalls).toBe(2)
-    expect(pieceFillStyles.at(-2)).toBe('#f59e0b')
-    expect(pieceFillStyles.at(-1)).toBe('#38bdf8')
+    expect(pieceFillStyles.at(-2)).toBe('#ffb236')
+    expect(pieceFillStyles.at(-1)).toBe('#3d9bff')
   })
 
   it('an infinite destination renders with the color of the real piece it represents, plus the infinity marker', () => {
@@ -522,7 +580,7 @@ describe('drawBoardRecursive', () => {
     ctx.fillRect = () => { destinationFillStyle = ctx.fillStyle as string }
     ctx.fillText = (text) => { if (text === '∞') markerDrawn = true }
     drawBoardForTest(ctx, voidBoard, world, 32)
-    expect(destinationFillStyle).not.toBe('#38bdf8')
+    expect(destinationFillStyle).not.toBe('#3d9bff')
     expect(markerDrawn).toBe(true)
   })
 
@@ -599,12 +657,12 @@ describe('drawBoardRecursive', () => {
 
   it('I4 regression: minCellPixels is checked against the CHILD\'s own per-cell size, not the parent container\'s cell', () => {
     // box's own screen cell is comfortably above minCellPixels (64px, from a 2x2 root at
-    // cellSize 64), but its interior is a 20x20 board: dividing 64px by 20 brings the
-    // CHILD's own per-cell size to 3.2px, below the 4px default cutoff. The old (buggy)
-    // parent-only check compared 64px >= 4px and wrongly allowed recursion; the fixed
-    // check must compare 3.2px >= 4px and refuse to recurse, keeping box's flat fill only.
+    // cellSize 64), but its interior is a 40x40 board: dividing 64px by 40 brings the
+    // CHILD's own per-cell size to 1.6px, below the 2px default cutoff. The old (buggy)
+    // parent-only check compared 64px >= 2px and wrongly allowed recursion; the fixed
+    // check must compare 1.6px >= 2px and refuse to recurse, keeping box's flat fill only.
     const root = makeFloorBoard('root', 2)
-    const inside = makeFloorBoard('inside', 20)
+    const inside = makeFloorBoard('inside', 40)
     const world = makeWorld(
       [root, inside],
       [{ id: 'box', kind: 'container', boardRef: 'inside' }],
@@ -613,8 +671,8 @@ describe('drawBoardRecursive', () => {
     const ctx = mockContext()
     let calls = 0
     ctx.fillRect = () => { calls++ }
-    // cellSize 64 -> box's own cell is 64px (above cutoff); its 20x20 interior's own
-    // cells would render at 64/20=3.2px (below cutoff).
+    // cellSize 64 -> box's own cell is 64px (above cutoff); its 40x40 interior's own
+    // cells would render at 64/40=1.6px (below cutoff).
     drawBoardForTest(ctx, root, world, 64)
     expect(calls).toBe(5) // 4 root cells + 1 box fill, nothing nested — recursion refused
   })
@@ -712,10 +770,10 @@ describe('indexPiecesByBoard', () => {
 describe('DEFAULT_RENDER_BUDGET', () => {
   it('matches the spec\'s exact default values', () => {
     expect(DEFAULT_RENDER_BUDGET).toEqual({
-      minCellPixels: 4,
+      minCellPixels: 2,
       maxCellsPerFrame: 4000,
       maxRecursionDepth: 48,
-      targetPlayerCellPixels: 64,
+      marginCells: 1,
     })
   })
 })
@@ -798,10 +856,10 @@ describe('drawBoardRecursive — Clone', () => {
     // fills (mainBody, clone) — compare one of those nested floor fills against a plain
     // undyed floor fill.
     const nestedFloorFill = stylesViaClone[11] // first cell of the recursed peek
-    expect(nestedFloorFill).not.toBe('#1e293b') // FLOOR_COLOR, unmixed
+    expect(nestedFloorFill).not.toBe(FLOOR_COLOR) // FLOOR_COLOR, unmixed
   })
 
-  it('nested clone tint composes rather than resetting: a plain container reached through a clone stays tinted', () => {
+  it('a clone of a container with its own interior peeks that interior directly, tinted', () => {
     // mainBody lives on its OWN separate board ('elsewhere'), away from the clone —
     // deliberately, so the clone's peek can't loop back into itself (a clone sitting on
     // the SAME board its own main body occupies would recurse into that board again,
@@ -828,9 +886,12 @@ describe('drawBoardRecursive — Clone', () => {
     const styles: string[] = []
     ctx.fillRect = () => { styles.push(ctx.fillStyle as string) }
     drawBoardForTest(ctx, root, world, 64)
-    expect(styles).toHaveLength(19)
+    // Clone -> source's own interior 'mainInside' (a clone is a reference to the
+    // source block, not a portal to where the source stands): 9 root cells + 1 clone
+    // fill + 4 mainInside cells = 14 fillRect calls; the last 4 are mainInside's.
+    expect(styles).toHaveLength(14)
     const innermostMainInsideFill = styles.at(-1) as string
-    expect(innermostMainInsideFill).not.toBe('#1e293b') // FLOOR_COLOR, unmixed — must be tinted
+    expect(innermostMainInsideFill).not.toBe(FLOOR_COLOR) // FLOOR_COLOR, unmixed — must be tinted
   })
 })
 
@@ -850,7 +911,7 @@ describe('drawBoardRecursive — Flip', () => {
     drawBoardForTest(ctx, root, world, 64)
     // Without mirroring, the requirement overlay (0,0) would draw at the LEFT half of
     // box's own screen cell; mirrored, it must draw at the RIGHT half instead.
-    const overlayCall = fillCalls.find((c) => c.style === '#334155')! // REQUIREMENT_OVERLAY.box
+    const overlayCall = fillCalls.find((c) => c.style === '#cfcfcf')! // REQUIREMENT_OVERLAY.box
     const boxCellLeft = 0 // box sits at root (0,0), screen left edge = 0
     const boxCellCenter = boxCellLeft + (64 / 2) / 2 // half of box's own 32px screen cell
     expect(overlayCall.x).toBeGreaterThan(boxCellCenter)
@@ -886,11 +947,11 @@ describe('drawBoardRecursive — Flip', () => {
     // 'box' draws its own shell first (unmirrored at the outer level, since outer itself
     // has no fliph), THEN recursion reaches 'innerBox's own shell — the second container
     // fill in draw order.
-    const innerBoxOwnFill = fillCalls.filter((c) => c.style === '#38bdf8').at(-1)! // PIECE_COLORS.container
+    const innerBoxOwnFill = fillCalls.filter((c) => c.style === '#3d9bff').at(-1)! // PIECE_COLORS.container
     expect(innerBoxOwnFill.x).toBeGreaterThanOrEqual(60)
     // innerBox's own recursively-drawn interior (the 'box' requirement overlay marker)
     // must ALSO land in that same mirrored region, not at the unmirrored x in [0,30).
-    const overlayCall = fillCalls.find((c) => c.style === '#334155')! // REQUIREMENT_OVERLAY.box
+    const overlayCall = fillCalls.find((c) => c.style === '#cfcfcf')! // REQUIREMENT_OVERLAY.box
     expect(overlayCall.x).toBeGreaterThanOrEqual(60)
   })
 
@@ -903,7 +964,7 @@ describe('drawBoardRecursive — Flip', () => {
     const fillCalls: { x: number; style: string }[] = []
     ctx.fillRect = (x) => { fillCalls.push({ x: x as number, style: ctx.fillStyle as string }) }
     drawBoardForTest(ctx, root, world, 64)
-    const overlayCall = fillCalls.find((c) => c.style === '#334155')! // REQUIREMENT_OVERLAY.box
+    const overlayCall = fillCalls.find((c) => c.style === '#cfcfcf')! // REQUIREMENT_OVERLAY.box
     const boxCellCenter = 0 + (64 / 2) / 2
     expect(overlayCall.x).toBeLessThan(boxCellCenter)
   })
@@ -1002,5 +1063,95 @@ describe('drawBoardRecursive — Transfer', () => {
     const lastFillIndex = callOrder.lastIndexOf('fill')
     const linkedStrokeIndex = callOrder.indexOf('stroke')
     expect(linkedStrokeIndex).toBeGreaterThan(lastFillIndex)
+  })
+})
+
+describe('paradox glyphs (∞ and ε share one visual path)', () => {
+  it('paradoxGlyph picks ∞ for an Infinite Exit destination and a single ε for an Infinite Enter destination', async () => {
+    const { paradoxGlyph } = await import('./CanvasRenderer')
+    expect(paradoxGlyph({ id: 'a', kind: 'normal', infiniteFor: 'x' })).toBe('∞')
+    expect(paradoxGlyph({ id: 'b', kind: 'container', boardRef: 'e', epsilonFor: 'x' })).toBe('ε')
+    expect(paradoxGlyph({ id: 'c', kind: 'normal' })).toBeNull()
+  })
+
+  it('an ε standing in the Void is drawn with the ε glyph, and nothing in the renderer decides it exists', () => {
+    const voidBoard = makeFloorBoard('void', 5)
+    const eps = { id: 'void-epsilon:s', kind: 'container' as const, boardRef: 'epsilon:s', epsilonFor: 's' }
+    const world = makeWorld(
+      [voidBoard, { id: 'epsilon:s', size: 1, cells: [[{ type: 'floor' }]] }],
+      [eps],
+      { [eps.id]: { board: 'void', x: 2, y: 2 } },
+    )
+    const ctx = mockContext()
+    const glyphs: string[] = []
+    ctx.fillText = (t) => { glyphs.push(t as string) }
+    renderBoard(ctx, voidBoard, world, 32)
+    expect(glyphs).toEqual(['ε'])
+  })
+})
+
+describe('Void-spawned ∞ of degree d shows d+1 stacked glyphs', () => {
+  it('a degree-2 Void ∞ (∞∞∞) draws three ∞ glyphs; degree 0 draws one', () => {
+    const voidBoard = makeFloorBoard('void', 7)
+    const world = makeWorld(
+      [voidBoard, makeFloorBoard('root', 3)],
+      [
+        { id: 'loop', kind: 'container', boardRef: 'root' },
+        { id: 'void-infinite:loop:2', kind: 'normal', infiniteFor: 'loop', infExitNum: 2 },
+        { id: 'void-infinite:loop', kind: 'normal', infiniteFor: 'loop' },
+      ],
+      {
+        loop: { board: 'root', x: 0, y: 0 },
+        'void-infinite:loop:2': { board: 'void', x: 3, y: 3 },
+        'void-infinite:loop': { board: 'void', x: 1, y: 1 },
+      },
+    )
+    const ctx = mockContext()
+    const glyphs: { x: number; y: number; t: string }[] = []
+    ctx.fillText = (t, x, y) => { glyphs.push({ t: t as string, x: x as number, y: y as number }) }
+    renderBoard(ctx, voidBoard, world, 30)
+    const inCell = (cx: number, cy: number) => glyphs.filter((g) => g.x >= cx * 30 && g.x < (cx + 1) * 30 && g.y >= cy * 30 && g.y < (cy + 1) * 30)
+    expect(inCell(3, 3).map((g) => g.t)).toEqual(['∞', '∞', '∞'])
+    expect(inCell(1, 1).map((g) => g.t)).toEqual(['∞'])
+  })
+})
+
+describe('clone colour', () => {
+  it('a second Ref instance of a board is drawn lighter than the canonical one; the canonical one keeps the plain colour', () => {
+    const root = makeFloorBoard('root', 3)
+    const inside = makeFloorBoard('inside', 2)
+    const world = makeWorld(
+      [root, inside],
+      [
+        { id: 'main', kind: 'container', boardRef: 'inside', exitBlock: true },
+        { id: 'copy', kind: 'container', boardRef: 'inside' },
+      ],
+      { main: { board: 'root', x: 0, y: 0 }, copy: { board: 'root', x: 2, y: 0 } },
+    )
+    expect(isCloneInstance(world, world.pieces.main)).toBe(false)
+    expect(isCloneInstance(world, world.pieces.copy)).toBe(true)
+    const ctx = mockContext()
+    const fills: { x: number; style: string }[] = []
+    ctx.fillRect = (x) => { fills.push({ x: x as number, style: ctx.fillStyle as string }) }
+    drawBoardForTest(ctx, root, world, 30)
+    const shellAt = (x: number) => fills.find((f) => f.x === x && f.style !== fills[0].style && (f.style === '#3d9bff' || f.style !== FLOOR_COLOR))!
+    const mainShell = shellAt(0)
+    const copyShell = shellAt(60)
+    expect(mainShell.style).toBe('#3d9bff')
+    const brightness = (hex: string) => parseInt(hex.slice(1, 3), 16) + parseInt(hex.slice(3, 5), 16) + parseInt(hex.slice(5, 7), 16)
+    expect(brightness(copyShell.style)).toBeGreaterThan(brightness(mainShell.style))
+  })
+
+  it('an ∞ Ref is not treated as a clone', () => {
+    const root = makeFloorBoard('root', 3)
+    const world = makeWorld(
+      [root],
+      [
+        { id: 'loop', kind: 'container', boardRef: 'root', exitBlock: true },
+        { id: 'inf', kind: 'container', boardRef: 'root', infExit: true, infExitNum: 0 },
+      ],
+      { loop: { board: 'root', x: 0, y: 0 }, inf: { board: 'root', x: 2, y: 0 } },
+    )
+    expect(isCloneInstance(world, world.pieces.inf)).toBe(false)
   })
 })

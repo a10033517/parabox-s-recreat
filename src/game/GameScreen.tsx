@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { GameState } from './engine/GameState'
+import { possess } from './engine/rules'
 import { BoardId, Direction, Location, PieceId, PLAYER_ID, VOID_BOARD_ID, World } from './engine/types'
-import { DrawContext, DEFAULT_RENDER_BUDGET, drawBoardRecursive, indexPiecesByBoard } from './render/CanvasRenderer'
-import { CameraTransform, Viewport, cameraForPlayer } from './render/camera'
-import { resolveAnchorBoardId } from './render/recursiveTransform'
+import { DrawContext, DEFAULT_RENDER_BUDGET, drawBoardRecursive, drawPiece, indexPiecesByBoard } from './render/CanvasRenderer'
+import { CrossBoardMove, crossBoardMoves, flipScaleAt, flippedPieces, interpolateCell } from './render/moveAnimation'
+import { CameraTransform, Viewport, cameraForFocus } from './render/camera'
+import { resolveAnchorBoardId, resolveDrawRoot } from './render/recursiveTransform'
+import { classifyEpsilonVisuals, epsilonSpawnScale } from './render/epsilonAnimation'
 import { DPad } from '../ui/DPad'
 import { SwipeLayer } from '../ui/SwipeLayer'
 
@@ -17,14 +20,22 @@ interface RenderAnimation {
   kind: AnimationKind
   sourceCamera: CameraTransform
   targetCamera: CameraTransform
+  // The ε the engine says this move created; drives the one-shot spawn scale animation.
+  spawnEpsilonId?: PieceId
+  // Pieces that changed boards (glide between the two cells) and pieces that flipped.
+  crossBoard: CrossBoardMove[]
+  flipped: Set<PieceId>
 }
 
 const DURATIONS: Record<AnimationKind, number> = {
-  move: 120,
-  'enter-leave': 250,
+  move: 150,
+  'enter-leave': 280,
   teleport: 400,
   'void-transition': 400,
 }
+
+// A move that spawns an ε plays longer, so the scale-up is readable after the world swap.
+export const EPSILON_SPAWN_DURATION_MS = 700
 
 // Exported (rather than module-private) so the animation layer's own logic can be
 // unit-tested directly against real pre/post World pairs, instead of only indirectly
@@ -39,11 +50,23 @@ export function lerp(a: number, b: number, t: number): number {
 }
 
 export function isSimpleContainmentStep(world: World, oldBoard: string, newBoard: string): boolean {
-  const newOwner = Object.values(world.pieces).find((p) => p.kind === 'container' && p.boardRef === newBoard)
+  const newOwner = Object.values(world.pieces).find((p) => (p.kind === 'container' || p.kind === 'player') && p.boardRef === newBoard)
   if (newOwner !== undefined && world.locations[newOwner.id]?.board === oldBoard) return true
-  const oldOwner = Object.values(world.pieces).find((p) => p.kind === 'container' && p.boardRef === oldBoard)
+  const oldOwner = Object.values(world.pieces).find((p) => (p.kind === 'container' || p.kind === 'player') && p.boardRef === oldBoard)
   if (oldOwner !== undefined && world.locations[oldOwner.id]?.board === newBoard) return true
   return false
+}
+
+// Two cameras share one coordinate space (so they can be interpolated) only when they are
+// anchored on the same board.
+export function sameCameraSpace(a: CameraTransform, b: CameraTransform): boolean {
+  return a.anchor === b.anchor && a.anchorBoardId === b.anchorBoardId
+}
+
+// The board a camera's coordinates are measured from (and the scene is drawn from).
+export function cameraAnchorBoard(camera: CameraTransform, world: World, rootAnchorBoardId: BoardId | undefined): BoardId | null {
+  if (camera.anchorBoardId !== undefined) return camera.anchorBoardId
+  return camera.anchor === 'root' && rootAnchorBoardId !== undefined ? rootAnchorBoardId : resolveAnchorBoardId(world, camera.anchor)
 }
 
 export function classifyMove(preWorld: World, postWorld: World): AnimationKind {
@@ -69,10 +92,14 @@ export function GameScreen({
   initialWorld,
   onExit,
   onWin,
+  levelName,
+  onNext,
 }: {
   initialWorld: World
   onExit: () => void
   onWin: () => void
+  levelName?: string
+  onNext?: () => void // shown on the win card when there is a next level
 }) {
   const stateRef = useRef<GameState>()
   if (!stateRef.current) stateRef.current = new GameState(initialWorld)
@@ -81,7 +108,7 @@ export function GameScreen({
   // Resolved ONCE per level load (from the level's initial World, same lazy-init idiom
   // as stateRef above), never re-derived from live/possibly-player-relocated World
   // snapshots on every frame or every move — see resolveCanonicalBoardTransform's and
-  // cameraForPlayer's own cachedRootAnchorBoardId doc (final-review I3). Undefined
+  // cameraForFocus's own cachedRootAnchorBoardId doc (final-review I3). Undefined
   // sentinel distinguishes "not yet computed" from a legitimate null result (an
   // unreachable/malformed world), so a null result is still cached rather than retried.
   const rootAnchorBoardIdRef = useRef<BoardId | null | undefined>(undefined)
@@ -102,18 +129,44 @@ export function GameScreen({
     const moved = state.move(direction)
     if (!moved) return
     const postMoveWorld = state.current
-    const kind = classifyMove(preMoveWorld, postMoveWorld)
-    const budget = { targetPlayerCellPixels: DEFAULT_RENDER_BUDGET.targetPlayerCellPixels }
+    // A SpawnEpsilonEvent that CREATED a new ε plays the Void transition (the ε appears in the
+    // Void and the camera follows); the decision comes from the engine's event, never from the
+    // renderer inspecting topology.
+    const spawnedEpsilon = state.lastEvents.some((e) => e.type === 'SpawnEpsilonEvent' && e.created)
+    // Possess swaps the player's identity with the possessed block without moving anything:
+    // animate from the pre-move world with that same swap applied, so no body glides.
+    const possessEvent = state.lastEvents.find((e) => e.type === 'PossessEvent')
+    const animPreWorld = possessEvent !== undefined ? possess(preMoveWorld, possessEvent.targetId) : preMoveWorld
+    const kind = spawnedEpsilon ? 'void-transition' : classifyMove(preMoveWorld, postMoveWorld)
+    const spawnEpsilonId = [...classifyEpsilonVisuals(preMoveWorld, postMoveWorld, state.lastEvents)]
+      .find(([, visual]) => visual === 'Spawn')?.[0]
+    const budget = { marginCells: DEFAULT_RENDER_BUDGET.marginCells }
+    const sourceCamera = cameraForFocus(preMoveWorld, viewportRef.current, budget, rootAnchorBoardId)
+    const targetCamera = cameraForFocus(postMoveWorld, viewportRef.current, budget, rootAnchorBoardId)
+    // Pieces glide / flip only when both frames share one coordinate space (no Void swap).
+    const sameSpace = kind !== 'void-transition' && sameCameraSpace(sourceCamera, targetCamera)
+    const anchorBoardId = sameSpace ? cameraAnchorBoard(targetCamera, postMoveWorld, rootAnchorBoardId) : null
     animationRef.current = {
-      preWorld: preMoveWorld,
+      preWorld: animPreWorld,
       postWorld: postMoveWorld,
       startTimeMs: performance.now(),
-      durationMs: DURATIONS[kind],
+      durationMs: spawnedEpsilon ? EPSILON_SPAWN_DURATION_MS : DURATIONS[kind],
+      spawnEpsilonId,
       kind,
-      sourceCamera: cameraForPlayer(preMoveWorld, budget, rootAnchorBoardId),
-      targetCamera: cameraForPlayer(postMoveWorld, budget, rootAnchorBoardId),
+      sourceCamera,
+      targetCamera,
+      crossBoard: anchorBoardId !== null ? crossBoardMoves(animPreWorld, postMoveWorld, anchorBoardId) : [],
+      flipped: sameSpace ? flippedPieces(animPreWorld, postMoveWorld) : new Set(),
     }
     setTick((t) => t + 1)
+  }
+
+  const handleRestart = () => {
+    if (state.restart()) {
+      wonRef.current = false
+      animationRef.current = null
+      setTick((t) => t + 1)
+    }
   }
 
   const handleUndo = () => {
@@ -172,7 +225,8 @@ export function GameScreen({
         canvas.height = targetHeight
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      ctx.clearRect(0, 0, viewport.width, viewport.height)
+      ctx.fillStyle = '#0b0b0b' // outside every board: the dark backdrop of the original
+      ctx.fillRect(0, 0, viewport.width, viewport.height)
 
       const anim = animationRef.current
       let world = state.current
@@ -184,10 +238,10 @@ export function GameScreen({
         if (rawT >= 1) {
           animationRef.current = null
           world = state.current
-          camera = cameraForPlayer(world, { targetPlayerCellPixels: DEFAULT_RENDER_BUDGET.targetPlayerCellPixels }, rootAnchorBoardId)
+          camera = cameraForFocus(world, viewport, { marginCells: DEFAULT_RENDER_BUDGET.marginCells }, rootAnchorBoardId)
         } else {
           const t = easeOut(Math.max(0, rawT))
-          if (anim.kind === 'void-transition' || anim.sourceCamera.anchor !== anim.targetCamera.anchor) {
+          if (anim.kind === 'void-transition' || !sameCameraSpace(anim.sourceCamera, anim.targetCamera)) {
             // Anchors are never interpolated (§12) — two-phase darken/swap/fade instead.
             if (t < 0.5) {
               world = anim.preWorld
@@ -201,6 +255,7 @@ export function GameScreen({
           } else {
             world = anim.postWorld
             camera = {
+              ...(anim.targetCamera.anchorBoardId !== undefined ? { anchorBoardId: anim.targetCamera.anchorBoardId } : {}),
               anchor: anim.targetCamera.anchor,
               centerX: lerp(anim.sourceCamera.centerX, anim.targetCamera.centerX, t),
               centerY: lerp(anim.sourceCamera.centerY, anim.targetCamera.centerY, t),
@@ -209,17 +264,17 @@ export function GameScreen({
           }
         }
       } else {
-        camera = cameraForPlayer(world, { targetPlayerCellPixels: DEFAULT_RENDER_BUDGET.targetPlayerCellPixels }, rootAnchorBoardId)
+        camera = cameraForFocus(world, viewport, { marginCells: DEFAULT_RENDER_BUDGET.marginCells }, rootAnchorBoardId)
       }
 
       // Same cached anchor id used for the camera above — the Void anchor case is
       // unaffected (VOID_BOARD_ID is always an unambiguous constant, no caching needed).
-      const anchorBoardId =
-        camera.anchor === 'root' && rootAnchorBoardId !== undefined
-          ? rootAnchorBoardId
-          : resolveAnchorBoardId(world, camera.anchor)
+      const anchorBoardId = cameraAnchorBoard(camera, world, rootAnchorBoardId)
       if (anchorBoardId !== null && world.boards[anchorBoardId] !== undefined) {
         const currentAnim = animationRef.current
+        const animT = currentAnim === null ? 1 : easeOut(Math.max(0, Math.min(1, (performance.now() - currentAnim.startTimeMs) / currentAnim.durationMs)))
+        const gliding = currentAnim !== null && currentAnim.kind !== 'void-transition' && sameCameraSpace(currentAnim.sourceCamera, currentAnim.targetCamera)
+        const crossBoard = gliding ? currentAnim.crossBoard : []
         const dc: DrawContext = {
           ctx,
           world,
@@ -228,12 +283,30 @@ export function GameScreen({
           budget: DEFAULT_RENDER_BUDGET,
           piecesByBoard: indexPiecesByBoard(world),
           cellsDrawnSoFar: { count: 0 },
-          getRenderLocation:
-            currentAnim !== null && currentAnim.kind === 'move'
-              ? getRenderLocationFactory(currentAnim.preWorld, currentAnim.postWorld, easeOut(Math.max(0, Math.min(1, (performance.now() - currentAnim.startTimeMs) / currentAnim.durationMs))))
+          getPieceScale:
+            currentAnim !== null && currentAnim.spawnEpsilonId !== undefined
+              ? (pieceId) => {
+                  if (pieceId !== currentAnim.spawnEpsilonId) return 1
+                  // The ε exists only in the post-move half of the two-phase transition.
+                  const raw = (performance.now() - currentAnim.startTimeMs) / currentAnim.durationMs
+                  return epsilonSpawnScale((raw - 0.5) / 0.5)
+                }
               : undefined,
+          getRenderLocation: gliding ? getRenderLocationFactory(currentAnim.preWorld, currentAnim.postWorld, animT) : undefined,
+          getPieceFlipScale:
+            gliding && currentAnim.flipped.size > 0
+              ? (pieceId) => (currentAnim.flipped.has(pieceId) ? flipScaleAt(animT) : 1)
+              : undefined,
+          hiddenPieces: crossBoard.length > 0 ? new Set(crossBoard.map((m) => m.pieceId)) : undefined,
         }
-        drawBoardRecursive(dc, world.boards[anchorBoardId], { boardId: anchorBoardId, originX: 0, originY: 0, scale: 1 }, 0, 0, false)
+        const drawRoot = resolveDrawRoot(world, anchorBoardId, 2, dc.getRenderLocation)
+        drawBoardRecursive(dc, world.boards[drawRoot.boardId], drawRoot, 0, 0, false)
+        // Pieces changing boards glide from their old cell to their new one, drawn on top.
+        for (const move of crossBoard) {
+          const onBoard = world.locations[move.pieceId]?.board
+          if (onBoard === undefined) continue
+          drawPiece(dc, move.pieceId, interpolateCell(move.from, move.to, animT), onBoard, 0, 0, animT < 0.5 ? move.from.mirrorH : move.to.mirrorH)
+        }
       }
 
       if (dimAlpha > 0) {
@@ -255,17 +328,47 @@ export function GameScreen({
 
   return (
     <div className="game-screen">
-      <div className="hud">
-        <span>步数: {state.moveCount}</span>
-        <button onClick={handleUndo}>复位上一步</button>
-        <button onClick={onExit}>离开</button>
-      </div>
+      <header className="topbar">
+        <button className="icon-btn" onClick={onExit}>
+          <span aria-hidden="true">‹</span>
+          <span className="sr-only">离开</span>
+        </button>
+        <div className="topbar-title">
+          {levelName !== undefined && <div className="topbar-name">{levelName}</div>}
+          <div className="topbar-sub">步数: {state.moveCount}</div>
+        </div>
+        <div className="topbar-actions">
+          <button className="icon-btn" onClick={handleUndo}>
+            <span aria-hidden="true">↶</span>
+            <span className="sr-only">复位上一步</span>
+          </button>
+          <button className="icon-btn" onClick={handleRestart}>
+            <span aria-hidden="true">⟲</span>
+            <span className="sr-only">重新开始</span>
+          </button>
+        </div>
+      </header>
       <SwipeLayer onMove={handleMove}>
-        <div ref={containerRef} className="game-viewport">
-          <canvas ref={canvasRef} />
+        <div className="game-stage">
+          <div ref={containerRef} className="game-viewport">
+            <canvas ref={canvasRef} />
+          </div>
         </div>
       </SwipeLayer>
       <DPad onMove={handleMove} />
+      {state.isWon && (
+        <div className="win-overlay" role="dialog" aria-label="通关">
+          <div className="win-card">
+            <div className="win-title">通关！</div>
+            <div className="win-steps">用了 {state.moveCount} 步</div>
+            <div className="win-actions">
+              {onNext !== undefined && <button className="btn-primary" onClick={onNext}>下一关</button>}
+              <button className="btn-secondary" onClick={handleUndo}>撤销一步</button>
+              <button className="btn-secondary" onClick={onExit}>关卡列表</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -20,6 +20,8 @@ beforeEach(() => {
     save: vi.fn(),
     restore: vi.fn(),
     fillText: vi.fn(),
+    beginPath: vi.fn(), rect: vi.fn(), arc: vi.fn(), moveTo: vi.fn(), fill: vi.fn(),
+    translate: vi.fn(), scale: vi.fn(),
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 0,
