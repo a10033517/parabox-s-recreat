@@ -9,754 +9,6 @@
       "record": {
         "world": "intro",
         "signatureMechanic": "nested_box",
-        "seed": 1000192,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 24,
-          "expandedStates": 14479,
-          "moves": [
-            "up",
-            "up",
-            "up",
-            "right",
-            "right",
-            "right",
-            "right",
-            "right",
-            "down",
-            "left",
-            "left",
-            "down",
-            "down",
-            "up",
-            "up",
-            "up",
-            "up",
-            "left",
-            "up",
-            "right",
-            "down",
-            "right",
-            "up",
-            "up"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/02.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000200,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 24,
-          "expandedStates": 26475,
-          "moves": [
-            "up",
-            "up",
-            "up",
-            "up",
-            "right",
-            "right",
-            "down",
-            "right",
-            "down",
-            "left",
-            "left",
-            "left",
-            "left",
-            "left",
-            "down",
-            "left",
-            "up",
-            "up",
-            "down",
-            "right",
-            "right",
-            "right",
-            "down",
-            "right"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/03.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000001,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 28,
-          "expandedStates": 11351,
-          "moves": [
-            "down",
-            "down",
-            "right",
-            "up",
-            "up",
-            "up",
-            "left",
-            "up",
-            "right",
-            "down",
-            "right",
-            "right",
-            "right",
-            "left",
-            "left",
-            "left",
-            "left",
-            "up",
-            "left",
-            "down",
-            "down",
-            "down",
-            "down",
-            "down",
-            "up",
-            "up",
-            "left",
-            "down"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/04.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000179,
-        "structure": {
-          "boards": 2,
-          "pieces": 5,
-          "boxes": 4
-        },
-        "solver": {
-          "solutionLength": 28,
-          "expandedStates": 13441,
-          "moves": [
-            "up",
-            "right",
-            "up",
-            "right",
-            "right",
-            "down",
-            "left",
-            "left",
-            "down",
-            "left",
-            "up",
-            "up",
-            "left",
-            "left",
-            "right",
-            "right",
-            "right",
-            "right",
-            "right",
-            "up",
-            "right",
-            "down",
-            "down",
-            "down",
-            "down",
-            "left",
-            "down",
-            "right"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/05.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000076,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 36,
-          "expandedStates": 2783,
-          "moves": [
-            "up",
-            "left",
-            "up",
-            "up",
-            "right",
-            "up",
-            "right",
-            "down",
-            "down",
-            "right",
-            "down",
-            "down",
-            "left",
-            "up",
-            "right",
-            "up",
-            "left",
-            "left",
-            "up",
-            "left",
-            "up",
-            "left",
-            "up",
-            "up",
-            "up",
-            "down",
-            "down",
-            "right",
-            "down",
-            "left",
-            "left",
-            "left",
-            "right",
-            "down",
-            "right",
-            "right"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/06.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000164,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 25,
-          "expandedStates": 37895,
-          "moves": [
-            "up",
-            "up",
-            "up",
-            "up",
-            "left",
-            "down",
-            "down",
-            "down",
-            "down",
-            "right",
-            "down",
-            "left",
-            "left",
-            "left",
-            "down",
-            "down",
-            "down",
-            "up",
-            "right",
-            "up",
-            "left",
-            "down",
-            "right",
-            "right",
-            "down"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/07.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000031,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 32,
-          "expandedStates": 14135,
-          "moves": [
-            "down",
-            "left",
-            "up",
-            "up",
-            "left",
-            "up",
-            "right",
-            "up",
-            "right",
-            "down",
-            "down",
-            "left",
-            "down",
-            "right",
-            "down",
-            "right",
-            "up",
-            "down",
-            "right",
-            "up",
-            "left",
-            "left",
-            "left",
-            "left",
-            "up",
-            "up",
-            "left",
-            "up",
-            "right",
-            "down",
-            "down",
-            "down"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/08.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000154,
-        "structure": {
-          "boards": 2,
-          "pieces": 5,
-          "boxes": 4
-        },
-        "solver": {
-          "solutionLength": 30,
-          "expandedStates": 27662,
-          "moves": [
-            "down",
-            "right",
-            "down",
-            "down",
-            "left",
-            "down",
-            "down",
-            "right",
-            "up",
-            "down",
-            "left",
-            "left",
-            "left",
-            "up",
-            "up",
-            "right",
-            "right",
-            "right",
-            "down",
-            "right",
-            "up",
-            "up",
-            "up",
-            "up",
-            "up",
-            "down",
-            "down",
-            "down",
-            "down",
-            "left"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/09.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000252,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 31,
-          "expandedStates": 23789,
-          "moves": [
-            "left",
-            "down",
-            "down",
-            "down",
-            "right",
-            "right",
-            "down",
-            "down",
-            "right",
-            "right",
-            "up",
-            "left",
-            "left",
-            "down",
-            "right",
-            "right",
-            "down",
-            "right",
-            "up",
-            "up",
-            "up",
-            "up",
-            "up",
-            "down",
-            "down",
-            "left",
-            "left",
-            "up",
-            "up",
-            "left",
-            "up"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/10.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000266,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 33,
-          "expandedStates": 16781,
-          "moves": [
-            "up",
-            "up",
-            "left",
-            "left",
-            "left",
-            "left",
-            "left",
-            "up",
-            "left",
-            "up",
-            "right",
-            "right",
-            "right",
-            "right",
-            "down",
-            "right",
-            "up",
-            "up",
-            "right",
-            "left",
-            "left",
-            "left",
-            "up",
-            "left",
-            "down",
-            "left",
-            "down",
-            "right",
-            "right",
-            "down",
-            "right",
-            "up",
-            "up"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/11.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000028,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 29,
-          "expandedStates": 52459,
-          "moves": [
-            "up",
-            "up",
-            "up",
-            "left",
-            "left",
-            "up",
-            "up",
-            "down",
-            "down",
-            "down",
-            "right",
-            "right",
-            "right",
-            "right",
-            "right",
-            "down",
-            "right",
-            "up",
-            "up",
-            "up",
-            "up",
-            "left",
-            "up",
-            "right",
-            "down",
-            "down",
-            "down",
-            "down",
-            "left"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/12.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000039,
-        "structure": {
-          "boards": 2,
-          "pieces": 5,
-          "boxes": 4
-        },
-        "solver": {
-          "solutionLength": 32,
-          "expandedStates": 38944,
-          "moves": [
-            "up",
-            "left",
-            "left",
-            "right",
-            "right",
-            "down",
-            "down",
-            "down",
-            "down",
-            "down",
-            "right",
-            "up",
-            "up",
-            "left",
-            "right",
-            "right",
-            "right",
-            "up",
-            "up",
-            "left",
-            "left",
-            "down",
-            "down",
-            "right",
-            "down",
-            "left",
-            "left",
-            "left",
-            "right",
-            "right",
-            "right",
-            "down"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/13.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
-        "seed": 1000018,
-        "structure": {
-          "boards": 2,
-          "pieces": 5,
-          "boxes": 4
-        },
-        "solver": {
-          "solutionLength": 32,
-          "expandedStates": 45010,
-          "moves": [
-            "up",
-            "right",
-            "down",
-            "down",
-            "down",
-            "left",
-            "down",
-            "right",
-            "up",
-            "up",
-            "up",
-            "up",
-            "right",
-            "down",
-            "left",
-            "left",
-            "down",
-            "left",
-            "down",
-            "up",
-            "right",
-            "up",
-            "up",
-            "left",
-            "down",
-            "right",
-            "right",
-            "right",
-            "down",
-            "down",
-            "left",
-            "down"
-          ]
-        },
-        "usage": {
-          "nested_box": true
-        },
-        "necessity": {
-          "nested_box": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "01-intro/14.json",
-      "record": {
-        "world": "intro",
-        "signatureMechanic": "nested_box",
         "seed": 1000152,
         "structure": {
           "boards": 2,
@@ -813,52 +65,58 @@
       }
     },
     {
-      "file": "01-intro/15.json",
+      "file": "01-intro/02.json",
       "record": {
         "world": "intro",
         "signatureMechanic": "nested_box",
-        "seed": 1000005,
+        "seed": 1000031,
         "structure": {
           "boards": 2,
           "pieces": 4,
           "boxes": 3
         },
         "solver": {
-          "solutionLength": 32,
-          "expandedStates": 62410,
+          "solutionLength": 38,
+          "expandedStates": 21105,
           "moves": [
-            "left",
-            "down",
-            "left",
             "down",
             "down",
             "right",
             "right",
-            "up",
-            "left",
+            "down",
             "down",
             "left",
             "up",
-            "up",
-            "up",
-            "up",
-            "up",
             "right",
+            "up",
             "up",
             "left",
-            "right",
-            "right",
-            "right",
-            "right",
-            "left",
-            "left",
-            "up",
             "left",
             "down",
             "right",
+            "right",
+            "right",
+            "down",
+            "up",
+            "left",
+            "left",
+            "down",
             "down",
             "right",
-            "right"
+            "up",
+            "up",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up"
           ]
         },
         "usage": {
@@ -873,56 +131,55 @@
       }
     },
     {
-      "file": "01-intro/16.json",
+      "file": "01-intro/03.json",
       "record": {
         "world": "intro",
         "signatureMechanic": "nested_box",
-        "seed": 1000219,
+        "seed": 1000039,
         "structure": {
           "boards": 2,
-          "pieces": 4,
-          "boxes": 3
+          "pieces": 5,
+          "boxes": 4
         },
         "solver": {
-          "solutionLength": 37,
-          "expandedStates": 28541,
+          "solutionLength": 36,
+          "expandedStates": 55586,
           "moves": [
-            "up",
-            "right",
             "down",
-            "down",
-            "down",
-            "right",
-            "right",
-            "up",
             "left",
-            "down",
-            "down",
-            "down",
             "left",
             "up",
             "left",
             "left",
             "left",
             "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "down",
+            "right",
             "up",
-            "right",
-            "down",
-            "down",
-            "down",
-            "right",
-            "down",
-            "left",
-            "left",
-            "left",
-            "left",
-            "left",
+            "up",
+            "up",
             "up",
             "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
             "down",
             "right",
             "down",
             "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "right",
             "down"
           ]
         },
@@ -938,7 +195,69 @@
       }
     },
     {
-      "file": "01-intro/17.json",
+      "file": "01-intro/04.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000001,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 34,
+          "expandedStates": 119779,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "up",
+            "right",
+            "left",
+            "down",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/05.json",
       "record": {
         "world": "intro",
         "signatureMechanic": "nested_box",
@@ -949,33 +268,35 @@
           "boxes": 4
         },
         "solver": {
-          "solutionLength": 34,
-          "expandedStates": 67341,
+          "solutionLength": 36,
+          "expandedStates": 90078,
           "moves": [
-            "up",
-            "up",
-            "left",
-            "left",
-            "left",
-            "up",
             "right",
-            "right",
-            "up",
             "right",
             "down",
-            "up",
-            "right",
-            "down",
-            "down",
+            "left",
             "down",
             "up",
             "left",
+            "up",
             "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
             "right",
             "down",
             "right",
             "right",
             "right",
+            "up",
+            "down",
+            "left",
+            "left",
+            "up",
             "up",
             "right",
             "right",
@@ -1000,25 +321,741 @@
       }
     },
     {
-      "file": "01-intro/18.json",
+      "file": "01-intro/06.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000333,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 39,
+          "expandedStates": 82847,
+          "moves": [
+            "left",
+            "down",
+            "left",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down",
+            "right",
+            "up",
+            "right",
+            "up",
+            "left",
+            "right",
+            "up",
+            "left",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "right",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "up",
+            "down",
+            "left",
+            "down"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/07.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000266,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 41,
+          "expandedStates": 108305,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "down",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "right",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/08.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000179,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 44,
+          "expandedStates": 96878,
+          "moves": [
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "down",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "left"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/09.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000076,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 48,
+          "expandedStates": 43454,
+          "moves": [
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "left",
+            "down",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "down",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "up",
+            "left",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/10.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000028,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 47,
+          "expandedStates": 72084,
+          "moves": [
+            "right",
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "down",
+            "right",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/11.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000005,
+        "structure": {
+          "boards": 2,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 54,
+          "expandedStates": 29855,
+          "moves": [
+            "up",
+            "up",
+            "up",
+            "left",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "right",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left",
+            "up",
+            "right",
+            "right",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/12.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000018,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 57,
+          "expandedStates": 17004,
+          "moves": [
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "left",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/13.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000219,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 50,
+          "expandedStates": 91951,
+          "moves": [
+            "down",
+            "down",
+            "left",
+            "down",
+            "left",
+            "down",
+            "left",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "left",
+            "left",
+            "down",
+            "right",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "down",
+            "left",
+            "down"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/14.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000166,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 64,
+          "expandedStates": 11239,
+          "moves": [
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "up",
+            "left",
+            "up",
+            "right",
+            "up",
+            "right",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "left",
+            "down",
+            "right",
+            "up",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/15.json",
       "record": {
         "world": "intro",
         "signatureMechanic": "nested_box",
         "seed": 1000027,
         "structure": {
           "boards": 2,
-          "pieces": 5,
-          "boxes": 4
+          "pieces": 4,
+          "boxes": 3
         },
         "solver": {
-          "solutionLength": 38,
-          "expandedStates": 53907,
+          "solutionLength": 58,
+          "expandedStates": 79894,
           "moves": [
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "right",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
             "left",
             "down",
-            "down",
             "left",
+            "left",
+            "up",
+            "right",
             "down",
+            "right",
+            "up",
+            "left",
+            "up",
             "right",
             "right",
             "up",
@@ -1066,7 +1103,95 @@
       }
     },
     {
-      "file": "01-intro/19.json",
+      "file": "01-intro/16.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000154,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 60,
+          "expandedStates": 74456,
+          "moves": [
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "right",
+            "down",
+            "left",
+            "up",
+            "left",
+            "down",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/17.json",
       "record": {
         "world": "intro",
         "signatureMechanic": "nested_box",
@@ -1077,26 +1202,20 @@
           "boxes": 3
         },
         "solver": {
-          "solutionLength": 44,
-          "expandedStates": 50246,
+          "solutionLength": 61,
+          "expandedStates": 84200,
           "moves": [
-            "up",
-            "up",
-            "left",
-            "left",
-            "left",
             "down",
             "down",
-            "down",
-            "down",
-            "up",
-            "up",
-            "up",
-            "right",
             "right",
             "down",
             "down",
             "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
             "left",
             "left",
             "down",
@@ -1106,24 +1225,224 @@
             "right",
             "right",
             "right",
-            "left",
-            "left",
+            "right",
             "up",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
             "up",
             "up",
             "up",
             "right",
             "right",
             "down",
-            "right",
-            "up",
-            "up",
-            "up",
-            "up",
-            "right",
-            "up",
+            "down",
             "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
             "right"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/18.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000267,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 60,
+          "expandedStates": 109288,
+          "moves": [
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "right",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "nested_box": true
+        },
+        "necessity": {
+          "nested_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "01-intro/19.json",
+      "record": {
+        "world": "intro",
+        "signatureMechanic": "nested_box",
+        "seed": 1000252,
+        "structure": {
+          "boards": 2,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 61,
+          "expandedStates": 106387,
+          "moves": [
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "left",
+            "up"
           ]
         },
         "usage": {
@@ -1142,33 +1461,28 @@
       "record": {
         "world": "intro",
         "signatureMechanic": "nested_box",
-        "seed": 1000166,
+        "seed": 1000280,
         "structure": {
           "boards": 2,
           "pieces": 4,
           "boxes": 3
         },
         "solver": {
-          "solutionLength": 58,
-          "expandedStates": 11239,
+          "solutionLength": 63,
+          "expandedStates": 112602,
           "moves": [
-            "left",
+            "down",
+            "down",
             "down",
             "right",
             "up",
+            "up",
             "right",
-            "down",
-            "down",
-            "right",
-            "right",
-            "left",
-            "left",
             "up",
             "left",
             "left",
             "down",
-            "down",
-            "right",
+            "left",
             "up",
             "up",
             "left",
@@ -1176,40 +1490,50 @@
             "right",
             "right",
             "right",
-            "right",
-            "down",
-            "up",
             "left",
             "left",
-            "down",
-            "down",
+            "left",
+            "left",
+            "left",
             "right",
             "right",
             "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "right",
+            "up",
             "left",
             "down",
             "left",
             "up",
             "left",
-            "up",
-            "right",
-            "up",
-            "right",
-            "down",
-            "down",
-            "right",
-            "down",
-            "left",
             "left",
             "up",
-            "left",
-            "down",
-            "left",
-            "down",
-            "right",
+            "up",
+            "up",
             "up",
             "right",
-            "right"
+            "down",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left"
           ]
         },
         "usage": {

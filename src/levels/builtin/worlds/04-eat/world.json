@@ -9,30 +9,41 @@
       "record": {
         "world": "eat",
         "signatureMechanic": "eat_transition",
-        "seed": 4002426,
+        "seed": 4003202,
         "structure": {
           "boards": 2,
           "pieces": 4,
           "boxes": 3
         },
         "solver": {
-          "solutionLength": 20,
-          "expandedStates": 7032,
+          "solutionLength": 31,
+          "expandedStates": 11289,
           "moves": [
-            "right",
             "down",
             "down",
-            "right",
-            "right",
-            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "down",
+            "left",
             "down",
             "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
             "up",
             "left",
-            "up",
-            "right",
-            "up",
-            "right",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
             "down",
             "down",
             "down",
@@ -57,38 +68,48 @@
       "record": {
         "world": "eat",
         "signatureMechanic": "eat_transition",
-        "seed": 4001222,
+        "seed": 4001331,
         "structure": {
           "boards": 2,
           "pieces": 4,
           "boxes": 3
         },
         "solver": {
-          "solutionLength": 22,
-          "expandedStates": 7049,
+          "solutionLength": 32,
+          "expandedStates": 28053,
           "moves": [
+            "up",
+            "right",
             "right",
             "right",
             "down",
-            "down",
-            "right",
-            "right",
-            "right",
-            "up",
-            "up",
+            "left",
+            "left",
             "up",
             "left",
             "left",
             "down",
             "down",
-            "down",
-            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
             "left",
+            "left",
+            "right",
             "down",
             "right",
+            "up",
+            "up",
+            "down",
             "left",
             "left",
-            "left"
+            "up",
+            "up",
+            "right",
+            "right"
           ]
         },
         "usage": {
@@ -107,38 +128,44 @@
       "record": {
         "world": "eat",
         "signatureMechanic": "eat_transition",
-        "seed": 4000785,
+        "seed": 4001526,
         "structure": {
           "boards": 2,
-          "pieces": 4,
-          "boxes": 3
+          "pieces": 5,
+          "boxes": 4
         },
         "solver": {
-          "solutionLength": 23,
-          "expandedStates": 6101,
+          "solutionLength": 29,
+          "expandedStates": 64901,
           "moves": [
-            "down",
-            "down",
-            "down",
             "left",
-            "left",
-            "left",
+            "down",
             "left",
             "down",
             "down",
+            "right",
             "up",
             "up",
             "up",
+            "right",
+            "right",
             "up",
-            "up",
+            "left",
+            "down",
+            "down",
+            "left",
             "left",
             "up",
             "right",
             "right",
+            "up",
+            "left",
+            "left",
+            "left",
             "right",
             "down",
             "right",
-            "down",
+            "right",
             "right"
           ]
         },
@@ -155,568 +182,6 @@
     },
     {
       "file": "04-eat/04.json",
-      "record": {
-        "world": "eat",
-        "signatureMechanic": "eat_transition",
-        "seed": 4000821,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 22,
-          "expandedStates": 16002,
-          "moves": [
-            "up",
-            "left",
-            "left",
-            "left",
-            "down",
-            "down",
-            "right",
-            "down",
-            "right",
-            "up",
-            "right",
-            "up",
-            "up",
-            "left",
-            "down",
-            "down",
-            "left",
-            "down",
-            "right",
-            "right",
-            "right",
-            "down"
-          ]
-        },
-        "usage": {
-          "eat_transition": true
-        },
-        "necessity": {
-          "eat_transition": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "04-eat/05.json",
-      "record": {
-        "world": "eat",
-        "signatureMechanic": "eat_transition",
-        "seed": 4001901,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 25,
-          "expandedStates": 23349,
-          "moves": [
-            "up",
-            "up",
-            "left",
-            "left",
-            "down",
-            "up",
-            "left",
-            "left",
-            "down",
-            "left",
-            "down",
-            "right",
-            "right",
-            "right",
-            "right",
-            "right",
-            "right",
-            "up",
-            "up",
-            "down",
-            "down",
-            "down",
-            "down",
-            "down",
-            "down"
-          ]
-        },
-        "usage": {
-          "eat_transition": true
-        },
-        "necessity": {
-          "eat_transition": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "04-eat/06.json",
-      "record": {
-        "world": "eat",
-        "signatureMechanic": "eat_transition",
-        "seed": 4001404,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 25,
-          "expandedStates": 25249,
-          "moves": [
-            "down",
-            "down",
-            "down",
-            "left",
-            "down",
-            "left",
-            "down",
-            "right",
-            "right",
-            "right",
-            "down",
-            "right",
-            "up",
-            "up",
-            "right",
-            "up",
-            "left",
-            "down",
-            "left",
-            "up",
-            "up",
-            "up",
-            "left",
-            "up",
-            "right"
-          ]
-        },
-        "usage": {
-          "eat_transition": true
-        },
-        "necessity": {
-          "eat_transition": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "04-eat/07.json",
-      "record": {
-        "world": "eat",
-        "signatureMechanic": "eat_transition",
-        "seed": 4001526,
-        "structure": {
-          "boards": 2,
-          "pieces": 5,
-          "boxes": 4
-        },
-        "solver": {
-          "solutionLength": 27,
-          "expandedStates": 15975,
-          "moves": [
-            "up",
-            "right",
-            "up",
-            "right",
-            "up",
-            "up",
-            "left",
-            "left",
-            "down",
-            "down",
-            "right",
-            "up",
-            "right",
-            "up",
-            "left",
-            "left",
-            "down",
-            "down",
-            "left",
-            "up",
-            "right",
-            "up",
-            "left",
-            "down",
-            "right",
-            "right",
-            "right"
-          ]
-        },
-        "usage": {
-          "eat_transition": true
-        },
-        "necessity": {
-          "eat_transition": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "04-eat/08.json",
-      "record": {
-        "world": "eat",
-        "signatureMechanic": "eat_transition",
-        "seed": 4002451,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 35,
-          "expandedStates": 7891,
-          "moves": [
-            "down",
-            "left",
-            "left",
-            "down",
-            "down",
-            "right",
-            "right",
-            "right",
-            "up",
-            "up",
-            "down",
-            "down",
-            "right",
-            "up",
-            "up",
-            "left",
-            "left",
-            "up",
-            "right",
-            "right",
-            "right",
-            "right",
-            "down",
-            "right",
-            "up",
-            "down",
-            "down",
-            "down",
-            "down",
-            "up",
-            "down",
-            "down",
-            "down",
-            "left",
-            "left"
-          ]
-        },
-        "usage": {
-          "eat_transition": true
-        },
-        "necessity": {
-          "eat_transition": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "04-eat/09.json",
-      "record": {
-        "world": "eat",
-        "signatureMechanic": "eat_transition",
-        "seed": 4002261,
-        "structure": {
-          "boards": 2,
-          "pieces": 5,
-          "boxes": 4
-        },
-        "solver": {
-          "solutionLength": 31,
-          "expandedStates": 25042,
-          "moves": [
-            "down",
-            "down",
-            "left",
-            "down",
-            "left",
-            "left",
-            "up",
-            "down",
-            "right",
-            "right",
-            "up",
-            "left",
-            "left",
-            "right",
-            "up",
-            "up",
-            "left",
-            "down",
-            "up",
-            "left",
-            "down",
-            "down",
-            "right",
-            "up",
-            "right",
-            "down",
-            "left",
-            "down",
-            "left",
-            "left",
-            "left"
-          ]
-        },
-        "usage": {
-          "eat_transition": true
-        },
-        "necessity": {
-          "eat_transition": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "04-eat/10.json",
-      "record": {
-        "world": "eat",
-        "signatureMechanic": "eat_transition",
-        "seed": 4001331,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 29,
-          "expandedStates": 45109,
-          "moves": [
-            "right",
-            "down",
-            "left",
-            "left",
-            "down",
-            "left",
-            "up",
-            "left",
-            "left",
-            "down",
-            "down",
-            "right",
-            "up",
-            "left",
-            "up",
-            "right",
-            "down",
-            "right",
-            "up",
-            "up",
-            "up",
-            "up",
-            "down",
-            "left",
-            "left",
-            "up",
-            "up",
-            "right",
-            "right"
-          ]
-        },
-        "usage": {
-          "eat_transition": true
-        },
-        "necessity": {
-          "eat_transition": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "04-eat/11.json",
-      "record": {
-        "world": "eat",
-        "signatureMechanic": "eat_transition",
-        "seed": 4000699,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 27,
-          "expandedStates": 82872,
-          "moves": [
-            "left",
-            "up",
-            "up",
-            "left",
-            "left",
-            "left",
-            "left",
-            "down",
-            "right",
-            "right",
-            "down",
-            "down",
-            "right",
-            "up",
-            "up",
-            "left",
-            "up",
-            "right",
-            "right",
-            "down",
-            "right",
-            "up",
-            "up",
-            "up",
-            "up",
-            "up",
-            "left"
-          ]
-        },
-        "usage": {
-          "eat_transition": true
-        },
-        "necessity": {
-          "eat_transition": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "04-eat/12.json",
-      "record": {
-        "world": "eat",
-        "signatureMechanic": "eat_transition",
-        "seed": 4001401,
-        "structure": {
-          "boards": 2,
-          "pieces": 5,
-          "boxes": 4
-        },
-        "solver": {
-          "solutionLength": 29,
-          "expandedStates": 61745,
-          "moves": [
-            "left",
-            "left",
-            "up",
-            "right",
-            "down",
-            "right",
-            "up",
-            "left",
-            "up",
-            "right",
-            "right",
-            "right",
-            "up",
-            "up",
-            "right",
-            "right",
-            "up",
-            "up",
-            "down",
-            "left",
-            "down",
-            "right",
-            "right",
-            "up",
-            "up",
-            "right",
-            "right",
-            "right",
-            "right"
-          ]
-        },
-        "usage": {
-          "eat_transition": true
-        },
-        "necessity": {
-          "eat_transition": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "04-eat/13.json",
-      "record": {
-        "world": "eat",
-        "signatureMechanic": "eat_transition",
-        "seed": 4001956,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 32,
-          "expandedStates": 40051,
-          "moves": [
-            "down",
-            "right",
-            "down",
-            "down",
-            "right",
-            "right",
-            "up",
-            "up",
-            "left",
-            "up",
-            "left",
-            "right",
-            "down",
-            "left",
-            "down",
-            "down",
-            "left",
-            "up",
-            "left",
-            "up",
-            "right",
-            "right",
-            "up",
-            "right",
-            "down",
-            "up",
-            "right",
-            "down",
-            "left",
-            "right",
-            "down",
-            "down"
-          ]
-        },
-        "usage": {
-          "eat_transition": true
-        },
-        "necessity": {
-          "eat_transition": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "04-eat/14.json",
       "record": {
         "world": "eat",
         "signatureMechanic": "eat_transition",
@@ -774,57 +239,56 @@
       }
     },
     {
-      "file": "04-eat/15.json",
+      "file": "04-eat/05.json",
       "record": {
         "world": "eat",
         "signatureMechanic": "eat_transition",
-        "seed": 4001302,
+        "seed": 4003172,
         "structure": {
           "boards": 2,
           "pieces": 4,
           "boxes": 3
         },
         "solver": {
-          "solutionLength": 37,
-          "expandedStates": 102319,
+          "solutionLength": 36,
+          "expandedStates": 19722,
           "moves": [
             "up",
-            "right",
-            "up",
-            "up",
             "up",
             "left",
             "up",
-            "right",
-            "up",
-            "right",
-            "right",
-            "down",
             "up",
             "left",
-            "left",
-            "down",
-            "down",
+            "right",
             "down",
             "down",
             "right",
-            "right",
+            "down",
             "down",
             "left",
-            "down",
             "left",
             "up",
-            "up",
+            "left",
             "up",
             "up",
             "left",
             "up",
             "right",
             "right",
-            "up",
             "right",
             "down",
-            "down"
+            "down",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right"
           ]
         },
         "usage": {
@@ -839,7 +303,205 @@
       }
     },
     {
-      "file": "04-eat/16.json",
+      "file": "04-eat/06.json",
+      "record": {
+        "world": "eat",
+        "signatureMechanic": "eat_transition",
+        "seed": 4000699,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 33,
+          "expandedStates": 82539,
+          "moves": [
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left"
+          ]
+        },
+        "usage": {
+          "eat_transition": true
+        },
+        "necessity": {
+          "eat_transition": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "04-eat/07.json",
+      "record": {
+        "world": "eat",
+        "signatureMechanic": "eat_transition",
+        "seed": 4002451,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 42,
+          "expandedStates": 30961,
+          "moves": [
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "right",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "eat_transition": true
+        },
+        "necessity": {
+          "eat_transition": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "04-eat/08.json",
+      "record": {
+        "world": "eat",
+        "signatureMechanic": "eat_transition",
+        "seed": 4001401,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 39,
+          "expandedStates": 68381,
+          "moves": [
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "right",
+            "up",
+            "right",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "up",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "eat_transition": true
+        },
+        "necessity": {
+          "eat_transition": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "04-eat/09.json",
       "record": {
         "world": "eat",
         "signatureMechanic": "eat_transition",
@@ -918,60 +580,60 @@
       }
     },
     {
-      "file": "04-eat/17.json",
+      "file": "04-eat/10.json",
       "record": {
         "world": "eat",
         "signatureMechanic": "eat_transition",
-        "seed": 4002077,
+        "seed": 4003512,
         "structure": {
           "boards": 2,
-          "pieces": 4,
-          "boxes": 3
+          "pieces": 5,
+          "boxes": 4
         },
         "solver": {
           "solutionLength": 41,
-          "expandedStates": 74355,
+          "expandedStates": 112903,
           "moves": [
-            "left",
-            "down",
-            "left",
-            "down",
-            "left",
-            "up",
-            "right",
-            "right",
-            "up",
-            "left",
-            "left",
-            "left",
-            "right",
-            "right",
-            "down",
-            "left",
-            "up",
-            "up",
-            "right",
-            "up",
-            "up",
-            "left",
-            "left",
-            "down",
-            "right",
-            "right",
-            "right",
-            "left",
             "down",
             "down",
             "right",
             "right",
             "up",
             "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "right",
+            "up",
+            "up",
             "left",
             "left",
             "left",
+            "down",
+            "left",
+            "up",
+            "up",
             "left",
             "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
             "left",
+            "left",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
             "up"
           ]
         },
@@ -987,26 +649,325 @@
       }
     },
     {
-      "file": "04-eat/18.json",
+      "file": "04-eat/11.json",
       "record": {
         "world": "eat",
         "signatureMechanic": "eat_transition",
-        "seed": 4001035,
+        "seed": 4003178,
         "structure": {
           "boards": 2,
           "pieces": 5,
           "boxes": 4
         },
         "solver": {
-          "solutionLength": 51,
-          "expandedStates": 63104,
+          "solutionLength": 43,
+          "expandedStates": 83177,
           "moves": [
+            "right",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "up",
+            "left",
+            "up",
+            "up",
+            "left",
+            "down",
             "up",
             "right",
             "right",
             "right",
+            "right",
+            "left",
+            "left",
             "down",
             "down",
+            "left",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "right",
+            "right",
+            "down"
+          ]
+        },
+        "usage": {
+          "eat_transition": true
+        },
+        "necessity": {
+          "eat_transition": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "04-eat/12.json",
+      "record": {
+        "world": "eat",
+        "signatureMechanic": "eat_transition",
+        "seed": 4003153,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 50,
+          "expandedStates": 19492,
+          "moves": [
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "right",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left"
+          ]
+        },
+        "usage": {
+          "eat_transition": true
+        },
+        "necessity": {
+          "eat_transition": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "04-eat/13.json",
+      "record": {
+        "world": "eat",
+        "signatureMechanic": "eat_transition",
+        "seed": 4001302,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 45,
+          "expandedStates": 93373,
+          "moves": [
+            "right",
+            "down",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "down",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "eat_transition": true
+        },
+        "necessity": {
+          "eat_transition": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "04-eat/14.json",
+      "record": {
+        "world": "eat",
+        "signatureMechanic": "eat_transition",
+        "seed": 4002261,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 46,
+          "expandedStates": 106602,
+          "moves": [
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "up",
+            "right",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "eat_transition": true
+        },
+        "necessity": {
+          "eat_transition": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "04-eat/15.json",
+      "record": {
+        "world": "eat",
+        "signatureMechanic": "eat_transition",
+        "seed": 4001035,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 54,
+          "expandedStates": 63226,
+          "moves": [
+            "right",
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
             "down",
             "left",
             "up",
@@ -1066,32 +1027,221 @@
       }
     },
     {
-      "file": "04-eat/19.json",
+      "file": "04-eat/16.json",
       "record": {
         "world": "eat",
         "signatureMechanic": "eat_transition",
-        "seed": 4001040,
+        "seed": 4003018,
         "structure": {
           "boards": 2,
           "pieces": 4,
           "boxes": 3
         },
         "solver": {
-          "solutionLength": 56,
-          "expandedStates": 30725,
+          "solutionLength": 57,
+          "expandedStates": 64876,
           "moves": [
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "right",
+            "down",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "up",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "right",
+            "up",
+            "left",
+            "down",
+            "down",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "left",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "eat_transition": true
+        },
+        "necessity": {
+          "eat_transition": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "04-eat/17.json",
+      "record": {
+        "world": "eat",
+        "signatureMechanic": "eat_transition",
+        "seed": 4002077,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 59,
+          "expandedStates": 81778,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "down",
+            "down",
+            "left",
+            "up",
+            "right",
+            "up",
+            "left",
             "down",
             "down",
             "left",
             "left",
             "up",
-            "up",
-            "left",
-            "up",
-            "right",
             "right",
             "down",
             "right",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "down",
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up"
+          ]
+        },
+        "usage": {
+          "eat_transition": true
+        },
+        "necessity": {
+          "eat_transition": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "04-eat/18.json",
+      "record": {
+        "world": "eat",
+        "signatureMechanic": "eat_transition",
+        "seed": 4001040,
+        "structure": {
+          "boards": 2,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 73,
+          "expandedStates": 31315,
+          "moves": [
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "right",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "left",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
             "up",
             "right",
             "up",
@@ -1150,6 +1300,106 @@
       }
     },
     {
+      "file": "04-eat/19.json",
+      "record": {
+        "world": "eat",
+        "signatureMechanic": "eat_transition",
+        "seed": 4001956,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 72,
+          "expandedStates": 53395,
+          "moves": [
+            "down",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "right",
+            "down",
+            "left",
+            "down",
+            "down",
+            "left",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "up",
+            "right",
+            "down",
+            "left",
+            "right",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "eat_transition": true
+        },
+        "necessity": {
+          "eat_transition": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
       "file": "04-eat/20.json",
       "record": {
         "world": "eat",
@@ -1157,22 +1407,29 @@
         "seed": 4001291,
         "structure": {
           "boards": 2,
-          "pieces": 4,
-          "boxes": 3
+          "pieces": 3,
+          "boxes": 2
         },
         "solver": {
-          "solutionLength": 73,
-          "expandedStates": 60951,
+          "solutionLength": 80,
+          "expandedStates": 62330,
           "moves": [
+            "up",
             "right",
-            "down",
             "right",
-            "down",
-            "down",
-            "down",
+            "up",
             "right",
-            "down",
+            "up",
             "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
             "left",
             "down",
             "left",

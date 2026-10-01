@@ -9,214 +9,6 @@
       "record": {
         "world": "flip",
         "signatureMechanic": "flip",
-        "seed": 11000615,
-        "structure": {
-          "boards": 2,
-          "pieces": 5,
-          "boxes": 4
-        },
-        "solver": {
-          "solutionLength": 20,
-          "expandedStates": 7810,
-          "moves": [
-            "left",
-            "up",
-            "up",
-            "left",
-            "up",
-            "right",
-            "down",
-            "down",
-            "down",
-            "right",
-            "up",
-            "left",
-            "left",
-            "left",
-            "down",
-            "left",
-            "up",
-            "up",
-            "up",
-            "left"
-          ]
-        },
-        "usage": {
-          "flip": true
-        },
-        "necessity": {
-          "flip": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "11-flip/02.json",
-      "record": {
-        "world": "flip",
-        "signatureMechanic": "flip",
-        "seed": 11001668,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 24,
-          "expandedStates": 3635,
-          "moves": [
-            "down",
-            "left",
-            "left",
-            "left",
-            "down",
-            "right",
-            "right",
-            "right",
-            "right",
-            "up",
-            "right",
-            "down",
-            "down",
-            "down",
-            "down",
-            "right",
-            "right",
-            "down",
-            "down",
-            "up",
-            "up",
-            "left",
-            "left",
-            "left"
-          ]
-        },
-        "usage": {
-          "flip": true
-        },
-        "necessity": {
-          "flip": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "11-flip/03.json",
-      "record": {
-        "world": "flip",
-        "signatureMechanic": "flip",
-        "seed": 11000731,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 22,
-          "expandedStates": 5832,
-          "moves": [
-            "up",
-            "up",
-            "left",
-            "up",
-            "up",
-            "right",
-            "right",
-            "right",
-            "left",
-            "left",
-            "right",
-            "right",
-            "right",
-            "left",
-            "down",
-            "down",
-            "left",
-            "down",
-            "right",
-            "right",
-            "up",
-            "up"
-          ]
-        },
-        "usage": {
-          "flip": true
-        },
-        "necessity": {
-          "flip": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "11-flip/04.json",
-      "record": {
-        "world": "flip",
-        "signatureMechanic": "flip",
-        "seed": 11000864,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 30,
-          "expandedStates": 1114,
-          "moves": [
-            "up",
-            "right",
-            "right",
-            "right",
-            "right",
-            "down",
-            "down",
-            "down",
-            "right",
-            "up",
-            "up",
-            "left",
-            "up",
-            "right",
-            "left",
-            "left",
-            "down",
-            "down",
-            "right",
-            "up",
-            "left",
-            "up",
-            "right",
-            "right",
-            "right",
-            "left",
-            "left",
-            "left",
-            "right",
-            "right"
-          ]
-        },
-        "usage": {
-          "flip": true
-        },
-        "necessity": {
-          "flip": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "11-flip/05.json",
-      "record": {
-        "world": "flip",
-        "signatureMechanic": "flip",
         "seed": 11000230,
         "structure": {
           "boards": 2,
@@ -264,7 +56,7 @@
       }
     },
     {
-      "file": "11-flip/06.json",
+      "file": "11-flip/02.json",
       "record": {
         "world": "flip",
         "signatureMechanic": "flip",
@@ -317,7 +109,124 @@
       }
     },
     {
-      "file": "11-flip/07.json",
+      "file": "11-flip/03.json",
+      "record": {
+        "world": "flip",
+        "signatureMechanic": "flip",
+        "seed": 11000597,
+        "structure": {
+          "boards": 2,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 33,
+          "expandedStates": 2214,
+          "moves": [
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "up"
+          ]
+        },
+        "usage": {
+          "flip": true
+        },
+        "necessity": {
+          "flip": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "11-flip/04.json",
+      "record": {
+        "world": "flip",
+        "signatureMechanic": "flip",
+        "seed": 11000701,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 28,
+          "expandedStates": 61251,
+          "moves": [
+            "up",
+            "right",
+            "down",
+            "up",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "down",
+            "down",
+            "right",
+            "up",
+            "up",
+            "down",
+            "left",
+            "left",
+            "left",
+            "down"
+          ]
+        },
+        "usage": {
+          "flip": true
+        },
+        "necessity": {
+          "flip": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "11-flip/05.json",
       "record": {
         "world": "flip",
         "signatureMechanic": "flip",
@@ -329,32 +238,32 @@
         },
         "solver": {
           "solutionLength": 33,
-          "expandedStates": 3328,
+          "expandedStates": 22547,
           "moves": [
-            "left",
-            "up",
-            "up",
-            "right",
-            "right",
-            "down",
-            "down",
-            "down",
-            "right",
-            "right",
-            "left",
-            "down",
-            "left",
-            "right",
-            "up",
-            "right",
-            "right",
             "up",
             "left",
             "left",
-            "left",
+            "up",
             "left",
             "down",
             "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "left",
+            "down",
+            "left",
+            "left",
+            "up",
             "right",
             "right",
             "right",
@@ -364,6 +273,138 @@
             "left",
             "up",
             "up"
+          ]
+        },
+        "usage": {
+          "flip": true
+        },
+        "necessity": {
+          "flip": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "11-flip/06.json",
+      "record": {
+        "world": "flip",
+        "signatureMechanic": "flip",
+        "seed": 11001670,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 32,
+          "expandedStates": 63034,
+          "moves": [
+            "down",
+            "right",
+            "right",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "right",
+            "up",
+            "right",
+            "up"
+          ]
+        },
+        "usage": {
+          "flip": true
+        },
+        "necessity": {
+          "flip": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "11-flip/07.json",
+      "record": {
+        "world": "flip",
+        "signatureMechanic": "flip",
+        "seed": 11000864,
+        "structure": {
+          "boards": 2,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 44,
+          "expandedStates": 4392,
+          "moves": [
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right"
           ]
         },
         "usage": {
@@ -379,424 +420,6 @@
     },
     {
       "file": "11-flip/08.json",
-      "record": {
-        "world": "flip",
-        "signatureMechanic": "flip",
-        "seed": 11000701,
-        "structure": {
-          "boards": 2,
-          "pieces": 5,
-          "boxes": 4
-        },
-        "solver": {
-          "solutionLength": 26,
-          "expandedStates": 20145,
-          "moves": [
-            "right",
-            "down",
-            "right",
-            "up",
-            "up",
-            "up",
-            "up",
-            "right",
-            "left",
-            "down",
-            "down",
-            "left",
-            "up",
-            "down",
-            "left",
-            "up",
-            "down",
-            "left",
-            "left",
-            "down",
-            "down",
-            "right",
-            "right",
-            "left",
-            "left",
-            "up"
-          ]
-        },
-        "usage": {
-          "flip": true
-        },
-        "necessity": {
-          "flip": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "11-flip/09.json",
-      "record": {
-        "world": "flip",
-        "signatureMechanic": "flip",
-        "seed": 11002061,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 33,
-          "expandedStates": 6949,
-          "moves": [
-            "up",
-            "right",
-            "up",
-            "left",
-            "left",
-            "up",
-            "left",
-            "down",
-            "down",
-            "left",
-            "left",
-            "down",
-            "right",
-            "up",
-            "right",
-            "up",
-            "left",
-            "left",
-            "left",
-            "down",
-            "down",
-            "right",
-            "right",
-            "right",
-            "right",
-            "right",
-            "up",
-            "right",
-            "down",
-            "down",
-            "up",
-            "left",
-            "left"
-          ]
-        },
-        "usage": {
-          "flip": true
-        },
-        "necessity": {
-          "flip": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "11-flip/10.json",
-      "record": {
-        "world": "flip",
-        "signatureMechanic": "flip",
-        "seed": 11000110,
-        "structure": {
-          "boards": 2,
-          "pieces": 5,
-          "boxes": 4
-        },
-        "solver": {
-          "solutionLength": 36,
-          "expandedStates": 4086,
-          "moves": [
-            "down",
-            "down",
-            "right",
-            "right",
-            "left",
-            "down",
-            "up",
-            "right",
-            "right",
-            "up",
-            "up",
-            "right",
-            "down",
-            "left",
-            "down",
-            "down",
-            "right",
-            "right",
-            "left",
-            "down",
-            "down",
-            "left",
-            "up",
-            "left",
-            "up",
-            "up",
-            "right",
-            "down",
-            "left",
-            "down",
-            "right",
-            "right",
-            "right",
-            "up",
-            "left",
-            "left"
-          ]
-        },
-        "usage": {
-          "flip": true
-        },
-        "necessity": {
-          "flip": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "11-flip/11.json",
-      "record": {
-        "world": "flip",
-        "signatureMechanic": "flip",
-        "seed": 11000813,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 31,
-          "expandedStates": 16797,
-          "moves": [
-            "right",
-            "down",
-            "down",
-            "down",
-            "left",
-            "down",
-            "down",
-            "right",
-            "up",
-            "up",
-            "up",
-            "up",
-            "left",
-            "up",
-            "right",
-            "right",
-            "right",
-            "left",
-            "left",
-            "down",
-            "down",
-            "down",
-            "down",
-            "right",
-            "right",
-            "right",
-            "up",
-            "up",
-            "up",
-            "down",
-            "down"
-          ]
-        },
-        "usage": {
-          "flip": true
-        },
-        "necessity": {
-          "flip": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "11-flip/12.json",
-      "record": {
-        "world": "flip",
-        "signatureMechanic": "flip",
-        "seed": 11001464,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 32,
-          "expandedStates": 13802,
-          "moves": [
-            "down",
-            "left",
-            "up",
-            "left",
-            "down",
-            "down",
-            "up",
-            "right",
-            "down",
-            "right",
-            "down",
-            "left",
-            "left",
-            "left",
-            "right",
-            "down",
-            "right",
-            "up",
-            "down",
-            "down",
-            "right",
-            "down",
-            "down",
-            "up",
-            "up",
-            "up",
-            "left",
-            "up",
-            "right",
-            "right",
-            "down",
-            "down"
-          ]
-        },
-        "usage": {
-          "flip": true
-        },
-        "necessity": {
-          "flip": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "11-flip/13.json",
-      "record": {
-        "world": "flip",
-        "signatureMechanic": "flip",
-        "seed": 11001209,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 30,
-          "expandedStates": 43840,
-          "moves": [
-            "up",
-            "up",
-            "up",
-            "up",
-            "right",
-            "up",
-            "left",
-            "right",
-            "right",
-            "down",
-            "down",
-            "down",
-            "down",
-            "down",
-            "down",
-            "right",
-            "up",
-            "right",
-            "down",
-            "down",
-            "left",
-            "down",
-            "right",
-            "right",
-            "up",
-            "left",
-            "left",
-            "left",
-            "left",
-            "left"
-          ]
-        },
-        "usage": {
-          "flip": true
-        },
-        "necessity": {
-          "flip": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "11-flip/14.json",
-      "record": {
-        "world": "flip",
-        "signatureMechanic": "flip",
-        "seed": 11001670,
-        "structure": {
-          "boards": 2,
-          "pieces": 4,
-          "boxes": 3
-        },
-        "solver": {
-          "solutionLength": 34,
-          "expandedStates": 31337,
-          "moves": [
-            "up",
-            "right",
-            "right",
-            "down",
-            "right",
-            "right",
-            "up",
-            "left",
-            "up",
-            "right",
-            "left",
-            "up",
-            "left",
-            "left",
-            "down",
-            "right",
-            "right",
-            "right",
-            "right",
-            "down",
-            "left",
-            "up",
-            "up",
-            "right",
-            "up",
-            "left",
-            "down",
-            "down",
-            "right",
-            "right",
-            "left",
-            "up",
-            "left",
-            "up"
-          ]
-        },
-        "usage": {
-          "flip": true
-        },
-        "necessity": {
-          "flip": true
-        },
-        "ablationExpandedStates": [
-          -1
-        ]
-      }
-    },
-    {
-      "file": "11-flip/15.json",
       "record": {
         "world": "flip",
         "signatureMechanic": "flip",
@@ -857,20 +480,484 @@
       }
     },
     {
-      "file": "11-flip/16.json",
+      "file": "11-flip/09.json",
       "record": {
         "world": "flip",
         "signatureMechanic": "flip",
-        "seed": 11000004,
+        "seed": 11001464,
+        "structure": {
+          "boards": 2,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 42,
+          "expandedStates": 14732,
+          "moves": [
+            "right",
+            "up",
+            "up",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "up",
+            "up",
+            "left",
+            "down",
+            "left",
+            "down",
+            "right",
+            "up",
+            "right",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "right",
+            "down",
+            "right",
+            "up",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "flip": true
+        },
+        "necessity": {
+          "flip": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "11-flip/10.json",
+      "record": {
+        "world": "flip",
+        "signatureMechanic": "flip",
+        "seed": 11001908,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 37,
+          "expandedStates": 106865,
+          "moves": [
+            "left",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "down",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "left",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "flip": true
+        },
+        "necessity": {
+          "flip": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "11-flip/11.json",
+      "record": {
+        "world": "flip",
+        "signatureMechanic": "flip",
+        "seed": 11001668,
+        "structure": {
+          "boards": 2,
+          "pieces": 3,
+          "boxes": 2
+        },
+        "solver": {
+          "solutionLength": 54,
+          "expandedStates": 2975,
+          "moves": [
+            "down",
+            "right",
+            "down",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "down",
+            "down",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "flip": true
+        },
+        "necessity": {
+          "flip": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "11-flip/12.json",
+      "record": {
+        "world": "flip",
+        "signatureMechanic": "flip",
+        "seed": 11000813,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 44,
+          "expandedStates": 57696,
+          "moves": [
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "down",
+            "up",
+            "right",
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "up",
+            "right",
+            "right",
+            "up"
+          ]
+        },
+        "usage": {
+          "flip": true
+        },
+        "necessity": {
+          "flip": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "11-flip/13.json",
+      "record": {
+        "world": "flip",
+        "signatureMechanic": "flip",
+        "seed": 11000731,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 51,
+          "expandedStates": 33069,
+          "moves": [
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down",
+            "right",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "flip": true
+        },
+        "necessity": {
+          "flip": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "11-flip/14.json",
+      "record": {
+        "world": "flip",
+        "signatureMechanic": "flip",
+        "seed": 11000110,
         "structure": {
           "boards": 2,
           "pieces": 5,
           "boxes": 4
         },
         "solver": {
-          "solutionLength": 50,
-          "expandedStates": 42790,
+          "solutionLength": 57,
+          "expandedStates": 9055,
           "moves": [
+            "up",
+            "up",
+            "left",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "left",
+            "down",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "down",
+            "right",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "left",
+            "down",
+            "down",
+            "up",
+            "left"
+          ]
+        },
+        "usage": {
+          "flip": true
+        },
+        "necessity": {
+          "flip": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "11-flip/15.json",
+      "record": {
+        "world": "flip",
+        "signatureMechanic": "flip",
+        "seed": 11000004,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 61,
+          "expandedStates": 44577,
+          "moves": [
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "right",
             "right",
             "down",
             "down",
@@ -935,69 +1022,179 @@
       }
     },
     {
-      "file": "11-flip/17.json",
+      "file": "11-flip/16.json",
       "record": {
         "world": "flip",
         "signatureMechanic": "flip",
-        "seed": 11001586,
+        "seed": 11001209,
         "structure": {
           "boards": 2,
           "pieces": 4,
           "boxes": 3
         },
         "solver": {
-          "solutionLength": 50,
-          "expandedStates": 84862,
+          "solutionLength": 61,
+          "expandedStates": 81997,
           "moves": [
+            "down",
+            "right",
+            "right",
+            "right",
             "up",
+            "up",
+            "up",
+            "left",
+            "right",
+            "up",
+            "right",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "right",
+            "up",
+            "right",
             "up",
             "up",
             "right",
             "down",
             "down",
             "left",
-            "down",
-            "right",
-            "right",
-            "left",
-            "up",
-            "up",
-            "left",
-            "left",
-            "up",
-            "up",
-            "down",
-            "down",
-            "left",
-            "down",
-            "right",
-            "up",
-            "up",
-            "up",
-            "left",
-            "up",
             "up",
             "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
             "down",
+            "down",
+            "right",
             "down",
             "down",
             "down",
             "left",
-            "down",
-            "right",
-            "right",
-            "down",
-            "right",
-            "right",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
             "up",
             "up",
             "left",
             "up",
             "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "flip": true
+        },
+        "necessity": {
+          "flip": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "11-flip/17.json",
+      "record": {
+        "world": "flip",
+        "signatureMechanic": "flip",
+        "seed": 11001249,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 71,
+          "expandedStates": 8915,
+          "moves": [
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "right",
+            "down",
+            "down",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
             "right",
             "left",
             "down",
             "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "left",
+            "up",
+            "left",
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
             "left"
           ]
         },
@@ -1020,20 +1217,22 @@
         "seed": 11000193,
         "structure": {
           "boards": 2,
-          "pieces": 4,
-          "boxes": 3
+          "pieces": 3,
+          "boxes": 2
         },
         "solver": {
-          "solutionLength": 52,
-          "expandedStates": 112086,
+          "solutionLength": 62,
+          "expandedStates": 119683,
           "moves": [
             "up",
-            "up",
-            "up",
-            "up",
-            "up",
-            "up",
             "left",
+            "up",
+            "right",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
             "left",
             "down",
             "down",
@@ -1046,25 +1245,33 @@
             "down",
             "left",
             "left",
-            "left",
+            "down",
+            "up",
+            "right",
+            "right",
             "up",
             "up",
-            "right",
-            "right",
-            "right",
             "right",
             "right",
             "down",
             "right",
             "up",
             "down",
-            "left",
-            "left",
-            "up",
-            "up",
-            "up",
+            "right",
             "down",
             "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
             "right",
             "right",
             "up",
@@ -1097,77 +1304,84 @@
       "record": {
         "world": "flip",
         "signatureMechanic": "flip",
-        "seed": 11002478,
+        "seed": 11001586,
         "structure": {
           "boards": 2,
-          "pieces": 4,
-          "boxes": 3
+          "pieces": 3,
+          "boxes": 2
         },
         "solver": {
-          "solutionLength": 62,
-          "expandedStates": 50747,
+          "solutionLength": 69,
+          "expandedStates": 87589,
           "moves": [
             "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "left",
+            "right",
+            "up",
+            "up",
             "left",
             "left",
             "down",
             "down",
             "down",
             "right",
-            "right",
-            "right",
-            "up",
-            "up",
-            "up",
-            "up",
-            "up",
-            "right",
-            "up",
+            "down",
             "left",
             "left",
             "down",
             "left",
             "up",
-            "up",
-            "down",
-            "right",
-            "right",
-            "up",
-            "up",
-            "right",
-            "right",
-            "down",
-            "right",
-            "right",
-            "up",
             "left",
-            "down",
-            "left",
-            "down",
-            "right",
+            "up",
             "right",
             "left",
-            "left",
-            "down",
-            "down",
-            "down",
-            "right",
-            "right",
-            "right",
             "up",
-            "up",
-            "up",
-            "up",
-            "up",
-            "right",
             "up",
             "left",
             "left",
-            "down",
-            "right",
+            "up",
+            "up",
             "down",
             "down",
             "left",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "left",
+            "down",
+            "down",
             "left"
           ]
         },
@@ -1190,14 +1404,17 @@
         "seed": 11001359,
         "structure": {
           "boards": 2,
-          "pieces": 5,
-          "boxes": 4
+          "pieces": 4,
+          "boxes": 3
         },
         "solver": {
-          "solutionLength": 68,
-          "expandedStates": 66285,
+          "solutionLength": 71,
+          "expandedStates": 60607,
           "moves": [
-            "down",
+            "up",
+            "up",
+            "up",
+            "left",
             "left",
             "left",
             "down",
