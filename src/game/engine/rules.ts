@@ -27,54 +27,6 @@ function mirrorHorizontal(dir: Direction): Direction {
   return dir
 }
 
-// The four directions' worth of "which cell of a same-size linked board does exiting
-// this cell land on" — opposite edge, matching offset, exactly like exiting any board
-// already lands you on the opposite edge of wherever the climb continues to; this is
-// the same idea applied directly between two linked containers' interiors instead of
-// via the normal owner-climb.
-function linkedEntryCell(size: number, x: number, y: number, dir: Direction): { x: number; y: number } {
-  switch (dir) {
-    case 'right': return { x: 0, y }
-    case 'left':  return { x: size - 1, y }
-    case 'down':  return { x, y: 0 }
-    case 'up':    return { x, y: size - 1 }
-  }
-}
-
-// ---- Transfer: three isolated stages ---------------------------------------
-// Target selection is NOT publicly specified by the official game (how ties between
-// several same-position sub-boxes are broken). Each stage is its own function so a
-// verified rule replaces only the selector, never the enter/exit engine.
-
-// Stage 1: which pieces could this container transfer to. Today: its explicit `linkedTo`.
-export function collectTransferCandidates(_world: World, container: Piece): PieceId[] {
-  // A dangling link is still a candidate: resolve then fails the move cleanly instead of
-  // silently falling through to an ordinary climb.
-  return container.linkedTo === undefined ? [] : [container.linkedTo]
-}
-
-// Stage 2: choose one. PROVISIONAL deterministic rule: the first candidate, or none. A
-// malformed link (target missing) still selects the link so resolve can fail cleanly.
-export function selectTransferTarget(candidates: PieceId[]): PieceId | undefined {
-  return candidates[0]
-}
-
-// Stage 3: the actual landing cell in the selected target's interior (mirrored offset).
-export function resolveTransferTarget(
-  world: World,
-  fromBoard: Board,
-  loc: Location,
-  dir: Direction,
-  targetId: PieceId,
-): Location | null {
-  const linked = world.pieces[targetId]
-  const linkedBoard = linked?.boardRef !== undefined ? world.boards[linked.boardRef] : undefined
-  if (linkedBoard === undefined) return null
-  const cell = linkedEntryCell(fromBoard.size, loc.x, loc.y, dir)
-  if (!inBounds(linkedBoard, cell.x, cell.y)) return null
-  return { board: linked.boardRef as BoardId, x: cell.x, y: cell.y }
-}
-
 export type MoveTarget =
   // viaOwner: set when the location was reached by climbing out through a container (the
   // first one climbed) — lets tryMovePiece spot a climb that lands back on the mover itself.
@@ -125,13 +77,6 @@ export function computeTarget(
   const containerId = findContainerFor(world, loc.board)
   if (containerId === undefined) return null
   const container = world.pieces[containerId]
-
-  const transferTarget = selectTransferTarget(collectTransferCandidates(world, container))
-  if (transferTarget !== undefined) {
-    const resolved = resolveTransferTarget(world, board, loc, dir, transferTarget)
-    // null = malformed link or size mismatch: fail cleanly, never fall through to a normal climb.
-    return resolved === null ? null : { kind: 'location', location: resolved, relativeCoord }
-  }
 
   // Leaving a flipped box: its interior is a mirror image of the outside, so the direction is
   // mirrored, and so is the position along a vertical exit (column x of the interior is column
@@ -654,7 +599,7 @@ export function possess(world: World, targetId: PieceId): World {
     if (id === PLAYER_ID) next = { ...target, id: PLAYER_ID, kind: 'player' }
     else if (id === targetId) next = { ...oldBody, id: targetId, kind: oldBody.boardRef !== undefined ? 'container' : 'normal' }
     else next = piece
-    for (const key of ['cloneOf', 'infiniteFor', 'epsilonFor', 'linkedTo'] as const) {
+    for (const key of ['cloneOf', 'infiniteFor', 'epsilonFor'] as const) {
       if (next[key] !== undefined && swapId(next[key]) !== next[key]) next = { ...next, [key]: swapId(next[key]) }
     }
     pieces[id] = next

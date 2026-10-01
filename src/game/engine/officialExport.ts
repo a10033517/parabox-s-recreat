@@ -123,7 +123,6 @@ export function exportOfficialLevel(world: World): OfficialExport {
     const loc = world.locations[piece.id]
     const x = loc.x
     const y = yOf(board, loc.y)
-    if (piece.linkedTo !== undefined) warnings.push(`${piece.id}: direct links (linkedTo) have no official equivalent and were dropped`)
     if (piece.wall) {
       lines.push(`${indent}Wall ${x} ${y} ${piece.kind === 'player' ? 1 : 0} ${piece.possessable ? 1 : 0} 0`)
       return

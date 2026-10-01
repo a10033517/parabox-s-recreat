@@ -188,35 +188,3 @@ describe('shared Definition + infinite exit', () => {
     expect(next.locations.loopA.board).toBe(VOID_BOARD_ID)
   })
 })
-
-describe('Transfer is split into candidate / selector / resolver (provisional selector)', () => {
-  it('a linked container yields one candidate, the selector picks it, the resolver mirrors the offset', async () => {
-    const { collectTransferCandidates, selectTransferTarget, resolveTransferTarget } = await import('./rules')
-    const world = makeWorld(
-      [makeFloorBoard('root', 5), makeFloorBoard('x', 3), makeFloorBoard('y', 3)],
-      [
-        { id: 'cx', kind: 'container', boardRef: 'x', linkedTo: 'cy' },
-        { id: 'cy', kind: 'container', boardRef: 'y', linkedTo: 'cx' },
-      ],
-      { cx: { board: 'root', x: 0, y: 0 }, cy: { board: 'root', x: 2, y: 0 } },
-    )
-    const candidates = collectTransferCandidates(world, world.pieces.cx)
-    expect(candidates).toEqual(['cy'])
-    expect(selectTransferTarget(candidates)).toBe('cy')
-    expect(selectTransferTarget([])).toBeUndefined()
-    // Leaving x through its right edge at row 1 lands on y's left edge, same row.
-    expect(resolveTransferTarget(world, world.boards.x, { board: 'x', x: 2, y: 1 }, 'right', 'cy')).toEqual({ board: 'y', x: 0, y: 1 })
-  })
-
-  it('a dangling link fails the move cleanly instead of falling through to an ordinary climb', () => {
-    const world = makeWorld(
-      [makeFloorBoard('root', 3), makeFloorBoard('x', 3)],
-      [
-        { id: PLAYER_ID, kind: 'player' },
-        { id: 'cx', kind: 'container', boardRef: 'x', linkedTo: 'missing' },
-      ],
-      { [PLAYER_ID]: { board: 'x', x: 2, y: 1 }, cx: { board: 'root', x: 0, y: 0 } },
-    )
-    expect(finalWorld(world, ['R']).locations[PLAYER_ID]).toEqual({ board: 'x', x: 2, y: 1 })
-  })
-})
