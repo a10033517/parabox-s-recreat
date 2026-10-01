@@ -43,3 +43,19 @@ export function onBackButton(handler: () => boolean): () => void {
     remove?.()
   }
 }
+
+// A short tap of feedback when the player moves (the "vibration" setting). Native apps use the
+// Haptics plugin (iOS and Android); browsers that support it use navigator.vibrate.
+export function moveFeedback(): void {
+  if (isNativeApp) {
+    import('@capacitor/haptics')
+      .then(({ Haptics, ImpactStyle }) => Haptics.impact({ style: ImpactStyle.Light }))
+      .catch(() => {})
+    return
+  }
+  try {
+    navigator.vibrate?.(8)
+  } catch {
+    // not supported
+  }
+}
