@@ -207,13 +207,13 @@ describe('classifyMove', () => {
     expect(classifyMove(pre, post)).toBe('enter-leave')
   })
 
-  it('returns \'teleport\' for a cross-container jump with no direct containment relationship (e.g. a linkedTo crossing)', () => {
+  it('returns \'teleport\' for a cross-container jump with no direct containment relationship', () => {
     const root = makeFloorBoard('root', 3)
     const c1Interior = makeFloorBoard('c1Interior', 2)
     const c2Interior = makeFloorBoard('c2Interior', 2)
     const pieces = [
       { id: PLAYER_ID, kind: 'player' as const },
-      { id: 'C1', kind: 'container' as const, boardRef: 'c1Interior', linkedTo: 'C2' },
+      { id: 'C1', kind: 'container' as const, boardRef: 'c1Interior' },
       { id: 'C2', kind: 'container' as const, boardRef: 'c2Interior' },
     ]
     const pre = makeWorld([root, c1Interior, c2Interior], pieces, {
@@ -222,7 +222,7 @@ describe('classifyMove', () => {
       C2: { board: 'root', x: 1, y: 0 },
     })
     const post = makeWorld([root, c1Interior, c2Interior], pieces, {
-      [PLAYER_ID]: { board: 'c2Interior', x: 0, y: 0 }, // Transfer-linked jump, straight across
+      [PLAYER_ID]: { board: 'c2Interior', x: 0, y: 0 }, // a jump between two boards with no containment between them
       C1: { board: 'root', x: 0, y: 0 },
       C2: { board: 'root', x: 1, y: 0 },
     })

@@ -50,7 +50,7 @@ function shade(hex: string, amount: number): string {
 // color. Every level this codebase ships has at most two cycle members.
 const CYCLE_PALETTE = ['#e8433f', '#e6c229', '#9b5de5', '#1fb5a3', '#ff7a2f']
 const LOCKED_RING_COLOR = '#e2e8f0' // pale slate/white — reads as "frozen", stays visually distinct from every PIECE_COLORS and CYCLE_PALETTE entry (all of which are saturated hues), unlike the previous yellow-400 which was a near-miss against CYCLE_PALETTE's yellow-500
-// Outline strokes (lock ring, Void border, linkedTo border) scale with the cell but stay within
+// Outline strokes (lock ring, Void border) scale with the cell but stay within
 // [2, 6] screen pixels. Unclamped, a piece the camera is INSIDE (e.g. a self-loop box pushed into
 // the Void with the player still in it) spans hundreds of pixels, and a cell/8 ring grew thick
 // enough to hide the player's own edge row (user-reported, 2026-09-24).
@@ -494,7 +494,7 @@ function drawPieceBody(
   // (see isInVoid in types.ts — every piece this loop reaches has already been filtered to
   // piecesByBoard's grouping by board.id, so board.id === VOID_BOARD_ID means THIS piece is
   // in the Void too), OR a level-authored infExit ∞ box wherever it stands (see the legacy
-  // renderBoard's matching comment). Drawn AFTER the recursive call above (like the linkedTo
+  // renderBoard's matching comment). Drawn AFTER the recursive call above (like the lock
   // border below) so a recursable interior's own opaque cell fills never paint over it
   // (final-review I2).
   if (onBoardId === VOID_BOARD_ID || piece.infExit === true) {
@@ -507,15 +507,6 @@ function drawPieceBody(
     dc.ctx.strokeRect(pieceRect.left + ringInset, pieceRect.top + ringInset, screenCellSize - ringInset * 2, screenCellSize - ringInset * 2)
     const glyph = paradoxGlyph(piece)
     if (glyph !== null) drawParadoxBadgeStack(dc.ctx, pieceRect, { glyph, count: voidParadoxCount(piece) })
-    dc.ctx.restore()
-  }
-
-  if (piece.kind === 'container' && piece.linkedTo !== undefined) {
-    dc.ctx.save()
-    dc.ctx.strokeStyle = LINKED_BORDER_COLOR
-    dc.ctx.lineWidth = outlineWidth(screenCellSize / 10)
-    const inset = dc.ctx.lineWidth / 2
-    dc.ctx.strokeRect(pieceRect.left + inset, pieceRect.top + inset, screenCellSize - inset * 2, screenCellSize - inset * 2)
     dc.ctx.restore()
   }
 }
@@ -571,7 +562,6 @@ function drawEyes(ctx: CanvasRenderingContext2D, rect: ScreenRect, cellSize: num
   ctx.fill()
 }
 
-export const LINKED_BORDER_COLOR = '#22d3ee' // cyan — distinct from every PIECE_COLORS/CYCLE_PALETTE/LOCKED_RING_COLOR entry
 
 // One paradox visual for both kinds: ∞ (Infinite Exit destination) and ε (Infinite Enter).
 // The simulation decides which pieces are paradox objects; the renderer only picks the glyph

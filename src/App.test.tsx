@@ -17,7 +17,7 @@ test('renders the menu screen by default', () => {
 test('navigating from menu to level select shows builtin levels', async () => {
   render(<App />)
   await userEvent.setup().click(screen.getByText('开始游戏'))
-  expect(screen.getByText('第一次推动')).toBeInTheDocument()
+  expect(screen.getByText('推箱子')).toBeInTheDocument()
 })
 
 test('a saved custom level appears in level select', async () => {
@@ -38,7 +38,7 @@ test('a corrupt completed-levels value does not white-screen level select', asyn
   localStorage.setItem('parabox:completedLevels', 'not valid json')
   render(<App />)
   await userEvent.setup().click(screen.getByText('开始游戏'))
-  expect(screen.getByText('第一次推动')).toBeInTheDocument()
+  expect(screen.getByText('推箱子')).toBeInTheDocument()
 })
 
 test('the level editor screen loads and shows its tool palette', async () => {

@@ -9,6 +9,12 @@ import { resolveAnchorBoardId, resolveDrawRoot } from './render/recursiveTransfo
 import { classifyEpsilonVisuals, epsilonSpawnScale } from './render/epsilonAnimation'
 import { DPad } from '../ui/DPad'
 import { SwipeLayer } from '../ui/SwipeLayer'
+import { SettingsPanel } from '../ui/SettingsPanel'
+import { InspectView } from '../ui/InspectView'
+import { containerAt } from './render/hitTest'
+import { BoardTransform } from './render/recursiveTransform'
+import { useSettings } from '../storage/settings'
+import { moveFeedback } from '../native'
 
 export type AnimationKind = 'move' | 'enter-leave' | 'teleport' | 'void-transition'
 
@@ -93,12 +99,14 @@ export function GameScreen({
   onExit,
   onWin,
   levelName,
+  hint,
   onNext,
 }: {
   initialWorld: World
   onExit: () => void
   onWin: () => void
   levelName?: string
+  hint?: string // what this level teaches (tutorial), shown above the board
   onNext?: () => void // shown on the win card when there is a next level
 }) {
   const stateRef = useRef<GameState>()
@@ -123,11 +131,33 @@ export function GameScreen({
   const wonRef = useRef(false)
   const viewportRef = useRef<Viewport>({ width: 320, height: 320 })
   const animationRef = useRef<RenderAnimation | null>(null)
+  const [settings] = useSettings()
+  // The keyboard listener is registered once, so it reads the latest settings through a ref.
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+  const [showSettings, setShowSettings] = useState(false)
+  // Looking inside a box: the game pauses (moves are ignored) while the inspect view is open.
+  const [inspecting, setInspecting] = useState<PieceId | null>(null)
+  const pausedRef = useRef(false)
+  pausedRef.current = inspecting !== null || showSettings
+  // What the last frame drew, so a tap can be matched to the box under the finger.
+  const lastFrameRef = useRef<{ world: World; camera: CameraTransform; viewport: Viewport; root: BoardTransform } | null>(null)
+
+  const inspectAt = (clientX: number, clientY: number) => {
+    const frame = lastFrameRef.current
+    const canvas = canvasRef.current
+    if (!settingsRef.current.tapToInspect || frame === null || canvas === null) return
+    const rect = canvas.getBoundingClientRect()
+    const pieceId = containerAt(frame, clientX - rect.left, clientY - rect.top)
+    if (pieceId !== null) setInspecting(pieceId)
+  }
 
   const handleMove = (direction: Direction) => {
+    if (pausedRef.current) return
     const preMoveWorld = state.current
     const moved = state.move(direction)
     if (!moved) return
+    if (settingsRef.current.haptics) moveFeedback()
     const postMoveWorld = state.current
     // A SpawnEpsilonEvent that CREATED a new ε plays the Void transition (the ε appears in the
     // Void and the camera follows); the decision comes from the engine's event, never from the
@@ -301,6 +331,7 @@ export function GameScreen({
         }
         const drawRoot = resolveDrawRoot(world, anchorBoardId, 2, dc.getRenderLocation)
         drawBoardRecursive(dc, world.boards[drawRoot.boardId], drawRoot, 0, 0, false)
+        lastFrameRef.current = { world, camera, viewport, root: drawRoot }
         // Pieces changing boards glide from their old cell to their new one, drawn on top.
         for (const move of crossBoard) {
           const onBoard = world.locations[move.pieceId]?.board
@@ -326,8 +357,19 @@ export function GameScreen({
     return () => cancelAnimationFrame(rafId)
   }, [state])
 
-  return (
-    <div className="game-screen">
+  const showDPad = settings.controls === 'dpad' || settings.controls === 'swipe+dpad'
+  // Swipes / taps count over the whole screen (outside the buttons) or over the board only.
+  const wholeScreen = settings.controls !== 'dpad' && settings.swipeArea === 'screen'
+  const stage = (
+    <div className="game-stage">
+      <div ref={containerRef} className="game-viewport">
+        <canvas ref={canvasRef} />
+      </div>
+    </div>
+  )
+
+  const content = (
+    <>
       <header className="topbar">
         <button className="icon-btn" onClick={onExit}>
           <span aria-hidden="true">‹</span>
@@ -346,16 +388,17 @@ export function GameScreen({
             <span aria-hidden="true">⟲</span>
             <span className="sr-only">重新开始</span>
           </button>
+          <button className="icon-btn" onClick={() => setShowSettings(true)}>
+            <span aria-hidden="true">⚙</span>
+            <span className="sr-only">设定</span>
+          </button>
         </div>
       </header>
-      <SwipeLayer onMove={handleMove}>
-        <div className="game-stage">
-          <div ref={containerRef} className="game-viewport">
-            <canvas ref={canvasRef} />
-          </div>
-        </div>
-      </SwipeLayer>
-      <DPad onMove={handleMove} />
+      {hint !== undefined && <div className="level-hint">{hint}</div>}
+      {wholeScreen ? stage : <SwipeLayer className="swipe-board" onMove={handleMove} settings={settings} onTap={inspectAt} onLongPress={inspectAt}>{stage}</SwipeLayer>}
+      {showDPad ? <DPad onMove={handleMove} /> : <div className="controls-hint">{settings.controls === 'tap' ? '点画面的上、下、左、右边来移动' : '在画面上滑动来移动'}</div>}
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      {inspecting !== null && <InspectView world={state.current} pieceId={inspecting} onClose={() => setInspecting(null)} />}
       {state.isWon && (
         <div className="win-overlay" role="dialog" aria-label="通关">
           <div className="win-card">
@@ -369,6 +412,12 @@ export function GameScreen({
           </div>
         </div>
       )}
-    </div>
+    </>
+  )
+
+  return wholeScreen ? (
+    <SwipeLayer className="game-screen swipe-screen" onMove={handleMove} settings={settings} onTap={inspectAt} onLongPress={inspectAt}>{content}</SwipeLayer>
+  ) : (
+    <div className="game-screen">{content}</div>
   )
 }

@@ -26,7 +26,7 @@
 1. **Clone 進入偏移**:見下節「clone_void_infinite 規格套用」;進入來源 interior 已改,**進入格的精確偏移**仍待原版對拍。
 2. **Infinite Enter / Epsilon**:引擎無 `infenter` / `infenterid` 模型。官方格式有欄位,runtime 行為只有玩家社群整理,規格自己也列為「待驗證」。
 3. **`floatinspace`**:官方以 block 屬性表示無 OuterLevel;引擎以 runtime `void` board 表示。兩者是否可互轉需對照,未實作。
-4. **Transfer**:引擎以 `linkedTo`(兩 container 直接連結、mirrored offset)實作。規格 §13 要求「同位置子箱候選 + 決定性 tie-break」,官方無公開 tie-break,需實測後才能寫測試。
+4. **Transfer**:已移除(2026-10-02)。原本的 `linkedTo`(兩個 container 直接連結,從一個出來就進到另一個)是本專案自訂的機制,官方沒有對應的規則或關卡欄位;使用者確認實機遊戲中沒有,因此連同教學關卡「容器传送」一起刪除。
 5. **Open / 不完整外框箱子、Cycle 旋轉、Oblong**:引擎的 board 邊界是陣列邊緣;Oblong 依使用者決定不做。
 6. **`Player = box` / Possess / Wall**:規格本身列為第二階段,未做。
 

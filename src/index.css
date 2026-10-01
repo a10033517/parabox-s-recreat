@@ -345,7 +345,7 @@ h1 {
 
 /* Without this, a swipe over the board scrolls the page or triggers
    pull-to-refresh on a real touch device instead of moving the player. */
-[data-testid='swipe-layer'] {
+.swipe-board {
   touch-action: none;
   display: flex;
   flex: 1;
@@ -354,9 +354,31 @@ h1 {
   min-height: 0;
 }
 
+/* Whole-screen swipe: the whole game screen takes the gesture (buttons still work). */
+.swipe-screen {
+  touch-action: none;
+}
+
+.level-hint {
+  margin: 4px 16px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface, rgba(255, 255, 255, 0.06));
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.controls-hint {
+  padding: 8px 0 4px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
 .game-stage {
   display: flex;
   flex: 1;
+  width: 100%;
   align-items: center;
   justify-content: center;
   min-height: 0;
@@ -500,4 +522,374 @@ canvas {
 .breadcrumb button {
   font-size: 0.875rem;
   color: var(--text-muted);
+}
+
+/* ---------- import levels ---------- */
+
+.import-card {
+  width: min(100%, 420px);
+  align-items: stretch;
+  text-align: left;
+}
+
+.import-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.import-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.import-hint code {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--surface-raised);
+}
+
+.import-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.import-tabs button {
+  min-height: 38px;
+  padding: 6px;
+  font-size: 0.9rem;
+}
+
+.import-tabs button.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.import-drop {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 110px;
+  padding: 16px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.import-drop input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.import-input,
+.import-text {
+  width: 100%;
+}
+
+.import-text {
+  min-height: 140px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.75rem;
+  resize: vertical;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.import-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  font-size: 0.85rem;
+}
+
+.import-ok {
+  color: var(--success);
+}
+
+.import-bad {
+  color: #ff6b6b;
+}
+
+.import-btn {
+  font-size: 1.3rem;
+}
+
+.level-tile-wrap {
+  position: relative;
+}
+
+.level-tile-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  min-width: 28px;
+  min-height: 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #ff8a8a;
+  font-size: 0.8rem;
+}
+
+/* ---------- settings ---------- */
+
+.settings-card {
+  width: min(100%, 420px);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  align-items: stretch;
+  gap: 10px;
+  text-align: left;
+}
+
+.settings-section {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.control-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.control-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  font-size: 0.9rem;
+}
+
+.control-option.is-active {
+  border-color: var(--accent);
+  background: rgba(61, 155, 255, 0.14);
+  color: #fff;
+}
+
+.control-icon {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+/* swipe: a finger trail; dpad: a cross; tap: four edge bars */
+.c-swipe::after,
+.c-swipe-dpad::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 15px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent));
+}
+
+.c-dpad::before,
+.c-dpad::after,
+.c-swipe-dpad::before {
+  content: '';
+  position: absolute;
+  background: var(--text-muted);
+  border-radius: 2px;
+}
+
+.c-dpad::before { left: 14px; top: 5px; width: 6px; height: 24px; }
+.c-dpad::after { left: 5px; top: 14px; width: 24px; height: 6px; }
+.c-swipe-dpad::before { left: 25px; top: 22px; width: 6px; height: 6px; box-shadow: -8px 0 var(--text-muted), -4px -4px var(--text-muted), -4px 4px var(--text-muted); }
+
+.c-tap {
+  box-shadow: inset 0 3px 0 var(--accent), inset 0 -3px 0 var(--accent), inset 3px 0 0 var(--accent), inset -3px 0 0 var(--accent);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-row-title {
+  font-size: 0.95rem;
+}
+
+.settings-row-hint {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.seg {
+  display: flex;
+  flex: none;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.seg button {
+  min-height: 34px;
+  min-width: 0;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.seg button.is-active {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.toggle {
+  position: relative;
+  flex: none;
+  width: 52px;
+  min-width: 52px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 15px;
+  background: var(--surface-raised);
+}
+
+.toggle.is-on {
+  background: var(--accent);
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: #fff;
+  transition: transform 150ms ease;
+}
+
+.toggle.is-on .toggle-knob {
+  transform: translateX(22px);
+}
+
+/* ---------- inspect a box ---------- */
+
+.inspect {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 16px);
+  background: rgba(11, 11, 11, 0.97);
+  animation: fade-in 160ms ease;
+}
+
+.inspect .topbar {
+  max-width: 560px;
+}
+
+.inspect-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 560px;
+}
+
+.inspect-crumbs button {
+  min-height: 30px;
+  padding: 2px 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.inspect-crumbs button.is-current {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.inspect-stage {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 560px;
+  min-height: 0;
+}
+
+.inspect-canvas {
+  border-radius: 16px;
+  cursor: zoom-in;
+  image-rendering: auto;
+}
+
+.inspect-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 560px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.inspect-kind {
+  font-weight: 700;
+}
+
+.inspect-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inspect-tag {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(61, 155, 255, 0.16);
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+
+.inspect-contents,
+.inspect-hint {
+  color: var(--text-muted);
+  font-size: 0.8rem;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderBoard, drawBoardRecursive, indexPiecesByBoard, DEFAULT_RENDER_BUDGET, resolveRecursionTarget, combineTint, LINKED_BORDER_COLOR, FLOOR_COLOR, isCloneInstance } from './CanvasRenderer'
+import { renderBoard, drawBoardRecursive, indexPiecesByBoard, DEFAULT_RENDER_BUDGET, resolveRecursionTarget, combineTint, FLOOR_COLOR, isCloneInstance } from './CanvasRenderer'
 import { CameraTransform, Viewport } from './camera'
 import { makeFloorBoard, makeWorld, setWall, setRequirement } from '../engine/testFixtures'
 import { PLAYER_ID, World, Board } from '../engine/types'
@@ -998,71 +998,6 @@ describe('drawBoardRecursive — getRenderLocation override', () => {
     // not at x=0 where its stored Location would otherwise place them.
     const boxOwnFillX = fillXs[16] // 16 root cells, then box's own fill
     expect(boxOwnFillX).toBeGreaterThanOrEqual(64)
-  })
-})
-
-describe('drawBoardRecursive — Transfer', () => {
-  it('draws a border on a container with its own linkedTo set', () => {
-    const root = makeFloorBoard('root', 2)
-    const c1Interior = makeFloorBoard('c1Interior', 2)
-    const c2Interior = makeFloorBoard('c2Interior', 2)
-    const world = makeWorld(
-      [root, c1Interior, c2Interior],
-      [
-        { id: 'C1', kind: 'container', boardRef: 'c1Interior', linkedTo: 'C2' },
-        { id: 'C2', kind: 'container', boardRef: 'c2Interior' },
-      ],
-      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 1, y: 0 } },
-    )
-    const ctx = mockContext()
-    let linkedBorderDrawn = false
-    ctx.strokeRect = () => { if (ctx.strokeStyle === LINKED_BORDER_COLOR) linkedBorderDrawn = true }
-    drawBoardForTest(ctx, root, world, 64)
-    expect(linkedBorderDrawn).toBe(true)
-  })
-
-  it('does NOT draw the border on a target that has no linkedTo of its own', () => {
-    const root = makeFloorBoard('root', 2)
-    const c1Interior = makeFloorBoard('c1Interior', 2)
-    const c2Interior = makeFloorBoard('c2Interior', 2)
-    const world = makeWorld(
-      [root, c1Interior, c2Interior],
-      [
-        { id: 'C1', kind: 'container', boardRef: 'c1Interior' }, // C1 is the "target" here, unlinked itself
-        { id: 'C2', kind: 'container', boardRef: 'c2Interior', linkedTo: 'C1' },
-      ],
-      { C1: { board: 'root', x: 0, y: 0 }, C2: { board: 'root', x: 1, y: 0 } },
-    )
-    const ctx = mockContext()
-    let totalStrokeCalls = 0
-    const strokeStylesAtC1: string[] = []
-    // Board size 2 at cellSize 64 means each root cell is 64px wide; C1 sits at root
-    // x=0 (screen x in [0,64)), C2 at root x=1 (screen x in [64,128)).
-    ctx.strokeRect = (x) => {
-      totalStrokeCalls++
-      if ((x as number) < 64) strokeStylesAtC1.push(ctx.strokeStyle as string)
-    }
-    drawBoardForTest(ctx, root, world, 64)
-    expect(totalStrokeCalls).toBe(1) // exactly one border drawn in the whole scene: C2's own
-    expect(strokeStylesAtC1).toHaveLength(0) // none of it is in C1's cell region
-  })
-
-  it('container border is drawn AFTER its nested content, so it is not painted over', () => {
-    const root = makeFloorBoard('root', 2)
-    const inside = makeFloorBoard('inside', 2)
-    const world = makeWorld(
-      [root, inside],
-      [{ id: 'C1', kind: 'container', boardRef: 'inside', linkedTo: 'C1' }], // self-linked is fine for this draw-order check
-      { C1: { board: 'root', x: 0, y: 0 } },
-    )
-    const ctx = mockContext()
-    const callOrder: string[] = []
-    ctx.fillRect = () => { callOrder.push('fill') }
-    ctx.strokeRect = () => { callOrder.push('stroke') }
-    drawBoardForTest(ctx, root, world, 64)
-    const lastFillIndex = callOrder.lastIndexOf('fill')
-    const linkedStrokeIndex = callOrder.indexOf('stroke')
-    expect(linkedStrokeIndex).toBeGreaterThan(lastFillIndex)
   })
 })
 

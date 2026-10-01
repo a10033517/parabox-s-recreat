@@ -4,14 +4,17 @@ import { MenuScreen } from './ui/MenuScreen'
 import { LevelSelect, LevelSection } from './ui/LevelSelect'
 import { GameScreen } from './game/GameScreen'
 import { EditorScreen } from './editor/EditorScreen'
-import { BUILTIN_LEVELS, loadCommunitySampleLevels, loadCustomLevels, loadGeneratedLevels, loadWorldLevels, loadAuthoredLevels, LevelMeta } from './levels'
-import { listCompletedLevels, markLevelComplete } from './storage/progress'
+import { BUILTIN_LEVELS, loadCommunitySampleLevels, loadCustomLevels, loadGeneratedLevels, loadWorldLevels, loadAuthoredLevels, LevelMeta, CUSTOM_LEVEL_ID_PREFIX } from './levels'
+import { deleteCustomLevel, listCompletedLevels, markLevelComplete } from './storage/progress'
+import { ImportDialog } from './ui/ImportDialog'
 
 type Screen = 'menu' | 'levelSelect' | 'game' | 'editor'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('menu')
   const [activeLevel, setActiveLevel] = useState<LevelMeta | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [, refresh] = useState(0) // imported / deleted levels live in storage: re-read them
 
   // Android back: game -> level list -> menu -> close the app.
   const screenRef = useRef(screen)
@@ -35,7 +38,7 @@ export default function App() {
     { title: '编辑器关卡', levels: loadAuthoredLevels() },
     { title: '更多生成关卡', levels: loadGeneratedLevels() },
     { title: '社群关卡', levels: loadCommunitySampleLevels() },
-    { title: '自制关卡', levels: loadCustomLevels() },
+    { title: '汇入与自制关卡', levels: loadCustomLevels() },
   ]
   const allLevels = sections.flatMap((section) => section.levels)
   const completedIds = listCompletedLevels()
@@ -53,6 +56,7 @@ export default function App() {
 
   if (screen === 'levelSelect') {
     return (
+      <>
       <LevelSelect
         levels={allLevels}
         sections={sections}
@@ -62,7 +66,18 @@ export default function App() {
           setScreen('game')
         }}
         onBack={() => setScreen('menu')}
+        onImport={() => setImporting(true)}
+        onDelete={{
+          canDelete: (level) => level.id.startsWith(CUSTOM_LEVEL_ID_PREFIX),
+          remove: (level) => {
+            if (!window.confirm(`删除「${level.name}」?`)) return
+            deleteCustomLevel(level.id.slice(CUSTOM_LEVEL_ID_PREFIX.length))
+            refresh((n) => n + 1)
+          },
+        }}
       />
+      {importing && <ImportDialog onClose={() => { setImporting(false); refresh((n) => n + 1) }} />}
+      </>
     )
   }
 
@@ -74,6 +89,7 @@ export default function App() {
         key={activeLevel.id}
         initialWorld={activeLevel.world}
         levelName={activeLevel.name}
+        hint={activeLevel.hint}
         onExit={() => setScreen('levelSelect')}
         onWin={() => markLevelComplete(activeLevel.id)}
         onNext={next !== undefined ? () => setActiveLevel(next) : undefined}

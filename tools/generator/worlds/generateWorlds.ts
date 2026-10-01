@@ -4,7 +4,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { serializeLevel } from '../../../src/game/engine/levelSchema'
 import { World } from '../../../src/game/engine/types'
 import { canonicalKey } from '../canonical'
+import { pruneIdlePieces } from '../prune'
 import { mulberry32 } from './build'
+import { hardenLevel } from './harden'
+import { difficultyScore } from './score'
 import { WORLD_PROFILES } from './profiles'
 import { DEFAULT_BUDGET, LevelRecord, WorldProfile, verifyWorldLevel } from './verify'
 
@@ -53,16 +56,33 @@ export function runWorld(profile: WorldProfile, opts: { attempts: number; second
       rejected[verdict.reason] = (rejected[verdict.reason] ?? 0) + 1
       continue
     }
-    accepted.push({ world, record: verdict.record })
+    // Idle boxes out (see prune.ts), then the slimmer level must pass the same checks.
+    const pruned = pruneIdlePieces(world, { maxDepth: DEFAULT_BUDGET.maxDepth, maxExpanded: DEFAULT_BUDGET.maxExpanded })
+    if (pruned === null) {
+      rejected.pruneUnsolved = (rejected.pruneUnsolved ?? 0) + 1
+      continue
+    }
+    if (pruned.removed.length === 0) {
+      accepted.push({ world, record: verdict.record })
+      continue
+    }
+    const prunedKey = canonicalKey(pruned.world)
+    if (seen.has(prunedKey)) {
+      rejected.duplicate = (rejected.duplicate ?? 0) + 1
+      continue
+    }
+    seen.add(prunedKey)
+    const recheck = verifyWorldLevel(profile, pruned.world, seed, DEFAULT_BUDGET)
+    if (!recheck.accepted) {
+      rejected[`pruned:${recheck.reason}`] = (rejected[`pruned:${recheck.reason}`] ?? 0) + 1
+      continue
+    }
+    accepted.push({ world: pruned.world, record: recheck.record })
   }
   return { profile, accepted, attempts, rejected, seconds: (Date.now() - started) / 1000 }
 }
 
-// Difficulty: solution length, plus how big a search the solver needed (a wide, branching
-// puzzle is harder than a long corridor of the same length).
-export function difficultyScore(record: LevelRecord): number {
-  return record.solver.solutionLength + 3 * Math.log2(record.solver.expandedStates + 1)
-}
+export { difficultyScore }
 
 // The `n` hardest accepted levels, ordered easiest first — a progression that stays hard.
 export function selectHardest<T extends { record: LevelRecord }>(accepted: T[], n: number): T[] {
@@ -106,13 +126,23 @@ function main(): void {
   const attempts = Number(arg('attempts', '1000000'))
   const seconds = Number(arg('seconds', '900'))
   const oversample = Number(arg('oversample', '2'))
+  // Hardening: re-roll where each shipped level's pieces stand, keep the hardest (harden.ts).
+  const hardenTries = Number(arg('harden-tries', '3000'))
+  const hardenSeconds = Number(arg('harden-seconds', '90'))
   const only = arg('only', '')
   const dry = process.argv.includes('--dry')
 
   const profiles = WORLD_PROFILES.filter((p) => only === '' || only.split(',').includes(p.id))
   for (const profile of profiles) {
     const run = runWorld(profile, { attempts, seconds, want: per * oversample, baseSeed: 1_000_000 * profile.order })
-    const chosen = selectHardest(run.accepted, per)
+    const picked = selectHardest(run.accepted, per)
+    const chosen = picked.map((c, i) => {
+      if (hardenTries <= 0) return c
+      const before = c.record.solver.solutionLength
+      const hard = hardenLevel(profile, c.world, c.record, mulberry32(c.record.seed * 7919 + i), { tries: hardenTries, seconds: hardenSeconds })
+      console.log(`${profile.id} #${i + 1}: ${before} -> ${hard.record.solver.solutionLength} moves (${hard.improved} improvements in ${hard.tries} tries)`)
+      return { world: hard.world, record: hard.record }
+    }).sort((a, b) => difficultyScore(a.record) - difficultyScore(b.record))
     const lengths = chosen.map((c) => c.record.solver.solutionLength)
     console.log(
       `${profile.id}: accepted ${run.accepted.length}/${run.attempts} in ${run.seconds.toFixed(0)}s, shipped ${chosen.length}, ` +

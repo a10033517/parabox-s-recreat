@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { SettingsPanel } from './SettingsPanel'
 import { World } from '../game/engine/types'
 import { drawWorldPreview } from './worldPreview'
 
@@ -39,6 +40,7 @@ export function MenuScreen({
   total?: number
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -75,8 +77,10 @@ export function MenuScreen({
       )}
       <div className="menu-actions">
         <button className="btn-primary" onClick={onStart}>开始游戏</button>
+        <button className="btn-secondary" onClick={() => setShowSettings(true)}>设定</button>
         <button className="btn-secondary" onClick={onEditor}>关卡编辑器</button>
       </div>
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
     </div>
   )
 }

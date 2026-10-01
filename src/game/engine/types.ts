@@ -33,7 +33,6 @@ export interface Piece {
   epsilonFor?: PieceId  // present only on an epsilon (ε) destination — names the SEED piece (first entered room)
   cloneOf?: PieceId     // present only on a clone — names its main body
   fliph?: boolean       // persistent horizontal-flip property
-  linkedTo?: PieceId    // present only on a container linked directly to another
   possessable?: boolean // the player can take control of it (official `possessable`; see possess in rules.ts)
   wall?: boolean        // a wall block (official possessable Wall): immovable unless it is the player
   // Official Ref fields, stored RAW, no gameplay meaning yet. Do NOT assume "same number ==
