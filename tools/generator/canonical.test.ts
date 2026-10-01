@@ -53,3 +53,23 @@ test('canonicalKey differs when content differs', () => {
   const b: World = { ...a, locations: { player: { board: 'root', x: 2, y: 1 } } }
   expect(canonicalKey(a)).not.toBe(canonicalKey(b))
 })
+
+test('canonicalKey differs for same coordinates but different containment topology', () => {
+  const floor = () => Array.from({ length: 3 }, () => Array.from({ length: 3 }, () => ({ type: 'floor' as const })))
+  const make = (boardRef: string): World => ({
+    boards: { root: { id: 'root', size: 3, cells: floor() }, a: { id: 'a', size: 3, cells: floor() }, b: { id: 'b', size: 3, cells: floor() } },
+    pieces: { player: { id: 'player', kind: 'player' }, c: { id: 'c', kind: 'container', boardRef } },
+    locations: { player: { board: 'root', x: 0, y: 0 }, c: { board: 'root', x: 1, y: 1 } },
+  })
+  expect(canonicalKey(make('a'))).not.toBe(canonicalKey(make('b')))
+})
+
+test('canonicalKey differs for clone / flip / link relation with identical positions', () => {
+  const base = (extra: object): World => ({
+    boards: { root: { id: 'root', size: 3, cells: Array.from({ length: 3 }, () => Array.from({ length: 3 }, () => ({ type: 'floor' as const }))) } },
+    pieces: { player: { id: 'player', kind: 'player' }, c: { id: 'c', kind: 'normal', ...extra } },
+    locations: { player: { board: 'root', x: 0, y: 0 }, c: { board: 'root', x: 1, y: 1 } },
+  })
+  const keys = [{}, { fliph: true }, { cloneOf: 'x' }, { linkedTo: 'x' }].map((e) => canonicalKey(base(e)))
+  expect(new Set(keys).size).toBe(4)
+})

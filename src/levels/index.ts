@@ -11,6 +11,9 @@ import level07 from './builtin/07-loop-eats-container.json?raw'
 import level08 from './builtin/08-two-node-cycle.json?raw'
 import level09 from './builtin/09-cycle-branch.json?raw'
 import level10 from './builtin/10-void-storage.json?raw'
+import level11 from './builtin/11-clone-box.json?raw'
+import level12 from './builtin/12-flip-box.json?raw'
+import level13 from './builtin/13-transfer.json?raw'
 
 export interface LevelMeta {
   id: string
@@ -29,9 +32,30 @@ export const BUILTIN_LEVELS: LevelMeta[] = [
   { id: '08-two-node-cycle', name: '双节点循环', world: parseLevel(JSON.parse(level08)) },
   { id: '09-cycle-branch', name: '循环与分支', world: parseLevel(JSON.parse(level09)) },
   { id: '10-void-storage', name: '虚空仓库', world: parseLevel(JSON.parse(level10)) },
+  { id: '11-clone-box', name: '分身箱子', world: parseLevel(JSON.parse(level11)) },
+  { id: '12-flip-box', name: '翻转箱子', world: parseLevel(JSON.parse(level12)) },
+  { id: '13-transfer', name: '容器传送', world: parseLevel(JSON.parse(level13)) },
 ]
 
 const generatedModules = import.meta.glob('./builtin/generated/*.json', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>
+
+// Mechanic-aware Infinite Enter levels (npm run generate:infinite-enter) live in their own
+// folder: generate:levels wipes `generated/` wholesale and must not delete them.
+const infiniteEnterModules = import.meta.glob('./builtin/generated-ie/*.json', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>
+
+// Third-party editor example levels (see docs/differential/community-samples/README.md),
+// converted from the official version-4 text format by tools/generator/convertCommunitySamples.ts.
+// Not gameplay-verified against the original game; kept separate so they're easy to tell apart
+// from this project's own curated/generated levels.
+const communitySampleModules = import.meta.glob('./builtin/community-samples/*.json', {
   query: '?raw',
   import: 'default',
   eager: true,
@@ -45,7 +69,81 @@ export function parseGeneratedModules(modules: Record<string, string>): LevelMet
 }
 
 export function loadGeneratedLevels(): LevelMeta[] {
-  return parseGeneratedModules(generatedModules)
+  return [...parseGeneratedModules(generatedModules), ...parseGeneratedModules(infiniteEnterModules)]
+}
+
+// World-classified levels (tools/generator/worlds): every level in a world was verified to
+// NEED that world's mechanic — solvable with it, proven unsolvable without it.
+const worldLevelModules = import.meta.glob('./builtin/worlds/*/*.json', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>
+
+interface WorldManifest {
+  worlds: { id: string; order: number; name: string; signature: string; levels: { file: string }[] }[]
+}
+const worldManifestModules = import.meta.glob('./builtin/worlds/manifest.json', {
+  import: 'default',
+  eager: true,
+}) as Record<string, WorldManifest>
+
+export interface WorldGroup {
+  id: string
+  name: string
+  levels: LevelMeta[]
+}
+
+// Levels made in the level editor (npm run editor), saved under builtin/authored/. One filed under
+// a World (after passing that World's check in the editor) is listed after the generated ones.
+const authoredLevelModules = import.meta.glob('./builtin/authored/*.json', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>
+
+interface AuthoredManifest {
+  levels: { file: string; name: string; worldId?: string }[]
+}
+const authoredManifestModules = import.meta.glob('./builtin/authored/manifest.json', {
+  import: 'default',
+  eager: true,
+}) as Record<string, AuthoredManifest>
+
+function authoredLevels(): (LevelMeta & { worldId?: string })[] {
+  const manifest = Object.values(authoredManifestModules)[0]
+  if (manifest === undefined) return []
+  return manifest.levels.flatMap((level) => {
+    const raw = authoredLevelModules[`./builtin/authored/${level.file}`]
+    if (raw === undefined) return []
+    return [{ id: `authored-${level.file.replace('.json', '')}`, name: level.name, world: parseLevel(JSON.parse(raw)), worldId: level.worldId }]
+  })
+}
+
+// Editor levels not filed under any World.
+export function loadAuthoredLevels(): LevelMeta[] {
+  return authoredLevels().filter((l) => l.worldId === undefined)
+}
+
+export function loadWorldLevels(): WorldGroup[] {
+  const manifest = Object.values(worldManifestModules)[0]
+  if (manifest === undefined) return []
+  const authored = authoredLevels()
+  return [...manifest.worlds]
+    .sort((a, b) => a.order - b.order)
+    .map((world) => ({
+      id: world.id,
+      name: world.name,
+      levels: world.levels.flatMap((level, i) => {
+        const raw = worldLevelModules[`./builtin/worlds/${level.file}`]
+        if (raw === undefined) return []
+        return [{ id: `world-${world.id}-${i + 1}`, name: `${world.name.split(' ')[0]} ${i + 1}`, world: parseLevel(JSON.parse(raw)) }]
+      }).concat(authored.filter((l) => l.worldId === world.id).map(({ worldId: _w, ...level }) => level)),
+    }))
+}
+
+export function loadCommunitySampleLevels(): LevelMeta[] {
+  return parseGeneratedModules(communitySampleModules).map((level) => ({ ...level, name: `[社群] ${level.name}` }))
 }
 
 // Custom level names are chosen by the user, so they could collide with a

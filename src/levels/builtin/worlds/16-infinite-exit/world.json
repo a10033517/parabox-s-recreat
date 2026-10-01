@@ -1,0 +1,1174 @@
+{
+  "id": "infinite-exit",
+  "order": 16,
+  "name": "无限大 Infinite Exit",
+  "signature": "infinite_paradox_exit",
+  "levels": [
+    {
+      "file": "16-infinite-exit/01.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000194,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 22,
+          "expandedStates": 5764,
+          "moves": [
+            "right",
+            "up",
+            "right",
+            "right",
+            "right",
+            "down",
+            "left",
+            "down",
+            "left",
+            "down",
+            "up",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/02.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16001292,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 21,
+          "expandedStates": 7274,
+          "moves": [
+            "up",
+            "right",
+            "right",
+            "right",
+            "left",
+            "right",
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "down",
+            "left",
+            "left",
+            "right",
+            "down"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/03.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16001098,
+        "structure": {
+          "boards": 1,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 21,
+          "expandedStates": 37214,
+          "moves": [
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "right",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/04.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000516,
+        "structure": {
+          "boards": 1,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 27,
+          "expandedStates": 9385,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "down",
+            "up",
+            "left",
+            "left",
+            "right",
+            "left",
+            "down",
+            "left",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "right"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/05.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16001206,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 21,
+          "expandedStates": 37979,
+          "moves": [
+            "up",
+            "left",
+            "left",
+            "left",
+            "right",
+            "down",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "up",
+            "left",
+            "up",
+            "left",
+            "up",
+            "right",
+            "up",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/06.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000263,
+        "structure": {
+          "boards": 1,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 24,
+          "expandedStates": 21894,
+          "moves": [
+            "down",
+            "down",
+            "down",
+            "up",
+            "right",
+            "right",
+            "up",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "left",
+            "down",
+            "left"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/07.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16001122,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 21,
+          "expandedStates": 48937,
+          "moves": [
+            "up",
+            "right",
+            "up",
+            "up",
+            "down",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "down",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/08.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000797,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 24,
+          "expandedStates": 30541,
+          "moves": [
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "left",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "right",
+            "left",
+            "up",
+            "left",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "down",
+            "left"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/09.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16001340,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 28,
+          "expandedStates": 13992,
+          "moves": [
+            "up",
+            "down",
+            "right",
+            "down",
+            "down",
+            "up",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "up",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "down"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/10.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000265,
+        "structure": {
+          "boards": 1,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 27,
+          "expandedStates": 35594,
+          "moves": [
+            "down",
+            "right",
+            "up",
+            "left",
+            "up",
+            "left",
+            "left",
+            "right",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "up",
+            "up",
+            "left",
+            "right",
+            "up",
+            "right"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/11.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16001345,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 29,
+          "expandedStates": 22824,
+          "moves": [
+            "right",
+            "right",
+            "right",
+            "down",
+            "left",
+            "up",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "up",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "down",
+            "left"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/12.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000868,
+        "structure": {
+          "boards": 1,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 37,
+          "expandedStates": 7486,
+          "moves": [
+            "left",
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "up",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "up",
+            "right",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "down",
+            "right",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/13.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000501,
+        "structure": {
+          "boards": 1,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 29,
+          "expandedStates": 54613,
+          "moves": [
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "right",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/14.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000625,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 39,
+          "expandedStates": 6437,
+          "moves": [
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "up",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/15.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000917,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 31,
+          "expandedStates": 50298,
+          "moves": [
+            "down",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "left",
+            "right",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/16.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000212,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 42,
+          "expandedStates": 7280,
+          "moves": [
+            "right",
+            "right",
+            "right",
+            "left",
+            "down",
+            "down",
+            "up",
+            "left",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "down",
+            "left",
+            "left",
+            "down",
+            "down",
+            "left",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "up",
+            "down",
+            "up",
+            "right",
+            "right",
+            "right",
+            "up",
+            "down"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/17.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16001381,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 33,
+          "expandedStates": 109621,
+          "moves": [
+            "down",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "up",
+            "right",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/18.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000509,
+        "structure": {
+          "boards": 1,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 38,
+          "expandedStates": 81301,
+          "moves": [
+            "down",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/19.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16000058,
+        "structure": {
+          "boards": 1,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 44,
+          "expandedStates": 82729,
+          "moves": [
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "up",
+            "up",
+            "left",
+            "left",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "up",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "16-infinite-exit/20.json",
+      "record": {
+        "world": "infinite-exit",
+        "signatureMechanic": "infinite_paradox_exit",
+        "seed": 16001062,
+        "structure": {
+          "boards": 1,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 48,
+          "expandedStates": 88496,
+          "moves": [
+            "down",
+            "right",
+            "right",
+            "down",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "right",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "infinite_paradox_exit": true
+        },
+        "necessity": {
+          "infinite_paradox_exit": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    }
+  ]
+}

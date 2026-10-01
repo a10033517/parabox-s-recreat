@@ -1,4 +1,4 @@
-import { World, Board, Piece, Location, PLAYER_ID, VOID_BOARD_ID, inBounds } from './types'
+import { World, Board, Piece, Location, Attempt, PLAYER_ID, VOID_BOARD_ID, inBounds } from './types'
 
 const VALID_PIECE_KINDS = new Set(['player', 'normal', 'container'])
 const VALID_CELL_TYPES = new Set(['floor', 'wall'])
@@ -12,7 +12,7 @@ export function parseLevel(data: unknown): World {
   if (typeof data !== 'object' || data === null) {
     throw new Error('Level data must be an object')
   }
-  const raw = data as { boards?: unknown; pieces?: unknown; locations?: unknown }
+  const raw = data as { boards?: unknown; pieces?: unknown; locations?: unknown; attemptOrder?: unknown }
 
   if (typeof raw.boards !== 'object' || raw.boards === null) {
     throw new Error('Level data is missing a "boards" object')
@@ -34,6 +34,15 @@ export function parseLevel(data: unknown): World {
     }
     if (board.id !== boardId) {
       throw new Error(`Board "${boardId}" has a mismatched id "${board.id}"`)
+    }
+    if (board.zoomFactor !== undefined && (typeof board.zoomFactor !== 'number' || !(board.zoomFactor > 0))) {
+      throw new Error(`Board "${boardId}" has an invalid zoomFactor (must be a positive number)`)
+    }
+    if (board.color !== undefined && !isHexColor(board.color)) {
+      throw new Error(`Board "${boardId}" has an invalid color (must be #rrggbb)`)
+    }
+    if (board.floatInSpace !== undefined && typeof board.floatInSpace !== 'boolean') {
+      throw new Error(`Board "${boardId}" has an invalid floatInSpace (must be a boolean)`)
     }
     if (board.cells.length !== board.size || board.cells.some((row) => row.length !== board.size)) {
       throw new Error(`Board "${boardId}" must be square: cells do not match its declared size`)
@@ -70,9 +79,27 @@ export function parseLevel(data: unknown): World {
     if (!VALID_PIECE_KINDS.has(piece.kind)) {
       throw new Error(`Piece "${pieceId}" has an invalid kind "${piece.kind}"`)
     }
+    for (const key of ['infExit', 'infEnter', 'exitBlock', 'possessable', 'wall'] as const) {
+      if (piece[key] !== undefined && typeof piece[key] !== 'boolean') {
+        throw new Error(`Piece "${pieceId}" has an invalid ${key} (must be a boolean)`)
+      }
+    }
+    if (piece.color !== undefined && !isHexColor(piece.color)) {
+      throw new Error(`Piece "${pieceId}" has an invalid color (must be #rrggbb)`)
+    }
+    for (const key of ['infExitNum', 'infEnterNum', 'infEnterId'] as const) {
+      if (piece[key] !== undefined && !Number.isInteger(piece[key])) {
+        throw new Error(`Piece "${pieceId}" has an invalid ${key} (must be an integer)`)
+      }
+    }
     if (piece.kind === 'container') {
-      if (piece.boardRef === undefined || boards[piece.boardRef] === undefined) {
+      if (piece.cloneOf === undefined && (piece.boardRef === undefined || boards[piece.boardRef] === undefined)) {
         throw new Error(`Container piece "${pieceId}" has a boardRef that does not exist`)
+      }
+    } else if (piece.kind === 'player' && piece.boardRef !== undefined) {
+      // The player may itself be a box (official player Block without fillwithwalls).
+      if (boards[piece.boardRef] === undefined) {
+        throw new Error(`Player piece "${pieceId}" has a boardRef that does not exist`)
       }
     } else if (piece.boardRef !== undefined) {
       throw new Error(`Piece "${pieceId}" has kind "${piece.kind}" but also has a boardRef, which only container pieces may have`)
@@ -88,7 +115,7 @@ export function parseLevel(data: unknown): World {
     Object.keys(boards).map((boardId) => [boardId, 0]),
   )
   for (const piece of Object.values(pieces)) {
-    if (piece.kind === 'container' && piece.boardRef !== undefined) {
+    if ((piece.kind === 'container' || piece.kind === 'player') && piece.boardRef !== undefined) {
       ownerCount[piece.boardRef] = (ownerCount[piece.boardRef] ?? 0) + 1
     }
   }
@@ -98,11 +125,8 @@ export function parseLevel(data: unknown): World {
       `Level must have at most one board with no owner; found ${orphanBoards.length}`,
     )
   }
-  const overOwnedBoards = Object.entries(ownerCount).filter(([, count]) => count > 1)
-  if (overOwnedBoards.length > 0) {
-    const [boardId] = overOwnedBoards[0]
-    throw new Error(`Board "${boardId}" has more than one owner (container referencing it)`)
-  }
+  // Several Ref instances may share one definition (2 Ref -> same Block); exiting
+  // the shared interior uses findContainerFor's canonical-instance rule.
 
   let startBoardId: string
   if (orphanBoards.length === 1) {
@@ -172,7 +196,7 @@ export function parseLevel(data: unknown): World {
     adjacency.set(boardId, new Set())
   }
   for (const piece of Object.values(pieces)) {
-    if (piece.kind === 'container' && piece.boardRef !== undefined) {
+    if ((piece.kind === 'container' || piece.kind === 'player') && piece.boardRef !== undefined) {
       const ownerBoard = locations[piece.id].board
       adjacency.get(ownerBoard)?.add(piece.boardRef)
       adjacency.get(piece.boardRef)?.add(ownerBoard)
@@ -196,5 +220,21 @@ export function parseLevel(data: unknown): World {
     )
   }
 
-  return { boards, pieces, locations }
+  const world: World = { boards, pieces, locations }
+  if (raw.attemptOrder !== undefined) {
+    const order = raw.attemptOrder
+    const valid = Array.isArray(order) &&
+      order.length === 3 &&
+      new Set(order).size === 3 &&
+      order.every((a) => a === 'push' || a === 'enter' || a === 'eat')
+    if (!valid) {
+      throw new Error('attemptOrder must be a permutation of ["push", "enter", "eat"]')
+    }
+    world.attemptOrder = order as Attempt[]
+  }
+  return world
+}
+
+function isHexColor(value: unknown): boolean {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
 }

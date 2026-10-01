@@ -1,0 +1,30 @@
+{
+  "boards": {
+    "root": {
+      "id": "root",
+      "size": 3,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    },
+    "flippedInside": {
+      "id": "flippedInside",
+      "size": 3,
+      "cells": [
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor", "requirement": "player" }],
+        [{ "type": "floor" }, { "type": "floor" }, { "type": "floor" }]
+      ]
+    }
+  },
+  "pieces": {
+    "player": { "id": "player", "kind": "player" },
+    "flippedBox": { "id": "flippedBox", "kind": "container", "boardRef": "flippedInside", "fliph": true }
+  },
+  "locations": {
+    "player": { "board": "root", "x": 1, "y": 1 },
+    "flippedBox": { "board": "root", "x": 2, "y": 1 }
+  }
+}

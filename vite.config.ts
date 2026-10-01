@@ -2,10 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+// `vite build --mode app` builds for the native iOS / Android shell (Capacitor): the app ships
+// its own files, so no service worker (it would only keep serving stale builds inside the app),
+// and relative asset paths.
+export default defineConfig(({ mode }) => ({
+  base: mode === 'app' ? './' : '/',
   plugins: [
     react(),
     VitePWA({
+      disable: mode === 'app',
       registerType: 'autoUpdate',
       manifest: {
         name: "Parabox Tribute",
@@ -31,4 +36,4 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', '.claude/**'],
   },
-})
+}))

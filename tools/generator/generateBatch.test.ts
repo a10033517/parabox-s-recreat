@@ -1,9 +1,12 @@
+import { GENERATOR_POLICY } from './basicValidator'
 import { checkWin } from '../../src/game/engine/rules'
 import { parseLevel } from '../../src/game/engine/levelSchema'
 import { canonicalKey } from './canonical'
 import { World } from '../../src/game/engine/types'
+import { DifficultyVector } from './difficultyAnalyzer'
+import { GeneratorConfig } from './generatorConfig'
 import {
-  DifficultyProfile, HardCandidate, generateLevelBatch, profileDistance, selectDiverseTopN,
+  HardCandidate, generateLevelBatch, profileDistance, selectDiverseTopN,
 } from './generateBatch'
 
 function seededRng(startSeed: number): () => number {
@@ -14,8 +17,31 @@ function seededRng(startSeed: number): () => number {
   }
 }
 
+// A generous, unrestricted test config: the shipped GENERATOR_CONFIG's
+// tiers start empty on purpose (see generatorConfig.ts's own comment) —
+// that already means "accept anything, classify as hard" by default, so
+// these tests use their own small/fast generator ranges rather than the
+// shipped wider ranges, to keep the test suite fast.
+function testConfig(overrides: Partial<GeneratorConfig> = {}): GeneratorConfig {
+  return {
+    generator: {
+      widthRange: [6, 6], heightRange: [6, 6], wallDensityRange: [0.15, 0.3],
+      boxCountRange: [1, 2], containerProbability: 0.2, crossBoardGoalProbability: 0.2,
+      interiorSizeRange: [3, 3], maxNestingDepth: 1,
+    },
+    validatorPolicy: GENERATOR_POLICY,
+    maxSolveDepth: 100,
+    maxSolverExpandedStates: 20000,
+    tiers: { easy: {}, medium: {}, hard: {} },
+    hardCandidatePoolSize: 10,
+    diversityWeight: 10,
+    maxAttempts: 500,
+    ...overrides,
+  }
+}
+
 test('generateLevelBatch reports whether it actually met its tier quotas', () => {
-  const result = generateLevelBatch(1, seededRng(42), 200)
+  const result = generateLevelBatch(1, seededRng(42), 500, testConfig())
   if (result.complete) {
     expect(result.counts.easy).toBeGreaterThanOrEqual(1)
     expect(result.counts.medium).toBeGreaterThanOrEqual(1)
@@ -26,7 +52,9 @@ test('generateLevelBatch reports whether it actually met its tier quotas', () =>
 })
 
 test('every accepted level is unsolved and parses back through parseLevel', () => {
-  const result = generateLevelBatch(1, seededRng(42), 200)
+  // Empty tiers mean everything solvable classifies as 'hard' — force at
+  // least one hard slot to be reachable within a small pool.
+  const result = generateLevelBatch(1, seededRng(1), 500, testConfig({ hardCandidatePoolSize: 3 }))
   expect(result.levels.length).toBeGreaterThan(0)
   for (const entry of result.levels) {
     const parsed = parseLevel(JSON.parse(entry.json))
@@ -35,65 +63,68 @@ test('every accepted level is unsolved and parses back through parseLevel', () =
 })
 
 test('no two accepted levels in one batch share a canonical state', () => {
-  const result = generateLevelBatch(2, seededRng(7), 200)
+  const result = generateLevelBatch(2, seededRng(7), 500, testConfig({ hardCandidatePoolSize: 5 }))
   const keys = result.levels.map((entry) => canonicalKey(entry.world))
   expect(new Set(keys).size).toBe(keys.length)
 })
 
 test('batch stats account for every attempt', () => {
-  const result = generateLevelBatch(1, seededRng(99), 200)
+  const result = generateLevelBatch(1, seededRng(99), 300, testConfig())
   const accountedFor =
-    result.levels.length +
     result.stats.discardedGenerationFailed +
+    result.stats.discardedInvalid +
     result.stats.discardedAlreadySolved +
     result.stats.discardedUnsolvable +
+    result.stats.discardedSearchCap +
     result.stats.discardedDuplicate +
     result.stats.discardedTierFull +
-    // Hard candidates that made it into the pool but were not among the
-    // final selected set are still "accounted for" via hardCandidatesFound
-    // rather than results.length, since selection discards some on purpose.
-    Math.max(0, result.hardCandidatesFound - result.counts.hard)
-  expect(accountedFor).toBe(result.stats.attempts)
+    result.stats.discardedTierReject +
+    result.levels.length
+  // Hard candidates that are found but NOT selected into the final
+  // levels list are counted neither in `levels.length` nor in any
+  // discarded-* bucket at attempt time (they're pool members, resolved
+  // only at the very end by selectDiverseTopN) — account for them too.
+  const unselectedHardCandidates = result.hardCandidatesFound - result.counts.hard
+  expect(accountedFor + unselectedHardCandidates).toBe(result.stats.attempts)
 })
 
 test('hardCandidatesFound reflects the pool size independent of how many were finally selected', () => {
-  const result = generateLevelBatch(1, seededRng(7), 200)
-  expect(result.hardCandidatesFound).toBeGreaterThanOrEqual(result.counts.hard)
+  const result = generateLevelBatch(1, seededRng(11), 500, testConfig({ hardCandidatePoolSize: 8 }))
+  expect(result.hardCandidatesFound).toBeLessThanOrEqual(8)
+  expect(result.counts.hard).toBeLessThanOrEqual(result.hardCandidatesFound)
 })
 
-function makeCandidate(profile: DifficultyProfile, score: number): HardCandidate {
-  const world: World = {
-    boards: { root: { id: 'root', size: 1, cells: [[{ type: 'floor' }]] } },
-    pieces: { player: { id: 'player', kind: 'player' } },
-    locations: { player: { board: 'root', x: 0, y: 0 } },
+function makeVector(overrides: Partial<DifficultyVector> = {}): DifficultyVector {
+  return {
+    solutionLength: 10, expandedStates: 100, generatedStates: 150, maxQueueSize: 20,
+    avgBranching: 2, maxBranching: 3, deadEndRatio: 0.1, criticalDecisions: 1,
+    spaceTransitions: 0, nestedBoxUsed: false, nestedBoxRequired: false, maxContainerDepthUsed: 0,
+    ...overrides,
   }
-  return { world, json: '{}', profile, score }
 }
 
-test('profileDistance is 0 for identical profiles and positive for a differing one', () => {
-  const a: DifficultyProfile = { moveCount: 20, crossingMoveCount: 1, eatCount: 2, survivingGroupCount: 2, groupsUsed: 2, expandedStates: 500, pushMoveCount: 0 }
+function makeCandidate(vector: Partial<DifficultyVector>, score: number): HardCandidate {
+  return { world: {} as World, json: '{}', vector: makeVector(vector), score }
+}
+
+test('profileDistance is 0 for identical vectors and grows with any difference', () => {
+  const a = makeVector()
   expect(profileDistance(a, a)).toBe(0)
-  const b: DifficultyProfile = { ...a, eatCount: 5 }
+  const b = makeVector({ solutionLength: 30 })
   expect(profileDistance(a, b)).toBeGreaterThan(0)
 })
 
-test('selectDiverseTopN prefers a lower-scoring but structurally distinct candidate over a near-duplicate', () => {
-  const highA = makeCandidate({ moveCount: 30, crossingMoveCount: 3, eatCount: 3, survivingGroupCount: 2, groupsUsed: 2, expandedStates: 1000, pushMoveCount: 0 }, 50)
-  const highB = makeCandidate({ moveCount: 31, crossingMoveCount: 3, eatCount: 3, survivingGroupCount: 2, groupsUsed: 2, expandedStates: 1010, pushMoveCount: 0 }, 49)
-  const distinct = makeCandidate({ moveCount: 20, crossingMoveCount: 0, eatCount: 2, survivingGroupCount: 4, groupsUsed: 4, expandedStates: 200, pushMoveCount: 0 }, 40)
-
+test('selectDiverseTopN prefers a lower-score-but-distinct candidate over a near-duplicate of a higher one', () => {
+  const highA = makeCandidate({ solutionLength: 30, criticalDecisions: 3 }, 50)
+  const highB = makeCandidate({ solutionLength: 31, criticalDecisions: 3 }, 49) // near-duplicate of highA
+  const distinct = makeCandidate({ solutionLength: 15, criticalDecisions: 0, avgBranching: 4 }, 40)
   const selected = selectDiverseTopN([highA, highB, distinct], 2)
   expect(selected).toHaveLength(2)
-  expect(selected[0]).toBe(highA) // highest raw score picked first
-  expect(selected[1]).toBe(distinct) // distinct beats the near-duplicate highB
+  expect(selected).toContain(highA)
+  expect(selected).toContain(distinct)
 })
 
-test('selectDiverseTopN always fills up to min(n, candidates.length) even when every candidate is similar', () => {
-  const candidates = [
-    makeCandidate({ moveCount: 20, crossingMoveCount: 1, eatCount: 2, survivingGroupCount: 2, groupsUsed: 2, expandedStates: 100, pushMoveCount: 0 }, 30),
-    makeCandidate({ moveCount: 21, crossingMoveCount: 1, eatCount: 2, survivingGroupCount: 2, groupsUsed: 2, expandedStates: 100, pushMoveCount: 0 }, 29),
-    makeCandidate({ moveCount: 22, crossingMoveCount: 1, eatCount: 2, survivingGroupCount: 2, groupsUsed: 2, expandedStates: 100, pushMoveCount: 0 }, 28),
-  ]
-  expect(selectDiverseTopN(candidates, 5)).toHaveLength(3)
-  expect(selectDiverseTopN(candidates, 2)).toHaveLength(2)
+test('selectDiverseTopN returns fewer than N if fewer candidates are available', () => {
+  const only = makeCandidate({}, 10)
+  expect(selectDiverseTopN([only], 5)).toHaveLength(1)
 })

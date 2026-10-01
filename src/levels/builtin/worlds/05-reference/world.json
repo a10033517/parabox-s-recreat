@@ -1,0 +1,1179 @@
+{
+  "id": "reference",
+  "order": 5,
+  "name": "互相包含 Reference",
+  "signature": "multi_loop_reference",
+  "levels": [
+    {
+      "file": "05-reference/01.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000576,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 21,
+          "expandedStates": 12859,
+          "moves": [
+            "down",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/02.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000286,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 24,
+          "expandedStates": 8553,
+          "moves": [
+            "up",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "left",
+            "up"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/03.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000854,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 20,
+          "expandedStates": 30493,
+          "moves": [
+            "up",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "down",
+            "up",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "left",
+            "left",
+            "up"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/04.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000685,
+        "structure": {
+          "boards": 2,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 23,
+          "expandedStates": 19629,
+          "moves": [
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "up",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/05.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000747,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 24,
+          "expandedStates": 17269,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "right",
+            "up",
+            "left",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/06.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000795,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 26,
+          "expandedStates": 25706,
+          "moves": [
+            "right",
+            "right",
+            "left",
+            "left",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/07.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000219,
+        "structure": {
+          "boards": 2,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 26,
+          "expandedStates": 27078,
+          "moves": [
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "right",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/08.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000147,
+        "structure": {
+          "boards": 2,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 22,
+          "expandedStates": 70496,
+          "moves": [
+            "down",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "down",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/09.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000389,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 22,
+          "expandedStates": 82113,
+          "moves": [
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "left",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "right",
+            "right",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/10.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000851,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 24,
+          "expandedStates": 59163,
+          "moves": [
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "right",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/11.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000487,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 32,
+          "expandedStates": 11597,
+          "moves": [
+            "left",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "left",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "down",
+            "down",
+            "up",
+            "down"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/12.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000362,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 37,
+          "expandedStates": 3719,
+          "moves": [
+            "up",
+            "left",
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "left",
+            "down",
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "left",
+            "down",
+            "left"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/13.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000637,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 31,
+          "expandedStates": 26437,
+          "moves": [
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "down",
+            "right",
+            "right",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/14.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000613,
+        "structure": {
+          "boards": 2,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 27,
+          "expandedStates": 83497,
+          "moves": [
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "left",
+            "down",
+            "down",
+            "down",
+            "up",
+            "left",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/15.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000961,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 31,
+          "expandedStates": 74393,
+          "moves": [
+            "down",
+            "down",
+            "right",
+            "right",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "right",
+            "up",
+            "up",
+            "up",
+            "down",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/16.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000688,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 32,
+          "expandedStates": 74469,
+          "moves": [
+            "left",
+            "left",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/17.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000811,
+        "structure": {
+          "boards": 2,
+          "pieces": 6,
+          "boxes": 5
+        },
+        "solver": {
+          "solutionLength": 32,
+          "expandedStates": 90544,
+          "moves": [
+            "up",
+            "up",
+            "up",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "right",
+            "right",
+            "up",
+            "right",
+            "up",
+            "left"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/18.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000555,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 38,
+          "expandedStates": 47117,
+          "moves": [
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "left",
+            "up",
+            "right"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/19.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000507,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 48,
+          "expandedStates": 6954,
+          "moves": [
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "left",
+            "right",
+            "up",
+            "up",
+            "right",
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    },
+    {
+      "file": "05-reference/20.json",
+      "record": {
+        "world": "reference",
+        "signatureMechanic": "multi_loop_reference",
+        "seed": 5000890,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 51,
+          "expandedStates": 15907,
+          "moves": [
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "up",
+            "left",
+            "down",
+            "up"
+          ]
+        },
+        "usage": {
+          "multi_loop_reference": true
+        },
+        "necessity": {
+          "multi_loop_reference": true
+        },
+        "ablationExpandedStates": [
+          -1,
+          -1
+        ]
+      }
+    }
+  ]
+}

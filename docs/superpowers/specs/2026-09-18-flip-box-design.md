@@ -66,9 +66,12 @@ playable.
   left-right-mirrored direction (confirmed rule, unchanged from the original round).
 - `computeTarget`'s climb, when exiting a `fliph` container's board, continues using
   the left-right-mirrored direction (my own derivation, flagged above).
-- A clone (`cloneOf` set) can independently carry its own `fliph`, separate from
-  whatever `fliph` its main body has (the Clone spec covers this; noted here since
-  it's the same field).
+- A clone (`cloneOf` set) may still carry its own `fliph` field, but it has no
+  effect — corrected after the final whole-branch review: `tryEnter`'s `cloneOf`
+  interception returns before `into.fliph` is ever read, so a clone never reaches
+  the entry-mirroring code path. This was wrongly asserted as working in the
+  original revision of both this spec and the Clone spec's revision note; see the
+  Clone spec for the corrected version of that claim.
 
 **Explicitly out of scope:**
 - Rendering. This spec asserts flip should eventually be visually consistent (box
@@ -195,5 +198,7 @@ No change needed — `fliph` is a plain optional boolean, no new validation requ
   used to compute the entry cell; up/down entries are unaffected.
 - Exiting a `fliph` container's board mirrors the horizontal component of the
   direction used to continue the climb outward; up/down exits are unaffected.
-- A clone can carry its own `fliph`, independent of its main body's.
+- A clone may carry its own `fliph` field, but it has no effect on entry (corrected
+  above) — a clone's entries are governed entirely by `resolveCloneTeleport`, not by
+  the entry-mirroring code path.
 - No new `PieceKind`, no change to `parseLevel` validation.

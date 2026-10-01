@@ -4,19 +4,16 @@ import { dirname, join } from 'node:path'
 import { World } from '../../src/game/engine/types'
 import { checkWin } from '../../src/game/engine/rules'
 import { serializeLevel } from '../../src/game/engine/levelSchema'
-import { createSeedWorld } from './seed'
-import { generateLevel } from './generateLevel'
-import { countBoxLines, countCrossingMoves, countEatMoves, countGroupsUsed, countPushMoves, solve } from './solver'
-import {
-  DifficultyMetrics, checkHardRequirements, difficultyTier, scoreDifficulty,
-} from './difficultyScorer'
+import { randomGenerate } from './randomGenerator'
+import { basicValidate } from './basicValidator'
+import { DifficultyVector, analyze } from './difficultyAnalyzer'
+import { Tier, classifyTier } from './filter'
 import { canonicalKey } from './canonical'
-import { getSurvivingGroups, isGroupUntouched, pruneUntouchedGoals } from './pruneUntouchedGoals'
-import { removeUnnecessaryFillerBoxes, trimUnusedCells } from './trimUnusedCells'
-import { tryInjectObstacle } from './injectObstacle'
-import { GENERATOR_CONFIG } from './generatorConfig'
+import { solveDetailed } from './solver'
+import { validateInfiniteEnter } from './infiniteEnterValidator'
+import { GENERATOR_CONFIG, GeneratorConfig } from './generatorConfig'
 
-export type Tier = 'easy' | 'medium' | 'hard'
+export type { Tier }
 
 export interface GeneratedLevel {
   tier: Tier
@@ -27,15 +24,14 @@ export interface GeneratedLevel {
 export interface BatchStats {
   attempts: number
   discardedGenerationFailed: number
+  discardedInvalid: number
   discardedAlreadySolved: number
-  discardedUnsolvable: number
+  discardedUnsolvable: number // search exhausted: proven unsolvable
+  discardedSearchCap: number // expansion/depth cap hit: NOT proven unsolvable
+  discardedNoInfiniteEnter: number // infiniteEnterRequired and the solution does not depend on one
   discardedDuplicate: number
   discardedTierFull: number
-  rejectedTooShort: number
-  rejectedTooFewEats: number
-  rejectedNotEnoughSurvivingGroups: number
-  rejectedTooFewGroupsUsed: number
-  rejectedTooLowScore: number
+  discardedTierReject: number
 }
 
 export interface BatchResult {
@@ -46,52 +42,39 @@ export interface BatchResult {
   hardCandidatesFound: number
 }
 
-export interface DifficultyProfile {
-  moveCount: number
-  crossingMoveCount: number
-  eatCount: number
-  survivingGroupCount: number
-  groupsUsed: number
-  expandedStates: number
-  pushMoveCount: number
-}
-
 export interface HardCandidate {
   world: World
   json: string
-  profile: DifficultyProfile
+  vector: DifficultyVector
   score: number
 }
 
-// Tuning history: MAX_ATTEMPTS was 500, then raised to 1000 in sub-project
-// 4b, then 2000 in this redesign's own diagnostic pass (section 12): the
-// real hard-candidate rate is rare (roughly 0.5-1% of attempts, high
-// run-to-run variance) even under the hard-biased seed profile — see
-// generatorConfig.ts's own comment on the retuned `hard` thresholds.
-// Raised again to 5000 after adding directionSeekWeights (generateLevel.ts)
-// — a real 2000-attempt run found anywhere from 0 to 13 hard candidates
-// depending on rng luck, so a bigger budget buys more consistent odds of
-// clearing targetPerTier(5). At the diagnosed ~100-200ms/attempt this costs
-// on the order of 10-15 minutes of wall-clock for the one-off generation
-// script, not shipped runtime code.
-const MAX_ATTEMPTS = 5000
-
-export function profileDistance(a: DifficultyProfile, b: DifficultyProfile): number {
-  const term = (x: number, y: number, scale: number) => Math.abs(x - y) / scale
+function scoreDifficulty(vector: DifficultyVector): number {
   return (
-    term(a.moveCount, b.moveCount, 20) +
-    term(a.crossingMoveCount, b.crossingMoveCount, 3) +
-    term(a.eatCount, b.eatCount, 3) +
-    term(a.survivingGroupCount, b.survivingGroupCount, 2) +
-    term(a.groupsUsed, b.groupsUsed, 2) +
-    term(a.expandedStates, b.expandedStates, 5000) +
-    term(a.pushMoveCount, b.pushMoveCount, 3)
+    vector.solutionLength +
+    vector.criticalDecisions * 5 +
+    vector.avgBranching * 3 +
+    Math.log2(vector.expandedStates + 1) * 2 +
+    (vector.nestedBoxRequired ? 10 : 0)
   )
 }
 
-// Greedy marginal-value selection — see the full design spec's section 10
-// for why this replaces a fixed diversity-distance threshold.
-export function selectDiverseTopN(candidates: HardCandidate[], n: number): HardCandidate[] {
+export function profileDistance(a: DifficultyVector, b: DifficultyVector): number {
+  const term = (x: number, y: number, scale: number) => Math.abs(x - y) / scale
+  return (
+    term(a.solutionLength, b.solutionLength, 20) +
+    term(a.criticalDecisions, b.criticalDecisions, 3) +
+    term(a.avgBranching, b.avgBranching, 2) +
+    term(a.expandedStates, b.expandedStates, 5000) +
+    term(a.spaceTransitions, b.spaceTransitions, 3)
+  )
+}
+
+export function selectDiverseTopN(
+  candidates: HardCandidate[],
+  n: number,
+  diversityWeight: number = GENERATOR_CONFIG.diversityWeight,
+): HardCandidate[] {
   const remaining = [...candidates]
   const selected: HardCandidate[] = []
   while (selected.length < n && remaining.length > 0) {
@@ -102,12 +85,9 @@ export function selectDiverseTopN(candidates: HardCandidate[], n: number): HardC
       const diversityBonus =
         selected.length === 0
           ? 0
-          : Math.min(...selected.map((chosen) => profileDistance(chosen.profile, candidate.profile)))
-      const value = candidate.score + GENERATOR_CONFIG.diversityWeight * diversityBonus
-      if (value > bestValue) {
-        bestValue = value
-        bestIndex = i
-      }
+          : Math.min(...selected.map((chosen) => profileDistance(chosen.vector, candidate.vector)))
+      const value = candidate.score + diversityWeight * diversityBonus
+      if (value > bestValue) { bestValue = value; bestIndex = i }
     }
     selected.push(remaining[bestIndex])
     remaining.splice(bestIndex, 1)
@@ -118,25 +98,18 @@ export function selectDiverseTopN(candidates: HardCandidate[], n: number): HardC
 export function generateLevelBatch(
   targetPerTier: number,
   rng: () => number,
-  maxAttempts: number = MAX_ATTEMPTS,
+  maxAttempts: number = GENERATOR_CONFIG.maxAttempts,
+  config: GeneratorConfig = GENERATOR_CONFIG,
 ): BatchResult {
   const counts: Record<Tier, number> = { easy: 0, medium: 0, hard: 0 }
   const results: GeneratedLevel[] = []
   const seenLevels = new Set<string>()
   const hardCandidates: HardCandidate[] = []
-  const hardPoolTarget = GENERATOR_CONFIG.hardCandidatePoolSize
+  const hardPoolTarget = config.hardCandidatePoolSize
   const stats: BatchStats = {
-    attempts: 0,
-    discardedGenerationFailed: 0,
-    discardedAlreadySolved: 0,
-    discardedUnsolvable: 0,
-    discardedDuplicate: 0,
-    discardedTierFull: 0,
-    rejectedTooShort: 0,
-    rejectedTooFewEats: 0,
-    rejectedNotEnoughSurvivingGroups: 0,
-    rejectedTooFewGroupsUsed: 0,
-    rejectedTooLowScore: 0,
+    attempts: 0, discardedGenerationFailed: 0, discardedInvalid: 0,
+    discardedAlreadySolved: 0, discardedUnsolvable: 0, discardedSearchCap: 0, discardedNoInfiniteEnter: 0, discardedDuplicate: 0,
+    discardedTierFull: 0, discardedTierReject: 0,
   }
 
   while (
@@ -144,164 +117,52 @@ export function generateLevelBatch(
     (counts.easy < targetPerTier || counts.medium < targetPerTier || hardCandidates.length < hardPoolTarget)
   ) {
     stats.attempts++
+    const generated = randomGenerate(config.generator, rng)
+    if (!generated) { stats.discardedGenerationFailed++; continue }
+    const { world } = generated
 
-    // Once easy and medium are both already filled, every further attempt
-    // exists solely to feed the hard pool — switch to the hard-biased seed
-    // profile at that point (see section 6.4 for why this trigger, rather
-    // than a separate generation phase, is used).
-    const useHardProfile = counts.easy >= targetPerTier && counts.medium >= targetPerTier
-    const profile = useHardProfile ? GENERATOR_CONFIG.hardSeedProfile : GENERATOR_CONFIG.seedProfile
-    const { world: seed, groups, fillerBoxIds } = createSeedWorld(rng, profile)
-    const steps =
-      GENERATOR_CONFIG.minReverseSteps +
-      Math.floor(rng() * (GENERATOR_CONFIG.maxReverseSteps - GENERATOR_CONFIG.minReverseSteps + 1))
-    const generated = generateLevel(seed, groups, steps, rng)
-    if (!generated) {
-      stats.discardedGenerationFailed++
-      continue
-    }
+    const validation = basicValidate(world, config.generator.maxNestingDepth, config.validatorPolicy)
+    if (!validation.valid) { stats.discardedInvalid++; continue }
 
-    let world = pruneUntouchedGoals(generated.world, groups)
-    const survivingGroups = getSurvivingGroups(world, groups)
-
-    // Approach-A invariant: every surviving group's box must actually be
-    // away from its seed position (section 4.6). This should be
-    // tautologically true given correct pruning; checking it here catches a
-    // future desync between pruneUntouchedGoals and getSurvivingGroups
-    // immediately rather than shipping a decorative "surviving" group.
-    for (const group of survivingGroups) {
-      if (isGroupUntouched(world, group)) {
-        throw new Error(
-          `generateLevelBatch: Approach A invariant violated for group ${group.containerId} — ` +
-            'it survived pruning but its box is still at the seed position, so it has no ' +
-            'unsatisfied interior goal.',
-        )
-      }
-    }
-
-    // The generator's own contract is "produce an unsolved, playable
-    // level" — checked directly here, independent of solve()'s own
-    // implementation.
-    if (checkWin(world)) {
-      stats.discardedAlreadySolved++
-      continue
-    }
+    if (checkWin(world)) { stats.discardedAlreadySolved++; continue }
 
     const levelKey = canonicalKey(world)
-    if (seenLevels.has(levelKey)) {
-      stats.discardedDuplicate++
-      continue
+    if (seenLevels.has(levelKey)) { stats.discardedDuplicate++; continue }
+
+    const detailed = solveDetailed(world, config.maxSolveDepth, config.maxSolverExpandedStates)
+    if (detailed.status === 'UNSOLVABLE') { stats.discardedUnsolvable++; continue }
+    if (detailed.status !== 'SOLVED') { stats.discardedSearchCap++; continue }
+    const solved = detailed.result
+    if (solved.moves.length === 0) { stats.discardedUnsolvable++; continue }
+
+    if (config.infiniteEnterRequired === true) {
+      const ie = validateInfiniteEnter(world, true, config.maxSolveDepth, config.maxSolverExpandedStates)
+      if (!ie.valid) { stats.discardedNoInfiniteEnter++; continue }
     }
 
-    let solved = solve(world, 150, GENERATOR_CONFIG.maxSolverExpandedStates)
-    if (!solved || solved.moves.length === 0) {
-      stats.discardedUnsolvable++
-      continue
-    }
-
-    // Post-hoc obstacle injection (see injectObstacle.ts for why this can't
-    // happen at seed time): a plain box dropped directly against this
-    // puzzle's own solved path, at a genuinely un-absorbable site, forcing
-    // a longer route if solve() confirms it. Gated by profile so easy/
-    // medium levels get it less often than hard ones. Run before metrics
-    // are computed so every metric below is measured against whichever
-    // world actually ships — same principle trimUnusedCells already
-    // follows a few lines down.
-    if (rng() < profile.obstacleBoxProbability) {
-      const injected = tryInjectObstacle(world, solved, rng)
-      if (injected) {
-        world = injected.world
-        solved = injected.solved
-      }
-    }
-
-    const metrics: DifficultyMetrics = {
-      moveCount: solved.moves.length,
-      crossingMoveCount: countCrossingMoves(world, solved.moves),
-      eatCount: countEatMoves(world, solved.moves),
-      survivingGroupCount: survivingGroups.length,
-      groupsUsed: countGroupsUsed(world, solved.moves, survivingGroups),
-      expandedStates: solved.expandedStates,
-      maxFrontierSize: solved.maxFrontierSize,
-      pushMoveCount: countPushMoves(world, solved.moves),
-      boxLineCount: countBoxLines(world, solved.moves),
-    }
-    const tier = difficultyTier(metrics)
-
-    // Cosmetic-only pass (see trimUnusedCells.ts's own comment for the proof
-    // this can't change any metric above): walls off floor cells the solved
-    // path never visits, and deletes any filler/obstacle box that is not
-    // strictly necessary — some equally-short solution exists that never
-    // needs to move it (per user feedback: checking only the one solve()
-    // result was too weak, since BFS returns *a* shortest solution, not
-    // *the* only one). Done after scoring so every metric is measured
-    // against the exact world solve() actually searched, not a
-    // pre-emptively trimmed one.
-    const shippedWorld = trimUnusedCells(
-      removeUnnecessaryFillerBoxes(world, fillerBoxIds, solved.moves.length),
-      solved.moves,
-    )
-    // Trimming can (rarely) make two otherwise-distinct seeds converge to
-    // the same playable puzzle once their unused decoration is stripped —
-    // re-check uniqueness on the shipped (trimmed) board, not just the
-    // pre-trim `levelKey` already checked above.
-    const shippedKey = canonicalKey(shippedWorld)
-    if (seenLevels.has(shippedKey)) {
-      stats.discardedDuplicate++
-      continue
-    }
-
-    if (tier !== 'hard') {
-      const check = checkHardRequirements(metrics)
-      if (!check.meetsMinMoveCount) stats.rejectedTooShort++
-      if (!check.meetsMinEatCount) stats.rejectedTooFewEats++
-      if (!check.meetsMinSurvivingGroupCount) stats.rejectedNotEnoughSurvivingGroups++
-      if (!check.meetsMinGroupsUsed) stats.rejectedTooFewGroupsUsed++
-      if (!check.meetsMinScore) stats.rejectedTooLowScore++
-    }
+    const vector = analyze(world, solved, config.maxSolverExpandedStates)
+    const tier = classifyTier(vector, config.tiers)
+    if (tier === 'reject') { stats.discardedTierReject++; continue }
 
     if (tier === 'hard') {
-      if (hardCandidates.length >= hardPoolTarget) {
-        stats.discardedTierFull++
-        continue
-      }
+      if (hardCandidates.length >= hardPoolTarget) { stats.discardedTierFull++; continue }
       seenLevels.add(levelKey)
-      seenLevels.add(shippedKey)
-      hardCandidates.push({
-        world: shippedWorld,
-        json: JSON.stringify(serializeLevel(shippedWorld)),
-        profile: {
-          moveCount: metrics.moveCount,
-          crossingMoveCount: metrics.crossingMoveCount,
-          eatCount: metrics.eatCount,
-          survivingGroupCount: metrics.survivingGroupCount,
-          groupsUsed: metrics.groupsUsed,
-          expandedStates: metrics.expandedStates,
-          pushMoveCount: metrics.pushMoveCount,
-        },
-        score: scoreDifficulty(metrics),
-      })
+      hardCandidates.push({ world, json: JSON.stringify(serializeLevel(world)), vector, score: scoreDifficulty(vector) })
       continue
     }
 
-    if (counts[tier] >= targetPerTier) {
-      stats.discardedTierFull++
-      continue
-    }
-
+    if (counts[tier] >= targetPerTier) { stats.discardedTierFull++; continue }
     seenLevels.add(levelKey)
     counts[tier]++
-    results.push({ tier, world: shippedWorld, json: JSON.stringify(serializeLevel(shippedWorld)) })
+    results.push({ tier, world, json: JSON.stringify(serializeLevel(world)) })
   }
 
-  for (const candidate of selectDiverseTopN(hardCandidates, targetPerTier)) {
+  for (const candidate of selectDiverseTopN(hardCandidates, targetPerTier, config.diversityWeight)) {
     counts.hard++
     results.push({ tier: 'hard', world: candidate.world, json: candidate.json })
   }
 
-  const complete =
-    counts.easy >= targetPerTier && counts.medium >= targetPerTier && counts.hard >= targetPerTier
-
+  const complete = counts.easy >= targetPerTier && counts.medium >= targetPerTier && counts.hard >= targetPerTier
   return { levels: results, complete, counts, stats, hardCandidatesFound: hardCandidates.length }
 }
 
@@ -324,10 +185,13 @@ function main() {
       `easy=${batch.counts.easy} medium=${batch.counts.medium} hard=${batch.counts.hard} ` +
       `(hardCandidatesFound=${batch.hardCandidatesFound}, attempts=${batch.stats.attempts}, ` +
       `discarded: genFailed=${batch.stats.discardedGenerationFailed} ` +
+      `invalid=${batch.stats.discardedInvalid} ` +
       `alreadySolved=${batch.stats.discardedAlreadySolved} ` +
       `unsolvable=${batch.stats.discardedUnsolvable} ` +
+      `searchCap=${batch.stats.discardedSearchCap} ` +
       `duplicate=${batch.stats.discardedDuplicate} ` +
-      `tierFull=${batch.stats.discardedTierFull})`,
+      `tierFull=${batch.stats.discardedTierFull} ` +
+      `tierReject=${batch.stats.discardedTierReject})`,
   )
 
   if (!batch.complete) {

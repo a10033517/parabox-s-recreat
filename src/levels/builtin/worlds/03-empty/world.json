@@ -1,0 +1,1308 @@
+{
+  "id": "empty",
+  "order": 3,
+  "name": "空箱 Empty",
+  "signature": "empty_open_box",
+  "levels": [
+    {
+      "file": "03-empty/01.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000130,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 22,
+          "expandedStates": 17379,
+          "moves": [
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "up",
+            "down",
+            "left",
+            "up",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/02.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000085,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 24,
+          "expandedStates": 15746,
+          "moves": [
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "left",
+            "right",
+            "up",
+            "up",
+            "up",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/03.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000576,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 24,
+          "expandedStates": 16436,
+          "moves": [
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "right",
+            "up",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "up"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/04.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000134,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 25,
+          "expandedStates": 14488,
+          "moves": [
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "right",
+            "up",
+            "right",
+            "right",
+            "up",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "right",
+            "down",
+            "up",
+            "left",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/05.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000405,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 26,
+          "expandedStates": 16046,
+          "moves": [
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/06.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000683,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 30,
+          "expandedStates": 7751,
+          "moves": [
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/07.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000676,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 25,
+          "expandedStates": 28781,
+          "moves": [
+            "left",
+            "down",
+            "left",
+            "up",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "left",
+            "up",
+            "right",
+            "up"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/08.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000020,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 25,
+          "expandedStates": 54680,
+          "moves": [
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "left",
+            "up",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/09.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000338,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 27,
+          "expandedStates": 55699,
+          "moves": [
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "up"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/10.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000620,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 27,
+          "expandedStates": 61207,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "right",
+            "up",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "left",
+            "left",
+            "right",
+            "down",
+            "down",
+            "down",
+            "right"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/11.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000628,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 29,
+          "expandedStates": 72329,
+          "moves": [
+            "left",
+            "down",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "left",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "right",
+            "up"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/12.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000234,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 29,
+          "expandedStates": 100644,
+          "moves": [
+            "up",
+            "left",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "up",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "left"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/13.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000581,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 38,
+          "expandedStates": 52450,
+          "moves": [
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "up",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/14.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000390,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 39,
+          "expandedStates": 61443,
+          "moves": [
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "left",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "left"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/15.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000308,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 45,
+          "expandedStates": 68111,
+          "moves": [
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "down",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "down",
+            "down",
+            "up"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/16.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000074,
+        "structure": {
+          "boards": 2,
+          "pieces": 5,
+          "boxes": 4
+        },
+        "solver": {
+          "solutionLength": 46,
+          "expandedStates": 62362,
+          "moves": [
+            "up",
+            "left",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "up",
+            "right",
+            "right",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "right",
+            "right",
+            "up",
+            "down",
+            "left"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/17.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000225,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 55,
+          "expandedStates": 50345,
+          "moves": [
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "up",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "right",
+            "left",
+            "down",
+            "down",
+            "left",
+            "down",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "down",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/18.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000656,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 63,
+          "expandedStates": 62159,
+          "moves": [
+            "down",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "right",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "up",
+            "up",
+            "down",
+            "right",
+            "right",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "left",
+            "left",
+            "up",
+            "right",
+            "up",
+            "right",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "down",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "left",
+            "left",
+            "right",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/19.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000323,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 70,
+          "expandedStates": 79768,
+          "moves": [
+            "up",
+            "up",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "down",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "down",
+            "right",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "right",
+            "down",
+            "right",
+            "right",
+            "left",
+            "left",
+            "left",
+            "up",
+            "left",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "left",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "up",
+            "down",
+            "left",
+            "left"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    },
+    {
+      "file": "03-empty/20.json",
+      "record": {
+        "world": "empty",
+        "signatureMechanic": "empty_open_box",
+        "seed": 3000688,
+        "structure": {
+          "boards": 2,
+          "pieces": 4,
+          "boxes": 3
+        },
+        "solver": {
+          "solutionLength": 71,
+          "expandedStates": 114174,
+          "moves": [
+            "up",
+            "up",
+            "up",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "down",
+            "right",
+            "down",
+            "down",
+            "right",
+            "down",
+            "down",
+            "left",
+            "left",
+            "up",
+            "right",
+            "down",
+            "right",
+            "up",
+            "up",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "right",
+            "left",
+            "down",
+            "left",
+            "up",
+            "left",
+            "up",
+            "up",
+            "right",
+            "down",
+            "down",
+            "down",
+            "down",
+            "right",
+            "down",
+            "left",
+            "left",
+            "left",
+            "down",
+            "left",
+            "up",
+            "left",
+            "up",
+            "right",
+            "up",
+            "up",
+            "right",
+            "right",
+            "right",
+            "up",
+            "up",
+            "left",
+            "down",
+            "down",
+            "right",
+            "up",
+            "left",
+            "up",
+            "right",
+            "down",
+            "down",
+            "right",
+            "right"
+          ]
+        },
+        "usage": {
+          "empty_open_box": true
+        },
+        "necessity": {
+          "empty_open_box": true
+        },
+        "ablationExpandedStates": [
+          -1
+        ]
+      }
+    }
+  ]
+}

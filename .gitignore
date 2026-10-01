@@ -3,5 +3,13 @@ dist
 dist-ssr
 *.local
 .claude/
+.superpowers/
 tsconfig.tsbuildinfo
 .aider*
+
+# Third-party example levels (Parafox editor samples, no licence) and levels derived from them:
+# used locally for engine testing, not published. Tests that need them skip when absent.
+docs/differential/community-samples/*.txt
+!docs/differential/community-samples/player_box_eat.txt
+src/levels/builtin/community-samples/*.json
+!src/levels/builtin/community-samples/player_box_eat.json
