@@ -5,32 +5,20 @@ import { BUILTIN_LEVELS, CUSTOM_LEVEL_ID_PREFIX, loadCommunitySampleLevels, load
 import { checkWin } from '../game/engine/rules'
 import { PLAYER_ID } from '../game/engine/types'
 import { solve } from '../../tools/generator/solver'
+import { TUTORIAL } from '../../tools/generator/tutorial'
 
 describe('BUILTIN_LEVELS', () => {
   it('has one entry per shipped level file, each parsing to an unsolved world', () => {
-    expect(BUILTIN_LEVELS).toHaveLength(13)
+    expect(BUILTIN_LEVELS).toHaveLength(TUTORIAL.length)
     for (const level of BUILTIN_LEVELS) {
       expect(level.world.locations[PLAYER_ID]).toBeDefined()
       expect(checkWin(level.world)).toBe(false)
     }
   })
 
-  it('includes the expected level ids in order', () => {
-    expect(BUILTIN_LEVELS.map((l) => l.id)).toEqual([
-      '01-first-push',
-      '02-enter-container',
-      '03-chain-push',
-      '04-eat',
-      '05-double-nested',
-      '06-self-loop',
-      '07-loop-eats-container',
-      '08-two-node-cycle',
-      '09-cycle-branch',
-      '10-void-storage',
-      '11-clone-box',
-      '12-flip-box',
-      '13-transfer',
-    ])
+  it('is the tutorial, in order, each with a hint', () => {
+    expect(BUILTIN_LEVELS.map((l) => l.id)).toEqual(TUTORIAL.map((l) => `tutorial-${l.id}`))
+    for (const level of BUILTIN_LEVELS) expect(level.hint).toBeTruthy()
   })
 })
 

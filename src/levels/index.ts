@@ -1,41 +1,37 @@
 import { parseLevel } from '../game/engine/levelSchema'
 import { World } from '../game/engine/types'
 import { listCustomLevels } from '../storage/progress'
-import level01 from './builtin/01-first-push.json?raw'
-import level02 from './builtin/02-enter-container.json?raw'
-import level03 from './builtin/03-chain-push.json?raw'
-import level04 from './builtin/04-eat.json?raw'
-import level05 from './builtin/05-double-nested.json?raw'
-import level06 from './builtin/06-self-loop.json?raw'
-import level07 from './builtin/07-loop-eats-container.json?raw'
-import level08 from './builtin/08-two-node-cycle.json?raw'
-import level09 from './builtin/09-cycle-branch.json?raw'
-import level10 from './builtin/10-void-storage.json?raw'
-import level11 from './builtin/11-clone-box.json?raw'
-import level12 from './builtin/12-flip-box.json?raw'
-import level13 from './builtin/13-transfer.json?raw'
 
 export interface LevelMeta {
   id: string
   name: string
   world: World
+  hint?: string // what the level teaches, shown while playing (tutorial levels)
 }
 
-export const BUILTIN_LEVELS: LevelMeta[] = [
-  { id: '01-first-push', name: '第一次推动', world: parseLevel(JSON.parse(level01)) },
-  { id: '02-enter-container', name: '进入箱子', world: parseLevel(JSON.parse(level02)) },
-  { id: '03-chain-push', name: '连锁推动', world: parseLevel(JSON.parse(level03)) },
-  { id: '04-eat', name: '箱子吞噬', world: parseLevel(JSON.parse(level04)) },
-  { id: '05-double-nested', name: '双层嵌套', world: parseLevel(JSON.parse(level05)) },
-  { id: '06-self-loop', name: '自我循环', world: parseLevel(JSON.parse(level06)) },
-  { id: '07-loop-eats-container', name: '循环吞噬容器', world: parseLevel(JSON.parse(level07)) },
-  { id: '08-two-node-cycle', name: '双节点循环', world: parseLevel(JSON.parse(level08)) },
-  { id: '09-cycle-branch', name: '循环与分支', world: parseLevel(JSON.parse(level09)) },
-  { id: '10-void-storage', name: '虚空仓库', world: parseLevel(JSON.parse(level10)) },
-  { id: '11-clone-box', name: '分身箱子', world: parseLevel(JSON.parse(level11)) },
-  { id: '12-flip-box', name: '翻转箱子', world: parseLevel(JSON.parse(level12)) },
-  { id: '13-transfer', name: '容器传送', world: parseLevel(JSON.parse(level13)) },
-]
+// The tutorial: one small level per idea, in the official game's order. Made and checked by
+// tools/generator/tutorial.ts (npm run generate:tutorial) — each needs the mechanic it teaches.
+const tutorialModules = import.meta.glob('./builtin/tutorial/*.json', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>
+const tutorialManifestModules = import.meta.glob('./builtin/tutorial/manifest.json', {
+  import: 'default',
+  eager: true,
+}) as Record<string, { levels: { file: string; name: string; hint: string }[] }>
+
+function tutorialLevels(): LevelMeta[] {
+  const manifest = Object.values(tutorialManifestModules)[0]
+  if (manifest === undefined) return []
+  return manifest.levels.flatMap((level) => {
+    const raw = tutorialModules[`./builtin/tutorial/${level.file}`]
+    if (raw === undefined) return []
+    return [{ id: `tutorial-${level.file.replace('.json', '')}`, name: level.name, hint: level.hint, world: parseLevel(JSON.parse(raw)) }]
+  })
+}
+
+export const BUILTIN_LEVELS: LevelMeta[] = tutorialLevels()
 
 const generatedModules = import.meta.glob('./builtin/generated/*.json', {
   query: '?raw',
