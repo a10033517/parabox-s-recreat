@@ -10,6 +10,7 @@ import { DifficultyVector, analyze } from './difficultyAnalyzer'
 import { Tier, classifyTier } from './filter'
 import { canonicalKey } from './canonical'
 import { solveDetailed } from './solver'
+import { pruneIdlePieces } from './prune'
 import { validateInfiniteEnter } from './infiniteEnterValidator'
 import { GENERATOR_CONFIG, GeneratorConfig } from './generatorConfig'
 
@@ -119,21 +120,28 @@ export function generateLevelBatch(
     stats.attempts++
     const generated = randomGenerate(config.generator, rng)
     if (!generated) { stats.discardedGenerationFailed++; continue }
-    const { world } = generated
-
-    const validation = basicValidate(world, config.generator.maxNestingDepth, config.validatorPolicy)
+    const validation = basicValidate(generated.world, config.generator.maxNestingDepth, config.validatorPolicy)
     if (!validation.valid) { stats.discardedInvalid++; continue }
 
-    if (checkWin(world)) { stats.discardedAlreadySolved++; continue }
+    if (checkWin(generated.world)) { stats.discardedAlreadySolved++; continue }
 
-    const levelKey = canonicalKey(world)
+    const levelKey = canonicalKey(generated.world)
     if (seenLevels.has(levelKey)) { stats.discardedDuplicate++; continue }
 
-    const detailed = solveDetailed(world, config.maxSolveDepth, config.maxSolverExpandedStates)
-    if (detailed.status === 'UNSOLVABLE') { stats.discardedUnsolvable++; continue }
+    const first = solveDetailed(generated.world, config.maxSolveDepth, config.maxSolverExpandedStates)
+    if (first.status === 'UNSOLVABLE') { stats.discardedUnsolvable++; continue }
+    if (first.status !== 'SOLVED') { stats.discardedSearchCap++; continue }
+    if (first.result.moves.length === 0) { stats.discardedUnsolvable++; continue }
+
+    // Idle boxes out (see prune.ts); the slimmer level is the one that is analysed and shipped.
+    const pruned = pruneIdlePieces(generated.world, { maxDepth: config.maxSolveDepth, maxExpanded: config.maxSolverExpandedStates })
+    if (pruned === null) { stats.discardedUnsolvable++; continue }
+    const world = pruned.world
+    const prunedKey = pruned.removed.length > 0 ? canonicalKey(world) : levelKey
+    if (prunedKey !== levelKey && seenLevels.has(prunedKey)) { stats.discardedDuplicate++; continue }
+    const detailed = pruned.removed.length > 0 ? solveDetailed(world, config.maxSolveDepth, config.maxSolverExpandedStates) : first
     if (detailed.status !== 'SOLVED') { stats.discardedSearchCap++; continue }
     const solved = detailed.result
-    if (solved.moves.length === 0) { stats.discardedUnsolvable++; continue }
 
     if (config.infiniteEnterRequired === true) {
       const ie = validateInfiniteEnter(world, true, config.maxSolveDepth, config.maxSolverExpandedStates)
@@ -147,12 +155,14 @@ export function generateLevelBatch(
     if (tier === 'hard') {
       if (hardCandidates.length >= hardPoolTarget) { stats.discardedTierFull++; continue }
       seenLevels.add(levelKey)
+      seenLevels.add(prunedKey)
       hardCandidates.push({ world, json: JSON.stringify(serializeLevel(world)), vector, score: scoreDifficulty(vector) })
       continue
     }
 
     if (counts[tier] >= targetPerTier) { stats.discardedTierFull++; continue }
     seenLevels.add(levelKey)
+    seenLevels.add(prunedKey)
     counts[tier]++
     results.push({ tier, world, json: JSON.stringify(serializeLevel(world)) })
   }
