@@ -4,14 +4,14 @@ import { possess } from './engine/rules'
 import { BoardId, Direction, Location, PieceId, PLAYER_ID, VOID_BOARD_ID, World, isInVoidSpace } from './engine/types'
 import { DrawContext, DEFAULT_RENDER_BUDGET, drawBoardRecursive, drawPiece, indexPiecesByBoard } from './render/CanvasRenderer'
 import { CrossBoardMove, crossBoardMoves, flipScaleAt, flippedPieces, interpolateCell } from './render/moveAnimation'
-import { CameraTransform, Viewport, cameraForFocus, interpolateCamera } from './render/camera'
+import { CameraTransform, Viewport, anchorRoomFraction, cameraForFocus, interpolateCamera } from './render/camera'
 import { resolveAnchorBoardId, resolveDrawRoot } from './render/recursiveTransform'
 import { classifyEpsilonVisuals, epsilonSpawnScale } from './render/epsilonAnimation'
 import { DPad } from '../ui/DPad'
 import { SwipeLayer } from '../ui/SwipeLayer'
 import { SettingsPanel } from '../ui/SettingsPanel'
-import { InspectView } from '../ui/InspectView'
-import { containerAt } from './render/hitTest'
+import { hitTestChain } from './render/hitTest'
+import { PeekLevel, peekCamera, peekTargetAt, playerRoomRect } from './render/peek'
 import { BoardTransform } from './render/recursiveTransform'
 import { EyeAnimator } from './render/eyes'
 import { music } from '../audio/music'
@@ -44,6 +44,9 @@ const DURATIONS: Record<AnimationKind, number> = {
 
 // A move that spawns an ε plays longer, so the scale-up is readable after the world swap.
 export const EPSILON_SPAWN_DURATION_MS = 700
+
+// Zooming into / out of a box the player taps (peek.ts).
+const PEEK_GLIDE_MS = 320
 
 // Moves that may wait for the move-rate limit; more than this and the extra input is dropped.
 const MAX_QUEUED_MOVES = 2
@@ -144,20 +147,56 @@ export function GameScreen({
   const settingsRef = useRef(settings)
   settingsRef.current = settings
   const [showSettings, setShowSettings] = useState(false)
-  // Looking inside a box: the game pauses (moves are ignored) while the inspect view is open.
-  const [inspecting, setInspecting] = useState<PieceId | null>(null)
   const pausedRef = useRef(false)
-  pausedRef.current = inspecting !== null || showSettings
+  pausedRef.current = showSettings
   // What the last frame drew, so a tap can be matched to the box under the finger.
   const lastFrameRef = useRef<{ world: World; camera: CameraTransform; viewport: Viewport; root: BoardTransform } | null>(null)
 
+  // Peeking into boxes (peek.ts): the levels zoomed into, outermost first, and the camera glide
+  // between views. Any move, undo or restart ends the peek.
+  const peekRef = useRef<PeekLevel[]>([])
+  const cameraGlideRef = useRef<{ from: CameraTransform; startMs: number } | null>(null)
+  const glideFromShown = () => {
+    const shown = lastFrameRef.current?.camera
+    cameraGlideRef.current = shown === undefined ? null : { from: shown, startMs: performance.now() }
+  }
+  // Where the camera rests: the box being peeked into, or the normal view.
+  const restingCamera = (world: World, viewport: Viewport): CameraTransform => {
+    const base = cameraForFocus(world, viewport, { marginCells: DEFAULT_RENDER_BUDGET.marginCells }, rootAnchorBoardId)
+    const peek = peekRef.current[peekRef.current.length - 1]
+    const anchor = cameraAnchorBoard(base, world, rootAnchorBoardId)
+    if (peek === undefined || anchor === null) return base
+    return peekCamera(base, peek.rect, viewport, anchorRoomFraction(world, anchor, DEFAULT_RENDER_BUDGET))
+  }
+  const endPeek = (glide: boolean) => {
+    if (peekRef.current.length === 0) return
+    peekRef.current = []
+    if (glide) glideFromShown()
+    else cameraGlideRef.current = null
+  }
+
+  // A tap on the board: peek into the box under it, deeper into a box inside the one being
+  // peeked into, or — outside the peeked box — back out one level.
   const inspectAt = (clientX: number, clientY: number) => {
     const frame = lastFrameRef.current
     const canvas = canvasRef.current
     if (!settingsRef.current.tapToInspect || frame === null || canvas === null) return
-    const rect = canvas.getBoundingClientRect()
-    const pieceId = containerAt(frame, clientX - rect.left, clientY - rect.top)
-    if (pieceId !== null) setInspecting(pieceId)
+    const bounds = canvas.getBoundingClientRect()
+    const sx = clientX - bounds.left
+    const sy = clientY - bounds.top
+    const anchor = cameraAnchorBoard(frame.camera, frame.world, rootAnchorBoardId)
+    const peek = peekRef.current[peekRef.current.length - 1]
+    const view = peek?.rect ?? (anchor === null ? null : playerRoomRect(frame.world, anchor))
+    if (view === null) return
+    const target = peekTargetAt(frame.world, frame.camera, frame.viewport, hitTestChain(frame, sx, sy), view, sx, sy)
+    if (target === null) return
+    if (target === 'outside') {
+      if (peekRef.current.length === 0) return
+      peekRef.current = peekRef.current.slice(0, -1)
+    } else {
+      peekRef.current = [...peekRef.current, target]
+    }
+    glideFromShown()
   }
 
   // Move-rate limit (settings.moveRate): a move that comes sooner than the interval after the
@@ -196,8 +235,12 @@ export function GameScreen({
     if (pausedRef.current) return
     // The eyes look the way the player goes, even when the move is blocked.
     eyeAnimator.look(direction, performance.now())
+    // Moving ends a peek: the camera comes back from wherever it was looking.
+    const peeking = peekRef.current.length > 0
+    const shownCamera = lastFrameRef.current?.camera
     const preMoveWorld = state.current
     const moved = state.move(direction)
+    endPeek(!moved)
     if (!moved) return
     if (settingsRef.current.haptics) moveFeedback()
     const postMoveWorld = state.current
@@ -213,7 +256,7 @@ export function GameScreen({
     const spawnEpsilonId = [...classifyEpsilonVisuals(preMoveWorld, postMoveWorld, state.lastEvents)]
       .find(([, visual]) => visual === 'Spawn')?.[0]
     const budget = { marginCells: DEFAULT_RENDER_BUDGET.marginCells }
-    const sourceCamera = cameraForFocus(preMoveWorld, viewportRef.current, budget, rootAnchorBoardId)
+    const sourceCamera = peeking && shownCamera !== undefined ? shownCamera : cameraForFocus(preMoveWorld, viewportRef.current, budget, rootAnchorBoardId)
     const targetCamera = cameraForFocus(postMoveWorld, viewportRef.current, budget, rootAnchorBoardId)
     // Pieces glide / flip only when both frames share one coordinate space (no Void swap).
     const sameSpace = kind !== 'void-transition' && sameCameraSpace(sourceCamera, targetCamera)
@@ -235,6 +278,7 @@ export function GameScreen({
 
   const handleRestart = () => {
     clearMoveQueue()
+    endPeek(false)
     if (state.restart()) {
       wonRef.current = false
       animationRef.current = null
@@ -244,6 +288,7 @@ export function GameScreen({
 
   const handleUndo = () => {
     clearMoveQueue()
+    endPeek(false)
     if (state.undo()) {
       wonRef.current = false
       animationRef.current = null // cancel any in-flight animation — undo settles instantly
@@ -315,7 +360,7 @@ export function GameScreen({
         if (rawT >= 1) {
           animationRef.current = null
           world = state.current
-          camera = cameraForFocus(world, viewport, { marginCells: DEFAULT_RENDER_BUDGET.marginCells }, rootAnchorBoardId)
+          camera = restingCamera(world, viewport)
         } else {
           const t = easeOut(Math.max(0, rawT))
           if (anim.kind === 'void-transition' || !sameCameraSpace(anim.sourceCamera, anim.targetCamera)) {
@@ -336,7 +381,14 @@ export function GameScreen({
           }
         }
       } else {
-        camera = cameraForFocus(world, viewport, { marginCells: DEFAULT_RENDER_BUDGET.marginCells }, rootAnchorBoardId)
+        camera = restingCamera(world, viewport)
+        // Gliding into / out of a peek.
+        const glide = cameraGlideRef.current
+        if (glide !== null) {
+          const t = (performance.now() - glide.startMs) / PEEK_GLIDE_MS
+          if (t >= 1 || !sameCameraSpace(glide.from, camera)) cameraGlideRef.current = null
+          else camera = interpolateCamera(glide.from, camera, easeOut(t))
+        }
       }
 
       // Same cached anchor id used for the camera above — the Void anchor case is
@@ -442,7 +494,6 @@ export function GameScreen({
       <SwipeLayer className="swipe-board" disabled={wholeScreen} onMove={handleMove} settings={settings} onTap={inspectAt} onLongPress={inspectAt}>{stage}</SwipeLayer>
       {showDPad ? <DPad onMove={handleMove} /> : <div className="controls-hint">{settings.controls === 'tap' ? '点画面的上、下、左、右边来移动' : '在画面上滑动来移动'}</div>}
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
-      {inspecting !== null && <InspectView world={state.current} pieceId={inspecting} onClose={() => setInspecting(null)} />}
       {state.isWon && (
         <div className="win-overlay" role="dialog" aria-label="通关">
           <div className="win-card">

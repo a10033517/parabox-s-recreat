@@ -14,6 +14,7 @@ export interface Hit {
   pieceId: PieceId
   boardId: BoardId // the board the piece stands on
   cellPixels: number // how big the piece is drawn on screen
+  rect: { originX: number; originY: number; scale: number } // where its cell is drawn, in camera units
 }
 
 // Every piece under the screen point (sx, sy) — viewport pixels — from the outermost to the
@@ -39,7 +40,7 @@ export function hitTestChain(view: HitView, sx: number, sy: number, minCellPixel
     const x = mirrorH ? board.size - 1 - col : col
     const pieceId = occupantAt(world, { board: boardId, x, y: row })
     if (pieceId === undefined) break
-    chain.push({ pieceId, boardId, cellPixels })
+    chain.push({ pieceId, boardId, cellPixels, rect: { originX: t.originX + col * t.scale, originY: t.originY + row * t.scale, scale: t.scale } })
     const target = resolveRecursionTarget(world, world.pieces[pieceId])
     const inner = target !== null ? world.boards[target.boardId] : undefined
     if (target === null || inner === undefined) break
@@ -48,14 +49,4 @@ export function hitTestChain(view: HitView, sx: number, sy: number, minCellPixel
     mirrorH = mirrorH !== target.mirrorH
   }
   return chain
-}
-
-// The box with a room inside that a tap at (sx, sy) means: the innermost one under the finger
-// that is still big enough to point at (tapping a small box inside a box picks the outer box).
-export function containerAt(view: HitView, sx: number, sy: number): PieceId | null {
-  const chain = hitTestChain(view, sx, sy)
-  for (let i = chain.length - 1; i >= 0; i--) {
-    if (resolveRecursionTarget(view.world, view.world.pieces[chain[i].pieceId]) !== null) return chain[i].pieceId
-  }
-  return null
 }

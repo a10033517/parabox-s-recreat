@@ -128,7 +128,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 
         {tab === 'other' && (
           <>
-            <Row title="点箱子查看内部" hint={settings.controls === 'tap' ? '长按有内部的箱子,查看它里面的结构' : '点一下(或长按)有内部的箱子,查看它里面的结构'}>
+            <Row title="点箱子查看内部" hint={settings.controls === 'tap' ? '长按有内部的箱子,镜头会拉近看里面;点箱子外面或移动就回来' : '点有内部的箱子,镜头会拉近看里面;再点里面的箱子看更深,点箱子外面或移动就回来'}>
               <Toggle label="点箱子查看内部" checked={settings.tapToInspect} onChange={(v) => set('tapToInspect', v)} />
             </Row>
           </>

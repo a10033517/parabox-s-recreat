@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { containerAt, hitTestChain } from './hitTest'
+import { hitTestChain } from './hitTest'
+import { peekTargetAt } from './peek'
 import { makeFloorBoard, makeWorld } from '../engine/testFixtures'
 import { PLAYER_ID, World } from '../engine/types'
 
@@ -26,31 +27,51 @@ function nested(fliph = false): World {
   )
 }
 
-describe('hitTestChain / containerAt', () => {
-  it('finds the piece under the finger, outermost first, through the box it is drawn in', () => {
+const ROOT = { originX: 0, originY: 0, scale: 4 } // the root room, in camera units
+const peekAt = (w: World, sx: number, sy: number, view = ROOT) => {
+  const v = view as { originX: number; originY: number; scale: number }
+  return peekTargetAt(w, view0.camera, view0.viewport, hitTestChain({ ...view0, world: w }, sx, sy), v, sx, sy)
+}
+const view0 = view(nested())
+
+describe('hitTestChain', () => {
+  it('finds the piece under the finger, outermost first, with where each is drawn', () => {
     // A covers x 200..300, y 100..200; its room's cells are 25px: B is at 200..225, 100..125.
-    expect(hitTestChain(view(nested()), 210, 110).map((h) => h.pieceId)).toEqual(['A', 'B'])
-    expect(containerAt(view(nested()), 210, 110)).toBe('B')
-  })
-
-  it('tapping a plain box inside a box means the box around it', () => {
-    expect(containerAt(view(nested()), 290, 190)).toBe('A') // 'small' at aIn (3,3)
-  })
-
-  it('empty floor and plain boxes outside any box are not boxes to look into', () => {
-    expect(containerAt(view(nested()), 350, 350)).toBeNull()
-    expect(containerAt(view(nested()), 50, 50)).toBeNull() // the player (no interior)
+    const chain = hitTestChain(view(nested()), 210, 110)
+    expect(chain.map((h) => h.pieceId)).toEqual(['A', 'B'])
+    expect(chain[0].rect).toEqual({ originX: 2, originY: 1, scale: 1 })
+    expect(chain[1].rect).toEqual({ originX: 2, originY: 1, scale: 0.25 })
   })
 
   it('inside a flipped box, the mirrored column is what is under the finger', () => {
     // Mirrored, B (interior column 0) is drawn at the right: 275..300.
-    expect(containerAt(view(nested(true)), 210, 110)).toBe('A')
-    expect(containerAt(view(nested(true)), 290, 110)).toBe('B')
+    expect(hitTestChain(view(nested(true)), 210, 110).map((h) => h.pieceId)).toEqual(['A'])
+    expect(hitTestChain(view(nested(true)), 290, 110).map((h) => h.pieceId)).toEqual(['A', 'B'])
   })
 
-  it('a box drawn too small to point at is skipped', () => {
+  it('a box drawn too small to point at ends the search', () => {
     const tiny = { ...view(nested()), camera: { anchor: 'root' as const, centerX: 2, centerY: 2, pixelsPerRootUnit: 40 }, viewport: { width: 160, height: 160 } }
-    // A is 40px (big enough); B is 10px (too small) -> A.
-    expect(containerAt(tiny, 82, 42)).toBe('A')
+    expect(hitTestChain(tiny, 82, 42).map((h) => h.pieceId)).toEqual(['A']) // B is 10px
+  })
+})
+
+describe('peekTargetAt', () => {
+  it('tapping a box in the room peeks into that box — the outermost one, one level at a time', () => {
+    expect(peekAt(nested(), 210, 110)).toEqual({ pieceId: 'A', rect: { originX: 2, originY: 1, scale: 1 } })
+  })
+
+  it('while peeking into A, a box inside it goes one level deeper', () => {
+    const inA = { originX: 2, originY: 1, scale: 1 }
+    expect(peekAt(nested(), 210, 110, inA)).toEqual({ pieceId: 'B', rect: { originX: 2, originY: 1, scale: 0.25 } })
+  })
+
+  it('outside the box being peeked into means "come back out"', () => {
+    expect(peekAt(nested(), 50, 350, { originX: 2, originY: 1, scale: 1 })).toBe('outside')
+  })
+
+  it('empty floor and boxes without a room are nothing to peek into', () => {
+    expect(peekAt(nested(), 350, 350)).toBeNull()
+    expect(peekAt(nested(), 50, 50)).toBeNull() // the player
+    expect(peekAt(nested(), 290, 190, { originX: 2, originY: 1, scale: 1 })).toBeNull() // 'small' inside A
   })
 })
