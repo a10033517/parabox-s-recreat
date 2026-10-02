@@ -12,12 +12,21 @@ describe('SwipeTracker', () => {
     expect(t.end(135, 105)).toBeNull() // already stepped
   })
 
-  it('"move" + drag: one step per threshold travelled, and it can turn', () => {
+  it('"move" + drag: later steps need three thresholds more, one step per event, and it can turn', () => {
     const t = tracker('move')
     t.begin(0, 0)
-    expect(t.move(95, 0)).toEqual(['right', 'right', 'right']) // one fast event covering 3 steps
-    expect(t.move(95, 40)).toEqual(['down'])
-    expect(t.move(60, 40)).toEqual(['left'])
+    expect(t.move(95, 0)).toEqual(['right']) // one fast event far past the threshold: still one step
+    expect(t.move(170, 0)).toEqual([]) // 75 more: not yet (needs 90)
+    expect(t.move(186, 0)).toEqual(['right'])
+    expect(t.move(186, 100)).toEqual(['down'])
+    expect(t.move(90, 100)).toEqual(['left'])
+  })
+
+  it('an ordinary swipe that overshoots the threshold is one step', () => {
+    const t = tracker('move')
+    t.begin(0, 0)
+    const steps = [10, 40, 80, 120, 110].flatMap((x) => t.move(x, 0))
+    expect(steps).toEqual(['right'])
   })
 
   it('"move" without drag: one step per swipe', () => {
