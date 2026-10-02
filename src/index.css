@@ -661,6 +661,31 @@ canvas {
   text-align: left;
 }
 
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.settings-tabs button {
+  flex: 1;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.settings-tabs button.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .settings-section {
   color: var(--text-muted);
   font-size: 0.75rem;
