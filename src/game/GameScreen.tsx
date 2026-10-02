@@ -13,6 +13,7 @@ import { SettingsPanel } from '../ui/SettingsPanel'
 import { InspectView } from '../ui/InspectView'
 import { containerAt } from './render/hitTest'
 import { BoardTransform } from './render/recursiveTransform'
+import { EyeAnimator } from './render/eyes'
 import { MOVE_INTERVAL_MS, useSettings } from '../storage/settings'
 import { moveFeedback } from '../native'
 
@@ -134,6 +135,9 @@ export function GameScreen({
   const wonRef = useRef(false)
   const viewportRef = useRef<Viewport>({ width: 320, height: 320 })
   const animationRef = useRef<RenderAnimation | null>(null)
+  const eyesRef = useRef<EyeAnimator>()
+  if (!eyesRef.current) eyesRef.current = new EyeAnimator(performance.now())
+  const eyeAnimator = eyesRef.current
   const [settings] = useSettings()
   // The keyboard listener is registered once, so it reads the latest settings through a ref.
   const settingsRef = useRef(settings)
@@ -189,6 +193,8 @@ export function GameScreen({
 
   const performMove = (direction: Direction) => {
     if (pausedRef.current) return
+    // The eyes look the way the player goes, even when the move is blocked.
+    eyeAnimator.look(direction, performance.now())
     const preMoveWorld = state.current
     const moved = state.move(direction)
     if (!moved) return
@@ -337,6 +343,7 @@ export function GameScreen({
         const animT = currentAnim === null ? 1 : easeOut(Math.max(0, Math.min(1, (performance.now() - currentAnim.startTimeMs) / currentAnim.durationMs)))
         const gliding = currentAnim !== null && currentAnim.kind !== 'void-transition' && sameCameraSpace(currentAnim.sourceCamera, currentAnim.targetCamera)
         const crossBoard = gliding ? currentAnim.crossBoard : []
+        const eyes = eyeAnimator.sample(performance.now())
         const dc: DrawContext = {
           ctx,
           world,
@@ -360,6 +367,7 @@ export function GameScreen({
               ? (pieceId) => (currentAnim.flipped.has(pieceId) ? flipScaleAt(animT) : 1)
               : undefined,
           hiddenPieces: crossBoard.length > 0 ? new Set(crossBoard.map((m) => m.pieceId)) : undefined,
+          getEyes: (pieceId) => (pieceId === PLAYER_ID ? eyes : undefined),
         }
         const drawRoot = resolveDrawRoot(world, anchorBoardId, 2, dc.getRenderLocation)
         drawBoardRecursive(dc, world.boards[drawRoot.boardId], drawRoot, 0, 0, false)
