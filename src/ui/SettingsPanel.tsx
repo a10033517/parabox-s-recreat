@@ -98,6 +98,10 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           <Toggle label="点箱子查看内部" checked={settings.tapToInspect} onChange={(v) => set('tapToInspect', v)} />
         </Row>
 
+        <Row title="背景音乐" hint="进入虚空时会换成虚空的配乐">
+          <Segmented label="背景音乐" value={settings.music} onChange={(v) => set('music', v)} options={[{ value: 'off', label: '关' }, { value: 'low', label: '小' }, { value: 'medium', label: '中' }, { value: 'high', label: '大' }]} />
+        </Row>
+
         <Row title="震动回馈" hint="每走一步轻轻震动一下">
           <Toggle label="震动回馈" checked={settings.haptics} onChange={(v) => set('haptics', v)} />
         </Row>

@@ -45,7 +45,7 @@ test('a short movement below the threshold does not trigger a move', () => {
 })
 
 describe('control settings', () => {
-  const base = { controls: 'swipe' as const, swipeArea: 'screen' as const, swipeTrigger: 'move' as const, dragSteps: true, holdRepeat: false, sensitivity: 'medium' as const, haptics: false, tapToInspect: true, moveRate: 'unlimited' as const }
+  const base = { controls: 'swipe' as const, swipeArea: 'screen' as const, swipeTrigger: 'move' as const, dragSteps: true, holdRepeat: false, sensitivity: 'medium' as const, haptics: false, tapToInspect: true, moveRate: 'unlimited' as const, music: 'off' as const }
 
   it('"move" trigger with drag: a long drag steps several times before the finger lifts', () => {
     const onMove = vi.fn()
@@ -94,7 +94,7 @@ describe('control settings', () => {
 })
 
 describe('tap and long press (look inside a box)', () => {
-  const base = { controls: 'swipe' as const, swipeArea: 'screen' as const, swipeTrigger: 'move' as const, dragSteps: true, holdRepeat: false, sensitivity: 'medium' as const, haptics: false, tapToInspect: true, moveRate: 'unlimited' as const }
+  const base = { controls: 'swipe' as const, swipeArea: 'screen' as const, swipeTrigger: 'move' as const, dragSteps: true, holdRepeat: false, sensitivity: 'medium' as const, haptics: false, tapToInspect: true, moveRate: 'unlimited' as const, music: 'off' as const }
 
   it('swipe mode: a tap is reported (not a move)', () => {
     const onMove = vi.fn()

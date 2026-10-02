@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { GameState } from './engine/GameState'
 import { possess } from './engine/rules'
-import { BoardId, Direction, Location, PieceId, PLAYER_ID, VOID_BOARD_ID, World } from './engine/types'
+import { BoardId, Direction, Location, PieceId, PLAYER_ID, VOID_BOARD_ID, World, isInVoidSpace } from './engine/types'
 import { DrawContext, DEFAULT_RENDER_BUDGET, drawBoardRecursive, drawPiece, indexPiecesByBoard } from './render/CanvasRenderer'
 import { CrossBoardMove, crossBoardMoves, flipScaleAt, flippedPieces, interpolateCell } from './render/moveAnimation'
 import { CameraTransform, Viewport, cameraForFocus, interpolateCamera } from './render/camera'
@@ -14,6 +14,7 @@ import { InspectView } from '../ui/InspectView'
 import { containerAt } from './render/hitTest'
 import { BoardTransform } from './render/recursiveTransform'
 import { EyeAnimator } from './render/eyes'
+import { music } from '../audio/music'
 import { MOVE_INTERVAL_MS, useSettings } from '../storage/settings'
 import { moveFeedback } from '../native'
 
@@ -303,6 +304,9 @@ export function GameScreen({
 
       const anim = animationRef.current
       let world = state.current
+      // The Void has its own music; set from where the player really is (not mid-animation).
+      const playerBoard = state.current.locations[PLAYER_ID]?.board
+      music.setTheme(playerBoard !== undefined && isInVoidSpace(state.current, playerBoard) ? 'void' : 'main')
       let camera: CameraTransform
       let dimAlpha = 0 // Void-transition darken overlay, 0..1
 
