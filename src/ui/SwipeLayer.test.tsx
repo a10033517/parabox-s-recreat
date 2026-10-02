@@ -45,16 +45,17 @@ test('a short movement below the threshold does not trigger a move', () => {
 })
 
 describe('control settings', () => {
-  const base = { controls: 'swipe' as const, swipeArea: 'screen' as const, swipeTrigger: 'move' as const, dragSteps: true, holdRepeat: false, sensitivity: 'medium' as const, haptics: false, tapToInspect: true }
+  const base = { controls: 'swipe' as const, swipeArea: 'screen' as const, swipeTrigger: 'move' as const, dragSteps: true, holdRepeat: false, sensitivity: 'medium' as const, haptics: false, tapToInspect: true, moveRate: 'unlimited' as const }
 
   it('"move" trigger with drag: a long drag steps several times before the finger lifts', () => {
     const onMove = vi.fn()
     render(<SwipeLayer onMove={onMove} settings={base}><div>content</div></SwipeLayer>)
     const el = screen.getByTestId('swipe-layer')
     fireEvent.touchStart(el, touch(0, 0))
-    fireEvent.touchMove(el, touch(90, 0))
+    // Medium sensitivity: 28px for the first step, then 3 x 28 = 84px more for each next one.
+    for (const x of [30, 60, 115, 200]) fireEvent.touchMove(el, touch(x, 0))
     expect(onMove.mock.calls.map((c) => c[0])).toEqual(['right', 'right', 'right'])
-    fireEvent.touchEnd(el, touch(90, 0))
+    fireEvent.touchEnd(el, touch(200, 0))
     expect(onMove).toHaveBeenCalledTimes(3)
   })
 
@@ -93,7 +94,7 @@ describe('control settings', () => {
 })
 
 describe('tap and long press (look inside a box)', () => {
-  const base = { controls: 'swipe' as const, swipeArea: 'screen' as const, swipeTrigger: 'move' as const, dragSteps: true, holdRepeat: false, sensitivity: 'medium' as const, haptics: false, tapToInspect: true }
+  const base = { controls: 'swipe' as const, swipeArea: 'screen' as const, swipeTrigger: 'move' as const, dragSteps: true, holdRepeat: false, sensitivity: 'medium' as const, haptics: false, tapToInspect: true, moveRate: 'unlimited' as const }
 
   it('swipe mode: a tap is reported (not a move)', () => {
     const onMove = vi.fn()

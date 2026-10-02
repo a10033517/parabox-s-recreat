@@ -9,6 +9,10 @@ export interface GestureConfig {
   dragSteps: boolean // 'move' trigger: keep stepping as the finger keeps travelling
 }
 
+// With drag steps on, each step after the first needs this many thresholds more travel — so an
+// ordinary swipe, which overshoots the threshold a lot, is still one step.
+export const DRAG_STEP_FACTOR = 3
+
 export function dominantDirection(dx: number, dy: number): Direction {
   if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'right' : 'left'
   return dy > 0 ? 'down' : 'up'
@@ -39,21 +43,15 @@ export class SwipeTracker {
   move(x: number, y: number): Direction[] {
     if (this.anchor === null || this.config.trigger !== 'move') return []
     if (this.stepped && !this.config.dragSteps) return []
-    const out: Direction[] = []
-    // A fast drag can cover several thresholds in one event: take them all.
-    for (;;) {
-      const dx: number = x - this.anchor.x
-      const dy: number = y - this.anchor.y
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < this.config.threshold) break
-      const dir = dominantDirection(dx, dy)
-      out.push(dir)
-      this.stepped = true
-      if (!this.config.dragSteps) break
-      // The next step is measured from one threshold further along, on the axis just used.
-      if (dir === 'left' || dir === 'right') this.anchor = { x: this.anchor.x + Math.sign(dx) * this.config.threshold, y: this.anchor.y }
-      else this.anchor = { x: this.anchor.x, y: this.anchor.y + Math.sign(dy) * this.config.threshold }
-    }
-    return out
+    const dx = x - this.anchor.x
+    const dy = y - this.anchor.y
+    const needed = this.stepped ? this.config.threshold * DRAG_STEP_FACTOR : this.config.threshold
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < needed) return []
+    // One step per event at most: a fast flick that jumps far in one event is still one step.
+    // The next step is measured from where the finger is now.
+    this.stepped = true
+    this.anchor = { x, y }
+    return [dominantDirection(dx, dy)]
   }
 
   // The finger lifted at (x, y): a step for the 'release' trigger, or 'tap' when it barely moved.

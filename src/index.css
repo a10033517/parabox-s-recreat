@@ -736,6 +736,19 @@ canvas {
   border-top: 1px solid var(--border);
 }
 
+.settings-row.is-stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.settings-row.is-stacked .seg {
+  display: flex;
+}
+
+.settings-row.is-stacked .seg button {
+  flex: 1;
+}
+
 .settings-row-title {
   font-size: 0.95rem;
 }

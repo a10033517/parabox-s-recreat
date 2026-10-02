@@ -4,7 +4,7 @@ import { possess } from './engine/rules'
 import { BoardId, Direction, Location, PieceId, PLAYER_ID, VOID_BOARD_ID, World } from './engine/types'
 import { DrawContext, DEFAULT_RENDER_BUDGET, drawBoardRecursive, drawPiece, indexPiecesByBoard } from './render/CanvasRenderer'
 import { CrossBoardMove, crossBoardMoves, flipScaleAt, flippedPieces, interpolateCell } from './render/moveAnimation'
-import { CameraTransform, Viewport, cameraForFocus } from './render/camera'
+import { CameraTransform, Viewport, cameraForFocus, interpolateCamera } from './render/camera'
 import { resolveAnchorBoardId, resolveDrawRoot } from './render/recursiveTransform'
 import { classifyEpsilonVisuals, epsilonSpawnScale } from './render/epsilonAnimation'
 import { DPad } from '../ui/DPad'
@@ -13,7 +13,8 @@ import { SettingsPanel } from '../ui/SettingsPanel'
 import { InspectView } from '../ui/InspectView'
 import { containerAt } from './render/hitTest'
 import { BoardTransform } from './render/recursiveTransform'
-import { useSettings } from '../storage/settings'
+import { EyeAnimator } from './render/eyes'
+import { MOVE_INTERVAL_MS, useSettings } from '../storage/settings'
 import { moveFeedback } from '../native'
 
 export type AnimationKind = 'move' | 'enter-leave' | 'teleport' | 'void-transition'
@@ -42,6 +43,9 @@ const DURATIONS: Record<AnimationKind, number> = {
 
 // A move that spawns an ε plays longer, so the scale-up is readable after the world swap.
 export const EPSILON_SPAWN_DURATION_MS = 700
+
+// Moves that may wait for the move-rate limit; more than this and the extra input is dropped.
+const MAX_QUEUED_MOVES = 2
 
 // Exported (rather than module-private) so the animation layer's own logic can be
 // unit-tested directly against real pre/post World pairs, instead of only indirectly
@@ -131,6 +135,9 @@ export function GameScreen({
   const wonRef = useRef(false)
   const viewportRef = useRef<Viewport>({ width: 320, height: 320 })
   const animationRef = useRef<RenderAnimation | null>(null)
+  const eyesRef = useRef<EyeAnimator>()
+  if (!eyesRef.current) eyesRef.current = new EyeAnimator(performance.now())
+  const eyeAnimator = eyesRef.current
   const [settings] = useSettings()
   // The keyboard listener is registered once, so it reads the latest settings through a ref.
   const settingsRef = useRef(settings)
@@ -152,8 +159,42 @@ export function GameScreen({
     if (pieceId !== null) setInspecting(pieceId)
   }
 
+  // Move-rate limit (settings.moveRate): a move that comes sooner than the interval after the
+  // last one waits; at most MAX_QUEUED wait, anything beyond is dropped.
+  const moveQueueRef = useRef<{ pending: Direction[]; lastAt: number; timer?: number }>({ pending: [], lastAt: -Infinity })
+  const clearMoveQueue = () => {
+    window.clearTimeout(moveQueueRef.current.timer)
+    moveQueueRef.current = { pending: [], lastAt: moveQueueRef.current.lastAt }
+  }
+  useEffect(() => clearMoveQueue, [])
+  const drainMoveQueue = () => {
+    const q = moveQueueRef.current
+    q.timer = undefined
+    const next = q.pending.shift()
+    if (next === undefined) return
+    q.lastAt = performance.now()
+    performMove(next)
+    if (q.pending.length > 0) q.timer = window.setTimeout(drainMoveQueue, MOVE_INTERVAL_MS[settingsRef.current.moveRate])
+  }
   const handleMove = (direction: Direction) => {
     if (pausedRef.current) return
+    const q = moveQueueRef.current
+    const interval = MOVE_INTERVAL_MS[settingsRef.current.moveRate]
+    const now = performance.now()
+    if (interval <= 0 || (q.pending.length === 0 && q.timer === undefined && now - q.lastAt >= interval)) {
+      q.lastAt = now
+      performMove(direction)
+      return
+    }
+    if (q.pending.length >= MAX_QUEUED_MOVES) return
+    q.pending.push(direction)
+    if (q.timer === undefined) q.timer = window.setTimeout(drainMoveQueue, Math.max(0, q.lastAt + interval - now))
+  }
+
+  const performMove = (direction: Direction) => {
+    if (pausedRef.current) return
+    // The eyes look the way the player goes, even when the move is blocked.
+    eyeAnimator.look(direction, performance.now())
     const preMoveWorld = state.current
     const moved = state.move(direction)
     if (!moved) return
@@ -192,6 +233,7 @@ export function GameScreen({
   }
 
   const handleRestart = () => {
+    clearMoveQueue()
     if (state.restart()) {
       wonRef.current = false
       animationRef.current = null
@@ -200,6 +242,7 @@ export function GameScreen({
   }
 
   const handleUndo = () => {
+    clearMoveQueue()
     if (state.undo()) {
       wonRef.current = false
       animationRef.current = null // cancel any in-flight animation — undo settles instantly
@@ -284,13 +327,8 @@ export function GameScreen({
             }
           } else {
             world = anim.postWorld
-            camera = {
-              ...(anim.targetCamera.anchorBoardId !== undefined ? { anchorBoardId: anim.targetCamera.anchorBoardId } : {}),
-              anchor: anim.targetCamera.anchor,
-              centerX: lerp(anim.sourceCamera.centerX, anim.targetCamera.centerX, t),
-              centerY: lerp(anim.sourceCamera.centerY, anim.targetCamera.centerY, t),
-              pixelsPerRootUnit: lerp(anim.sourceCamera.pixelsPerRootUnit, anim.targetCamera.pixelsPerRootUnit, t),
-            }
+            // Same progress (t) as the gliding pieces, so the zoom lands with them.
+            camera = interpolateCamera(anim.sourceCamera, anim.targetCamera, t)
           }
         }
       } else {
@@ -305,6 +343,7 @@ export function GameScreen({
         const animT = currentAnim === null ? 1 : easeOut(Math.max(0, Math.min(1, (performance.now() - currentAnim.startTimeMs) / currentAnim.durationMs)))
         const gliding = currentAnim !== null && currentAnim.kind !== 'void-transition' && sameCameraSpace(currentAnim.sourceCamera, currentAnim.targetCamera)
         const crossBoard = gliding ? currentAnim.crossBoard : []
+        const eyes = eyeAnimator.sample(performance.now())
         const dc: DrawContext = {
           ctx,
           world,
@@ -328,6 +367,7 @@ export function GameScreen({
               ? (pieceId) => (currentAnim.flipped.has(pieceId) ? flipScaleAt(animT) : 1)
               : undefined,
           hiddenPieces: crossBoard.length > 0 ? new Set(crossBoard.map((m) => m.pieceId)) : undefined,
+          getEyes: (pieceId) => (pieceId === PLAYER_ID ? eyes : undefined),
         }
         const drawRoot = resolveDrawRoot(world, anchorBoardId, 2, dc.getRenderLocation)
         drawBoardRecursive(dc, world.boards[drawRoot.boardId], drawRoot, 0, 0, false)

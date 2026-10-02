@@ -13,9 +13,9 @@ function Segmented<T extends string>({ value, options, onChange, label }: { valu
   )
 }
 
-function Row({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+function Row({ title, hint, children, stacked }: { title: string; hint?: string; children: ReactNode; stacked?: boolean }) {
   return (
-    <div className="settings-row">
+    <div className={`settings-row${stacked ? ' is-stacked' : ''}`}>
       <div className="settings-row-text">
         <div className="settings-row-title">{title}</div>
         {hint !== undefined && <div className="settings-row-hint">{hint}</div>}
@@ -76,7 +76,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             </Row>
             {settings.swipeTrigger === 'move' && (
               <>
-                <Row title="拖曳连续移动" hint="手指不放开继续拖,每多一段距离就再走一步,也可以转弯">
+                <Row title="拖曳连续移动" hint="手指不放开继续拖,每多拖一大段距离再走一步,也可以转弯">
                   <Toggle label="拖曳连续移动" checked={settings.dragSteps} onChange={(v) => set('dragSteps', v)} />
                 </Row>
                 <Row title="按住持续移动" hint="滑动后手指停住不放,会一直往那个方向走">
@@ -89,6 +89,10 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             </Row>
           </>
         )}
+
+        <Row title="最快移动速度" hint="输入再快,每秒最多走几步;来不及走的会排队(最多 2 步)" stacked>
+          <Segmented label="最快移动速度" value={settings.moveRate} onChange={(v) => set('moveRate', v)} options={[{ value: 'unlimited', label: '不限' }, { value: 'fast', label: '每秒 8 步' }, { value: 'medium', label: '每秒 5 步' }, { value: 'slow', label: '每秒 3 步' }]} />
+        </Row>
 
         <Row title="点箱子查看内部" hint={settings.controls === 'tap' ? '长按有内部的箱子,查看它里面的结构' : '点一下(或长按)有内部的箱子,查看它里面的结构'}>
           <Toggle label="点箱子查看内部" checked={settings.tapToInspect} onChange={(v) => set('tapToInspect', v)} />

@@ -42,6 +42,26 @@ export function worldToScreen(
   }
 }
 
+// The camera part-way (t in 0..1) from source to target, for entering / leaving a box. The zoom
+// is geometric — the same curve a piece's size follows as it glides into a box
+// (interpolateCell), so the box reaches its full framing exactly when the piece lands inside —
+// and the centre moves with the zoom, so the point being zoomed into stays put on screen
+// instead of swinging across it.
+export function interpolateCamera(source: CameraTransform, target: CameraTransform, t: number): CameraTransform {
+  const p0 = source.pixelsPerRootUnit
+  const p1 = target.pixelsPerRootUnit
+  const pixelsPerRootUnit = p0 * Math.pow(p1 / p0, t)
+  // How far along the visible span has shrunk / grown; plain t when the zoom does not change.
+  const u = Math.abs(1 / p1 - 1 / p0) < 1e-12 * (1 / p0) ? t : (1 / pixelsPerRootUnit - 1 / p0) / (1 / p1 - 1 / p0)
+  return {
+    ...(target.anchorBoardId !== undefined ? { anchorBoardId: target.anchorBoardId } : {}),
+    anchor: target.anchor,
+    centerX: source.centerX + (target.centerX - source.centerX) * u,
+    centerY: source.centerY + (target.centerY - source.centerY) * u,
+    pixelsPerRootUnit,
+  }
+}
+
 export function cameraFallbackForAnchor(anchor: CameraAnchor, viewport: Viewport, budget: CameraBudget): CameraTransform {
   const spanUnits = 1 + 2 * budget.marginCells
   return { anchor, centerX: 0.5, centerY: 0.5, pixelsPerRootUnit: clampCameraZoom(Math.min(viewport.width, viewport.height) / spanUnits) }
@@ -108,7 +128,7 @@ export function cameraForFocus(
     }
   }
 
-  // Case 1: frame the containing box's own cell on its parent board, plus margin — the box
+  // Case 1: frame the containing box's own cell on its parent board — the box
   // through which the renderer actually shows this board (ownerPathToAnchor).
   if (anchorBoardId === null) return cameraFallbackForAnchor(anchor, viewport, budget)
   const ownerId = ownerPathToAnchor(world, focusBoardId, anchorBoardId)?.[0]
@@ -116,13 +136,24 @@ export function cameraForFocus(
   if (ownerLoc === undefined) return cameraFallbackForAnchor(anchor, viewport, budget)
   const parent = boardTransformInAnchor(world, ownerLoc.board, anchorBoardId)
   if (parent === null) return cameraFallbackForAnchor(anchor, viewport, budget)
-  const spanUnits = 1 + 2 * budget.marginCells
+  // The box the player walked into is drawn exactly as big as the level's own room is when the
+  // player stands in it (Case 2) — entering a box never shrinks the room on screen; its
+  // surroundings show in the same margin around it.
+  const roomFraction = anchorRoomFraction(world, anchorBoardId, budget)
   const ownerX = parent.mirrorH === true ? world.boards[ownerLoc.board].size - 1 - ownerLoc.x : ownerLoc.x
   return {
     ...local,
     anchor,
     centerX: parent.originX + (ownerX + 0.5) * parent.scale,
     centerY: parent.originY + (ownerLoc.y + 0.5) * parent.scale,
-    pixelsPerRootUnit: clampCameraZoom(shortSide / (spanUnits * parent.scale)),
+    pixelsPerRootUnit: clampCameraZoom((shortSide * roomFraction) / parent.scale),
   }
+}
+
+// How much of the view's short side the level's own room fills when the player stands in it:
+// the room plus budget.marginCells of its cells on each side. Every room the player (or the
+// inspect view) is in is drawn at this size.
+export function anchorRoomFraction(world: World, anchorBoardId: BoardId, budget: CameraBudget): number {
+  const size = world.boards[anchorBoardId]?.size ?? 1
+  return size / (size + 2 * budget.marginCells)
 }

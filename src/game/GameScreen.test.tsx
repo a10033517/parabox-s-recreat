@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   GameScreen,
@@ -12,6 +12,8 @@ import { makeFloorBoard, makeWorld, setRequirement, setWall } from './engine/tes
 import { PLAYER_ID, VOID_BOARD_ID, World } from './engine/types'
 
 beforeEach(() => {
+  // Moves apply at once in these tests; the move-rate limit has its own test below.
+  localStorage.setItem('parabox:settings', JSON.stringify({ moveRate: 'unlimited' }))
   HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
     fillRect: vi.fn(),
     strokeRect: vi.fn(),
@@ -118,6 +120,25 @@ test('pushing the player into a self-loop sends them to the Void, and play conti
   expect(screen.getByText('步数: 2')).toBeInTheDocument()
   await user.click(screen.getByText('离开'))
   expect(onExit).toHaveBeenCalledTimes(1)
+})
+
+test('the move-rate limit makes fast input wait its turn, and drops input beyond two waiting moves', () => {
+  vi.useFakeTimers()
+  try {
+    localStorage.setItem('parabox:settings', JSON.stringify({ moveRate: 'slow', controls: 'dpad' }))
+    render(<GameScreen initialWorld={makeWorld([makeFloorBoard('root', 7)], [{ id: PLAYER_ID, kind: 'player' }], { [PLAYER_ID]: { board: 'root', x: 0, y: 3 } })} onExit={() => {}} onWin={() => {}} />)
+    const right = screen.getByLabelText('右')
+    for (let i = 0; i < 5; i++) fireEvent.click(right)
+    expect(screen.getByText('步数: 1')).toBeInTheDocument() // the first goes at once
+    act(() => { vi.advanceTimersByTime(320) })
+    expect(screen.getByText('步数: 2')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(320) })
+    expect(screen.getByText('步数: 3')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(2000) })
+    expect(screen.getByText('步数: 3')).toBeInTheDocument() // the last two clicks were dropped
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 test('captures the exact pre-move and post-move World via state.current, not a history index', async () => {

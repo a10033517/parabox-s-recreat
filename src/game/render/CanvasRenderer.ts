@@ -1,4 +1,5 @@
 import { Board, BoardId, Location, Piece, PieceId, PieceKind, World, findContainerFor, VOID_BOARD_ID } from '../engine/types'
+import { EyeState } from './eyes'
 import { CameraTransform, Viewport, worldToScreen } from './camera'
 import { BoardTransform } from './recursiveTransform'
 
@@ -227,6 +228,8 @@ export interface DrawContext {
   getPieceFlipScale?: (pieceId: PieceId) => number
   // Pieces skipped by the board draw (the caller draws them itself, e.g. mid-move between boards).
   hiddenPieces?: ReadonlySet<PieceId>
+  // Where the player's eyes look and how open they are (eyes.ts). Absent = straight ahead, open.
+  getEyes?: (pieceId: PieceId) => EyeState | undefined
 }
 
 // A piece the level author flagged infExit/infEnter shows a STATIC badge: infExitNum/
@@ -479,7 +482,12 @@ function drawPieceBody(
     }
   }
   // A player that is itself a box shows its dark interior floor, so its eyes turn pale.
-  if (piece.kind === 'player') drawEyes(dc.ctx, pieceRect, screenCellSize, applyTint(target !== null ? EYE_COLOR_ON_INTERIOR : EYE_COLOR, tintAmount))
+  if (piece.kind === 'player') {
+    const eyes = dc.getEyes?.(pieceId)
+    // Inside a mirrored room the screen's left is the room's right: the gaze is in screen terms.
+    const look = eyes === undefined ? undefined : { ...eyes, lookX: mirrorH ? -eyes.lookX : eyes.lookX }
+    drawEyes(dc.ctx, pieceRect, screenCellSize, applyTint(target !== null ? EYE_COLOR_ON_INTERIOR : EYE_COLOR, tintAmount), look)
+  }
   // A block the player could possess shows faint, empty eyes.
   else if (piece.possessable === true) drawEyes(dc.ctx, pieceRect, screenCellSize, POSSESSABLE_EYE_COLOR)
   drawPieceOutline(dc.ctx, pieceRect, screenCellSize)
@@ -551,14 +559,26 @@ function drawPieceOutline(ctx: CanvasRenderingContext2D, rect: ScreenRect, cellS
 }
 
 // Two round eyes, as on the original's player block and player goal.
-function drawEyes(ctx: CanvasRenderingContext2D, rect: ScreenRect, cellSize: number, color: string): void {
+// `eyes` (the player only): the dots shift toward where it looks and squash shut to blink.
+function drawEyes(ctx: CanvasRenderingContext2D, rect: ScreenRect, cellSize: number, color: string, eyes?: EyeState): void {
   if (cellSize < 6) return
   const r = cellSize * 0.075
+  const shift = cellSize * 0.07
+  const cx = (x: number) => rect.left + cellSize * x + (eyes?.lookX ?? 0) * shift
+  const cy = rect.top + cellSize * 0.44 + (eyes?.lookY ?? 0) * shift
   ctx.fillStyle = color
   ctx.beginPath()
-  ctx.arc(rect.left + cellSize * 0.3, rect.top + cellSize * 0.44, r, 0, Math.PI * 2)
-  ctx.moveTo(rect.left + cellSize * 0.7 + r, rect.top + cellSize * 0.44)
-  ctx.arc(rect.left + cellSize * 0.7, rect.top + cellSize * 0.44, r, 0, Math.PI * 2)
+  const open = eyes?.open ?? 1
+  if (open >= 1 || typeof ctx.ellipse !== 'function') {
+    ctx.arc(cx(0.3), cy, r, 0, Math.PI * 2)
+    ctx.moveTo(cx(0.7) + r, cy)
+    ctx.arc(cx(0.7), cy, r, 0, Math.PI * 2)
+  } else {
+    const ry = r * Math.max(0.15, open)
+    ctx.ellipse(cx(0.3), cy, r, ry, 0, 0, Math.PI * 2)
+    ctx.moveTo(cx(0.7) + r, cy)
+    ctx.ellipse(cx(0.7), cy, r, ry, 0, 0, Math.PI * 2)
+  }
   ctx.fill()
 }
 
