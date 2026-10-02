@@ -17,6 +17,7 @@ export function SwipeLayer({
   className,
   onTap,
   onLongPress,
+  disabled = false,
 }: {
   onMove: (direction: Direction) => void
   children: ReactNode
@@ -26,6 +27,8 @@ export function SwipeLayer({
   // mode) — at client coordinates. Used to look inside a box.
   onTap?: (x: number, y: number) => void
   onLongPress?: (x: number, y: number) => void
+  // Ignore every gesture (the element itself stays, so what is inside is never re-created).
+  disabled?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const tracker = useRef<SwipeTracker | null>(null)
@@ -63,7 +66,7 @@ export function SwipeLayer({
   const onButton = (target: EventTarget | null) => target instanceof Element && target.closest('button, input, select, a, [role="dialog"]') !== null
 
   const begin = (x: number, y: number, target: EventTarget | null) => {
-    if (onButton(target)) return
+    if (disabled || onButton(target)) return
     tracker.current = new SwipeTracker(config)
     tracker.current.begin(x, y)
     stopPress()
@@ -128,7 +131,7 @@ export function SwipeLayer({
       onMouseMove={(e) => { if (tracker.current !== null && mouseAllowed()) move(e.clientX, e.clientY) }}
       onMouseUp={(e) => { if (mouseAllowed()) end(e.clientX, e.clientY) }}
       onMouseLeave={() => { if (mouseAllowed()) cancel() }}
-      onDoubleClick={(e) => { if (!onButton(e.target)) onLongPress?.(e.clientX, e.clientY) }}
+      onDoubleClick={(e) => { if (!disabled && !onButton(e.target)) onLongPress?.(e.clientX, e.clientY) }}
     >
       {children}
     </div>

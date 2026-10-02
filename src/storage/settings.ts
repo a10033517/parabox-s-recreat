@@ -15,7 +15,11 @@ export interface Settings {
   haptics: boolean
   tapToInspect: boolean // tap (or long-press) a box to look inside it
   moveRate: MoveRate // the most moves per second, however fast the input comes
+  music: MusicLevel // background music volume
 }
+
+export type MusicLevel = 'off' | 'low' | 'medium' | 'high'
+export const MUSIC_VOLUME: Record<MusicLevel, number> = { off: 0, low: 0.3, medium: 0.6, high: 1 }
 
 export type MoveRate = 'unlimited' | 'fast' | 'medium' | 'slow'
 
@@ -38,6 +42,7 @@ export function defaultSettings(): Settings {
     haptics: true,
     tapToInspect: true,
     moveRate: 'fast',
+    music: 'medium',
   }
 }
 

@@ -7,6 +7,8 @@ import { EditorScreen } from './editor/EditorScreen'
 import { BUILTIN_LEVELS, loadCommunitySampleLevels, loadCustomLevels, loadGeneratedLevels, loadWorldLevels, loadAuthoredLevels, LevelMeta, CUSTOM_LEVEL_ID_PREFIX } from './levels'
 import { deleteCustomLevel, listCompletedLevels, markLevelComplete } from './storage/progress'
 import { ImportDialog } from './ui/ImportDialog'
+import { music } from './audio/music'
+import { MUSIC_VOLUME, useSettings } from './storage/settings'
 
 type Screen = 'menu' | 'levelSelect' | 'game' | 'editor'
 
@@ -15,6 +17,27 @@ export default function App() {
   const [activeLevel, setActiveLevel] = useState<LevelMeta | null>(null)
   const [importing, setImporting] = useState(false)
   const [, refresh] = useState(0) // imported / deleted levels live in storage: re-read them
+
+  // Background music: browsers allow sound only after a gesture, so the first tap / key starts
+  // it; the settings set its volume; it goes quiet while the app is in the background.
+  const [settings] = useSettings()
+  useEffect(() => music.setVolume(MUSIC_VOLUME[settings.music]), [settings.music])
+  useEffect(() => {
+    const unlock = () => music.unlock()
+    const visibility = () => music.setHidden(document.visibilityState === 'hidden')
+    window.addEventListener('pointerdown', unlock)
+    window.addEventListener('keydown', unlock)
+    document.addEventListener('visibilitychange', visibility)
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+      document.removeEventListener('visibilitychange', visibility)
+    }
+  }, [])
+  // Outside a level, always the main theme (GameScreen switches to the Void theme in the Void).
+  useEffect(() => {
+    if (screen !== 'game') music.setTheme('main')
+  }, [screen])
 
   // Android back: game -> level list -> menu -> close the app.
   const screenRef = useRef(screen)

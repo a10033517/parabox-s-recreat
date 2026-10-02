@@ -10,6 +10,7 @@ import {
 } from './GameScreen'
 import { makeFloorBoard, makeWorld, setRequirement, setWall } from './engine/testFixtures'
 import { PLAYER_ID, VOID_BOARD_ID, World } from './engine/types'
+import { loadSettings, saveSettings } from '../storage/settings'
 
 beforeEach(() => {
   // Moves apply at once in these tests; the move-rate limit has its own test below.
@@ -139,6 +140,17 @@ test('the move-rate limit makes fast input wait its turn, and drops input beyond
   } finally {
     vi.useRealTimers()
   }
+})
+
+test('switching the controls keeps the same canvas (a new one would stay black)', () => {
+  render(<GameScreen initialWorld={simpleWorld()} onExit={() => {}} onWin={() => {}} />)
+  const canvas = document.querySelector('canvas')
+  for (const controls of ['dpad', 'swipe', 'tap', 'swipe+dpad'] as const) {
+    act(() => saveSettings({ ...loadSettings(), controls }))
+    expect(document.querySelector('canvas')).toBe(canvas)
+  }
+  act(() => saveSettings({ ...loadSettings(), swipeArea: 'board' }))
+  expect(document.querySelector('canvas')).toBe(canvas)
 })
 
 test('captures the exact pre-move and post-move World via state.current, not a history index', async () => {
