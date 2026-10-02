@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
-import { cameraForFocus, clampCameraZoom, worldToScreen, cameraFallbackForAnchor } from './camera'
+import { cameraForFocus, clampCameraZoom, worldToScreen, cameraFallbackForAnchor, interpolateCamera } from './camera'
 import { makeFloorBoard, makeWorld } from '../engine/testFixtures'
 import { PLAYER_ID, VOID_BOARD_ID } from '../engine/types'
 
@@ -54,7 +54,7 @@ describe('cameraForFocus', () => {
     expect(camera.pixelsPerRootUnit).toBeCloseTo(400 / (4 + 2))
   })
 
-  it('player inside a box: frames that box cell on its parent board plus one ring of the parent', () => {
+  it("player inside a box: frames that box, drawn as big as the level's own room", () => {
     const root = makeFloorBoard('root', 4)
     const inside = makeFloorBoard('inside', 2)
     const world = makeWorld(
@@ -65,7 +65,11 @@ describe('cameraForFocus', () => {
     const camera = cameraForFocus(world, viewport, budget)
     expect(camera.centerX).toBeCloseTo(2.5)
     expect(camera.centerY).toBeCloseTo(1.5)
-    expect(camera.pixelsPerRootUnit).toBeCloseTo(400 / 3)
+    // The root room (4 cells + 1 margin each side) fills 4/6 of the short side; the box (one
+    // root unit) fills the same 4/6 once the player is inside it.
+    expect(camera.pixelsPerRootUnit).toBeCloseTo((400 * 4) / 6)
+    const rootCamera = cameraForFocus(makeWorld([root, inside], [{ id: PLAYER_ID, kind: 'player' }, { id: 'box', kind: 'container', boardRef: 'inside' }], { [PLAYER_ID]: { board: 'root', x: 0, y: 0 }, box: { board: 'root', x: 2, y: 1 } }), viewport, budget)
+    expect(1 * camera.pixelsPerRootUnit).toBeCloseTo(4 * rootCamera.pixelsPerRootUnit)
   })
 
   it('an ordinary step on the same board does not move the camera', () => {
@@ -195,5 +199,41 @@ describe.skipIf(!hasSample('file_format_example.txt'))('file_format_example: ins
     expect(camera.pixelsPerRootUnit).toBeCloseTo(300 / (3 + 2))
     // Outside the loop (on the root board) the level anchor is used as before.
     expect(cameraForFocus(start, viewport, { marginCells: 1 }, anchorBoardId).anchorBoardId).toBeUndefined()
+  })
+})
+
+describe('interpolateCamera', () => {
+  const source = { anchor: 'root' as const, centerX: 3.5, centerY: 3.5, pixelsPerRootUnit: 50 }
+  const target = { anchor: 'root' as const, centerX: 5.5, centerY: 2.5, pixelsPerRootUnit: 350 }
+
+  it('starts at the source and ends exactly at the target', () => {
+    expect(interpolateCamera(source, target, 0)).toMatchObject(source)
+    const end = interpolateCamera(source, target, 1)
+    expect(end.centerX).toBeCloseTo(target.centerX)
+    expect(end.centerY).toBeCloseTo(target.centerY)
+    expect(end.pixelsPerRootUnit).toBeCloseTo(target.pixelsPerRootUnit)
+  })
+
+  it('zooms geometrically: half way is the geometric mean, like a gliding piece\'s size', () => {
+    expect(interpolateCamera(source, target, 0.5).pixelsPerRootUnit).toBeCloseTo(Math.sqrt(50 * 350))
+  })
+
+  it('the point being zoomed into stays at the same place on screen the whole way', () => {
+    const viewport = { width: 400, height: 400 }
+    // The fixed point of the zoom: same screen position in source and target.
+    const fx = (target.centerX * 350 - source.centerX * 50) / (350 - 50)
+    const fy = (target.centerY * 350 - source.centerY * 50) / (350 - 50)
+    const start = worldToScreen(fx, fy, source, viewport)
+    for (const t of [0.25, 0.5, 0.75]) {
+      const p = worldToScreen(fx, fy, interpolateCamera(source, target, t), viewport)
+      expect(p.x).toBeCloseTo(start.x)
+      expect(p.y).toBeCloseTo(start.y)
+    }
+  })
+
+  it('without a zoom change it is a plain slide', () => {
+    const a = { ...source, pixelsPerRootUnit: 80 }
+    const b = { ...target, pixelsPerRootUnit: 80 }
+    expect(interpolateCamera(a, b, 0.5).centerX).toBeCloseTo(4.5)
   })
 })

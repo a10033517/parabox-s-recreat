@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { BoardId, PieceId, World, findContainerFor } from '../game/engine/types'
 import { DEFAULT_RENDER_BUDGET, DrawContext, PIECE_COLORS, drawBoardRecursive, indexPiecesByBoard, isCloneInstance, resolveRecursionTarget } from '../game/render/CanvasRenderer'
-import { CameraTransform } from '../game/render/camera'
+import { CameraTransform, anchorRoomFraction } from '../game/render/camera'
 import { hitTestChain } from '../game/render/hitTest'
-import { BoardTransform } from '../game/render/recursiveTransform'
+import { BoardTransform, resolveAnchorBoardId } from '../game/render/recursiveTransform'
 
 const KIND_NAME = { player: '玩家', normal: '实心箱', container: '箱子' } as const
 
@@ -87,11 +87,12 @@ export function InspectView({ world, pieceId, onClose }: { world: World; pieceId
     const dpr = window.devicePixelRatio || 1
     canvas.width = Math.round(side * dpr)
     canvas.height = Math.round(side * dpr)
-    // Framed like the game frames the box the player is in: the box plus a margin of the room
-    // around it. A box standing nowhere (no location) is drawn alone.
+    // Framed like the game frames the box the player is in: the box as big as the level's own
+    // room, its surroundings in the margin around it. A box standing nowhere is drawn alone.
     const placed = world.locations[current] !== undefined && world.boards[world.locations[current]!.board] !== undefined
-    const margin = placed ? DEFAULT_RENDER_BUDGET.marginCells * board.size : 0.2
-    const camera: CameraTransform = { anchor: 'root', centerX: board.size / 2, centerY: board.size / 2, pixelsPerRootUnit: side / (board.size + 2 * margin) }
+    const levelAnchor = resolveAnchorBoardId(world, 'root')
+    const fraction = placed && levelAnchor !== null ? anchorRoomFraction(world, levelAnchor, DEFAULT_RENDER_BUDGET) : board.size / (board.size + 0.4)
+    const camera: CameraTransform = { anchor: 'root', centerX: board.size / 2, centerY: board.size / 2, pixelsPerRootUnit: (side * fraction) / board.size }
     const viewport = { width: side, height: side }
     const root: BoardTransform = placed ? ringAround(world, current, board.size) : { boardId, originX: 0, originY: 0, scale: 1 }
     viewRef.current = { camera, viewport, root }

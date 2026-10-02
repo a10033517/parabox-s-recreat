@@ -4,7 +4,7 @@ import { possess } from './engine/rules'
 import { BoardId, Direction, Location, PieceId, PLAYER_ID, VOID_BOARD_ID, World } from './engine/types'
 import { DrawContext, DEFAULT_RENDER_BUDGET, drawBoardRecursive, drawPiece, indexPiecesByBoard } from './render/CanvasRenderer'
 import { CrossBoardMove, crossBoardMoves, flipScaleAt, flippedPieces, interpolateCell } from './render/moveAnimation'
-import { CameraTransform, Viewport, cameraForFocus } from './render/camera'
+import { CameraTransform, Viewport, cameraForFocus, interpolateCamera } from './render/camera'
 import { resolveAnchorBoardId, resolveDrawRoot } from './render/recursiveTransform'
 import { classifyEpsilonVisuals, epsilonSpawnScale } from './render/epsilonAnimation'
 import { DPad } from '../ui/DPad'
@@ -321,13 +321,8 @@ export function GameScreen({
             }
           } else {
             world = anim.postWorld
-            camera = {
-              ...(anim.targetCamera.anchorBoardId !== undefined ? { anchorBoardId: anim.targetCamera.anchorBoardId } : {}),
-              anchor: anim.targetCamera.anchor,
-              centerX: lerp(anim.sourceCamera.centerX, anim.targetCamera.centerX, t),
-              centerY: lerp(anim.sourceCamera.centerY, anim.targetCamera.centerY, t),
-              pixelsPerRootUnit: lerp(anim.sourceCamera.pixelsPerRootUnit, anim.targetCamera.pixelsPerRootUnit, t),
-            }
+            // Same progress (t) as the gliding pieces, so the zoom lands with them.
+            camera = interpolateCamera(anim.sourceCamera, anim.targetCamera, t)
           }
         }
       } else {
