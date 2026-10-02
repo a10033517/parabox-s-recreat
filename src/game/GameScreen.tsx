@@ -435,7 +435,7 @@ export function GameScreen({
         </div>
       </header>
       {hint !== undefined && <div className="level-hint">{hint}</div>}
-      {wholeScreen ? stage : <SwipeLayer className="swipe-board" onMove={handleMove} settings={settings} onTap={inspectAt} onLongPress={inspectAt}>{stage}</SwipeLayer>}
+      <SwipeLayer className="swipe-board" disabled={wholeScreen} onMove={handleMove} settings={settings} onTap={inspectAt} onLongPress={inspectAt}>{stage}</SwipeLayer>
       {showDPad ? <DPad onMove={handleMove} /> : <div className="controls-hint">{settings.controls === 'tap' ? '点画面的上、下、左、右边来移动' : '在画面上滑动来移动'}</div>}
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
       {inspecting !== null && <InspectView world={state.current} pieceId={inspecting} onClose={() => setInspecting(null)} />}
@@ -455,9 +455,10 @@ export function GameScreen({
     </>
   )
 
-  return wholeScreen ? (
-    <SwipeLayer className="game-screen swipe-screen" onMove={handleMove} settings={settings} onTap={inspectAt} onLongPress={inspectAt}>{content}</SwipeLayer>
-  ) : (
-    <div className="game-screen">{content}</div>
+  // One element tree whatever the controls: switching where swipes count must not re-create the
+  // canvas (the render loop holds on to it — a new one would stay black). Only which layer
+  // listens changes.
+  return (
+    <SwipeLayer className="game-screen swipe-screen" disabled={!wholeScreen} onMove={handleMove} settings={settings} onTap={inspectAt} onLongPress={inspectAt}>{content}</SwipeLayer>
   )
 }
