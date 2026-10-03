@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { crossBoardMoves, flipScaleAt, flippedPieces, interpolateCell, pieceCellInAnchor } from './moveAnimation'
+import { crossBoardMoves, flipScaleAt, flippedPieces, interpolateCell, pieceCellInAnchor, selfLoopTransits } from './moveAnimation'
+import { EngineEvent, withEngineContext } from '../engine/events'
 import { applyMove } from '../engine/rules'
 import { makeFloorBoard, makeWorld, setWall } from '../engine/testFixtures'
-import { PLAYER_ID, World } from '../engine/types'
+import { Direction, PLAYER_ID, World } from '../engine/types'
 
 function nested(fliph = false): World {
   // root 4x4; box B (3x3 interior 'bIn') at root (2,1); the player on root at (1,1).
@@ -86,5 +87,51 @@ describe('flip animation', () => {
     expect(flipScaleAt(0)).toBeCloseTo(-1)
     expect(flipScaleAt(0.5)).toBeCloseTo(0)
     expect(flipScaleAt(1)).toBeCloseTo(1)
+  })
+})
+
+describe('selfLoopTransits', () => {
+  // A 5x5 room holding a box L, at (2,2) with a wall behind it, that leads into the room itself.
+  const loopWorld = (player: { x: number; y: number }) => {
+    const root = makeFloorBoard('root', 5)
+    setWall(root, 3, 2)
+    return makeWorld(
+      [root],
+      [{ id: PLAYER_ID, kind: 'player' }, { id: 'L', kind: 'container', boardRef: 'root' }],
+      { [PLAYER_ID]: { board: 'root', ...player }, L: { board: 'root', x: 2, y: 2 } },
+    )
+  }
+  const step = (world: World, dir: Direction) => {
+    const events: EngineEvent[] = []
+    const next = withEngineContext({ events }, () => applyMove(world, dir))
+    if (next === null) throw new Error('blocked')
+    return { next, events }
+  }
+
+  it('leaving the room through its own box: glides out of the box cell, the camera zooms out of it', () => {
+    const pre = loopWorld({ x: 0, y: 2 })
+    const { next, events } = step(pre, 'left')
+    expect(next.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 2 }) // came out beside L
+    const transit = selfLoopTransits(pre, next, events, 'root')
+    expect(transit.player).toEqual({ kind: 'exit', boxCell: { originX: 2, originY: 2, scale: 1, mirrorH: false } })
+    // From where the room's copy inside L shows the player (in L's cell, a fifth of the size).
+    expect(transit.moves).toEqual([
+      { pieceId: PLAYER_ID, from: { originX: 2, originY: 2.4, scale: 0.2, mirrorH: false }, to: { originX: 1, originY: 2, scale: 1, mirrorH: false } },
+    ])
+  })
+
+  it('walking into its own box: shrinks into the box cell, the camera zooms into it', () => {
+    const pre = loopWorld({ x: 1, y: 2 })
+    const { next, events } = step(pre, 'right')
+    expect(next.locations[PLAYER_ID]).toEqual({ board: 'root', x: 0, y: 2 }) // the room's left edge
+    const transit = selfLoopTransits(pre, next, events, 'root')
+    expect(transit.player?.kind).toBe('enter')
+    expect(transit.moves[0].to).toEqual({ originX: 2, originY: 2.4, scale: 0.2, mirrorH: false })
+  })
+
+  it('an ordinary step makes no transit', () => {
+    const pre = loopWorld({ x: 1, y: 1 })
+    const { next, events } = step(pre, 'up')
+    expect(selfLoopTransits(pre, next, events, 'root')).toEqual({ moves: [] })
   })
 })
