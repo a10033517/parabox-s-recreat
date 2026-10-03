@@ -3,7 +3,7 @@ import { GameState } from './engine/GameState'
 import { possess } from './engine/rules'
 import { BoardId, Direction, Location, PieceId, PLAYER_ID, VOID_BOARD_ID, World, isInVoidSpace } from './engine/types'
 import { DrawContext, DEFAULT_RENDER_BUDGET, drawBoardRecursive, drawPiece, indexPiecesByBoard } from './render/CanvasRenderer'
-import { CrossBoardMove, crossBoardMoves, flipScaleAt, flippedPieces, interpolateCell } from './render/moveAnimation'
+import { CrossBoardMove, crossBoardMoves, selfLoopTransits, flipScaleAt, flippedPieces, interpolateCell } from './render/moveAnimation'
 import { CameraTransform, Viewport, anchorRoomFraction, cameraForFocus, interpolateCamera } from './render/camera'
 import { resolveAnchorBoardId, resolveDrawRoot } from './render/recursiveTransform'
 import { classifyEpsilonVisuals, epsilonSpawnScale } from './render/epsilonAnimation'
@@ -11,7 +11,7 @@ import { DPad } from '../ui/DPad'
 import { SwipeLayer } from '../ui/SwipeLayer'
 import { SettingsPanel } from '../ui/SettingsPanel'
 import { hitTestChain } from './render/hitTest'
-import { PeekLevel, peekCamera, peekTargetAt, playerRoomRect } from './render/peek'
+import { PeekRect, peekCamera, peekRects, peekTargetAt, playerInPeekedRoom, playerRoomRect } from './render/peek'
 import { BoardTransform } from './render/recursiveTransform'
 import { EyeAnimator } from './render/eyes'
 import { music } from '../audio/music'
@@ -154,19 +154,27 @@ export function GameScreen({
 
   // Peeking into boxes (peek.ts): the levels zoomed into, outermost first, and the camera glide
   // between views. Any move, undo or restart ends the peek.
-  const peekRef = useRef<PeekLevel[]>([])
+  const peekRef = useRef<PieceId[]>([])
   const cameraGlideRef = useRef<{ from: CameraTransform; startMs: number } | null>(null)
   const glideFromShown = () => {
     const shown = lastFrameRef.current?.camera
     cameraGlideRef.current = shown === undefined ? null : { from: shown, startMs: performance.now() }
   }
+  // Where the box being peeked into is drawn now (null: not peeking, or the peek no longer holds).
+  const peekedRect = (world: World, base: CameraTransform): PeekRect | null => {
+    if (peekRef.current.length === 0) return null
+    const anchor = cameraAnchorBoard(base, world, rootAnchorBoardId)
+    const rects = anchor === null ? null : peekRects(world, anchor, peekRef.current)
+    if (rects === null) peekRef.current = [] // the peeked box is gone from where it was
+    return rects === null ? null : rects[rects.length - 1]
+  }
   // Where the camera rests: the box being peeked into, or the normal view.
   const restingCamera = (world: World, viewport: Viewport): CameraTransform => {
     const base = cameraForFocus(world, viewport, { marginCells: DEFAULT_RENDER_BUDGET.marginCells }, rootAnchorBoardId)
-    const peek = peekRef.current[peekRef.current.length - 1]
+    const rect = peekedRect(world, base)
     const anchor = cameraAnchorBoard(base, world, rootAnchorBoardId)
-    if (peek === undefined || anchor === null) return base
-    return peekCamera(base, peek.rect, viewport, anchorRoomFraction(world, anchor, DEFAULT_RENDER_BUDGET))
+    if (rect === null || anchor === null) return base
+    return peekCamera(base, rect, viewport, anchorRoomFraction(world, anchor, DEFAULT_RENDER_BUDGET))
   }
   const endPeek = (glide: boolean) => {
     if (peekRef.current.length === 0) return
@@ -185,8 +193,8 @@ export function GameScreen({
     const sx = clientX - bounds.left
     const sy = clientY - bounds.top
     const anchor = cameraAnchorBoard(frame.camera, frame.world, rootAnchorBoardId)
-    const peek = peekRef.current[peekRef.current.length - 1]
-    const view = peek?.rect ?? (anchor === null ? null : playerRoomRect(frame.world, anchor))
+    const base = cameraForFocus(frame.world, frame.viewport, { marginCells: DEFAULT_RENDER_BUDGET.marginCells }, rootAnchorBoardId)
+    const view = peekRef.current.length > 0 ? peekedRect(frame.world, base) : anchor === null ? null : playerRoomRect(frame.world, anchor)
     if (view === null) return
     const target = peekTargetAt(frame.world, frame.camera, frame.viewport, hitTestChain(frame, sx, sy), view, sx, sy)
     if (target === null) return
@@ -194,7 +202,7 @@ export function GameScreen({
       if (peekRef.current.length === 0) return
       peekRef.current = peekRef.current.slice(0, -1)
     } else {
-      peekRef.current = [...peekRef.current, target]
+      peekRef.current = [...peekRef.current, target.pieceId]
     }
     glideFromShown()
   }
@@ -235,12 +243,13 @@ export function GameScreen({
     if (pausedRef.current) return
     // The eyes look the way the player goes, even when the move is blocked.
     eyeAnimator.look(direction, performance.now())
-    // Moving ends a peek: the camera comes back from wherever it was looking.
+    // Moving ends a peek — the camera comes back from wherever it was looking — unless the
+    // player is in the room being looked at (a box that contains itself), then it stays.
     const peeking = peekRef.current.length > 0
     const shownCamera = lastFrameRef.current?.camera
     const preMoveWorld = state.current
     const moved = state.move(direction)
-    endPeek(!moved)
+    if (!playerInPeekedRoom(state.current, peekRef.current[peekRef.current.length - 1])) endPeek(!moved)
     if (!moved) return
     if (settingsRef.current.haptics) moveFeedback()
     const postMoveWorld = state.current
@@ -257,20 +266,25 @@ export function GameScreen({
       .find(([, visual]) => visual === 'Spawn')?.[0]
     const budget = { marginCells: DEFAULT_RENDER_BUDGET.marginCells }
     const sourceCamera = peeking && shownCamera !== undefined ? shownCamera : cameraForFocus(preMoveWorld, viewportRef.current, budget, rootAnchorBoardId)
-    const targetCamera = cameraForFocus(postMoveWorld, viewportRef.current, budget, rootAnchorBoardId)
+    const targetCamera = restingCamera(postMoveWorld, viewportRef.current)
     // Pieces glide / flip only when both frames share one coordinate space (no Void swap).
     const sameSpace = kind !== 'void-transition' && sameCameraSpace(sourceCamera, targetCamera)
     const anchorBoardId = sameSpace ? cameraAnchorBoard(targetCamera, postMoveWorld, rootAnchorBoardId) : null
+    // Into / out of a box holding its own room: the same board before and after, but animated
+    // like any box — the piece grows out of / shrinks into the box's small copy of the room. The
+    // camera stays where it is.
+    const loops = anchorBoardId !== null ? selfLoopTransits(animPreWorld, postMoveWorld, state.lastEvents, anchorBoardId) : { moves: [] }
+    const animKind = loops.moves.length > 0 && kind === 'move' ? 'enter-leave' : kind
     animationRef.current = {
       preWorld: animPreWorld,
       postWorld: postMoveWorld,
       startTimeMs: performance.now(),
-      durationMs: spawnedEpsilon ? EPSILON_SPAWN_DURATION_MS : DURATIONS[kind],
+      durationMs: spawnedEpsilon ? EPSILON_SPAWN_DURATION_MS : DURATIONS[animKind],
       spawnEpsilonId,
-      kind,
+      kind: animKind,
       sourceCamera,
       targetCamera,
-      crossBoard: anchorBoardId !== null ? crossBoardMoves(animPreWorld, postMoveWorld, anchorBoardId) : [],
+      crossBoard: anchorBoardId !== null ? [...crossBoardMoves(animPreWorld, postMoveWorld, anchorBoardId), ...loops.moves] : [],
       flipped: sameSpace ? flippedPieces(animPreWorld, postMoveWorld) : new Set(),
     }
     setTick((t) => t + 1)

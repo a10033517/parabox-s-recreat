@@ -9,7 +9,7 @@ import { BoardTransform } from './recursiveTransform'
 const ROOT_HOST_COLOR = '#d4d4d4'
 export const FLOOR_COLOR = shade(ROOT_HOST_COLOR, -0.58)
 const WALL_COLOR = shade(ROOT_HOST_COLOR, 0.12)
-const OUTLINE_COLOR = '#141414'
+const SHADOW_COLOR = 'rgba(0, 0, 0, 0.35)'
 const WALL_SHADOW = 'rgba(0,0,0,0.28)'
 const EYE_COLOR = '#2a0016'
 const EYE_COLOR_ON_INTERIOR = '#ffd6ec'
@@ -455,6 +455,7 @@ function drawPieceBody(
   // A clone is drawn in a lighter, brighter shade of its original (user request, 2026-09-25),
   // shell and interior alike (the interior's walls / floor are shades of this color).
   const baseColor = isCloneInstance(dc.world, piece) ? shade(ownColor, CLONE_LIGHTEN) : ownColor
+  drawPieceShadow(dc.ctx, pieceRect, screenCellSize)
   dc.ctx.fillStyle = applyTint(baseColor, tintAmount)
   dc.ctx.fillRect(pieceRect.left, pieceRect.top, screenCellSize, screenCellSize)
 
@@ -490,7 +491,6 @@ function drawPieceBody(
   }
   // A block the player could possess shows faint, empty eyes.
   else if (piece.possessable === true) drawEyes(dc.ctx, pieceRect, screenCellSize, POSSESSABLE_EYE_COLOR)
-  drawPieceOutline(dc.ctx, pieceRect, screenCellSize)
 
   // Static paradox badge: an unconditional overlay for a level-authored infExit/infEnter
   // piece, drawn on top of whatever recursive content was (or wasn't) drawn above — see
@@ -547,14 +547,13 @@ function lockRingWidth(cellSize: number): number {
 }
 
 // Dark border around every piece (a path, not strokeRect: strokeRect is reserved for state rings).
-function drawPieceOutline(ctx: CanvasRenderingContext2D, rect: ScreenRect, cellSize: number): void {
-  const w = Math.min(4, Math.max(1, cellSize * 0.03))
-  ctx.fillStyle = OUTLINE_COLOR
+// A piece's shadow: a dark copy of its cell just below and to the right, drawn UNDER the piece
+// (as in the original), so nothing is ever painted over the piece or what is inside it.
+function drawPieceShadow(ctx: CanvasRenderingContext2D, rect: ScreenRect, cellSize: number): void {
+  const offset = Math.min(8, Math.max(1, cellSize * 0.06))
+  ctx.fillStyle = SHADOW_COLOR
   ctx.beginPath()
-  ctx.rect(rect.left, rect.top, cellSize, w)
-  ctx.rect(rect.left, rect.top + cellSize - w, cellSize, w)
-  ctx.rect(rect.left, rect.top + w, w, cellSize - 2 * w)
-  ctx.rect(rect.left + cellSize - w, rect.top + w, w, cellSize - 2 * w)
+  ctx.rect(rect.left + offset, rect.top + offset, cellSize, cellSize)
   ctx.fill()
 }
 

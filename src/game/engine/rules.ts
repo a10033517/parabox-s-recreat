@@ -187,8 +187,14 @@ function tryMovePieceImpl(
   //   self-loop it climbs through is right behind it in the same push — it would come out
   //   beside that self-loop, which is itself on the move (user-reported, 2026-09-24: this must
   //   come out of ∞∞, not overlap).
+  // - But when the level has no ∞ box to come out of, a pushed piece that would land back on
+  //   its own cell is simply not moving: the push fails as if against a wall (official
+  //   behaviour, user-reported 2026-10-03). So boxes pushed after it stay put, and when the
+  //   pusher is the self-containing box itself it falls back to eating the piece, which comes
+  //   in at the middle of the room's edge — never into the Void.
   if (target.viaOwner !== undefined && occupantAt(world, target.location) === pieceId) {
     if (inMotion.size === 0) return target.flipped === true ? toggleFlip(world, pieceId) : world
+    if (findAuthoredInfiniteExitCandidates(world, target.viaOwner).filter((id) => id !== pieceId).length === 0) return null
     return resolveInfiniteExit(world, pieceId, target.viaOwner, dir, inMotion)
   }
 
