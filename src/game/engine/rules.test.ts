@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { computeTarget, getEntryCell, applyMove, tryEnter, tryMovePiece, resolveBlocked, resolveInfiniteExit, resolveCloneTeleport, checkWin } from './rules'
 import { HALF, makeFraction, ZERO, ONE } from './fraction'
 import { makeFloorBoard, makeWorld, setWall, setRequirement } from './testFixtures'
-import { PLAYER_ID, Attempt, World } from './types'
+import { PLAYER_ID, Attempt, VOID_BOARD_ID, World } from './types'
 
 describe('computeTarget', () => {
   it('returns the adjacent cell unchanged when it stays within the board', () => {
@@ -1290,5 +1290,63 @@ describe('Clone as a reference to its source block (C01–C14 subset)', () => {
     )
     const next = applyMove(world, 'right')!
     expect(next.locations[PLAYER_ID]).toEqual({ board: 'root', x: 0, y: 3 })
+  })
+})
+
+describe('a self-containing box pushed onto a box at the edge eats it (official, user-reported 2026-10-03)', () => {
+  // 5x5 room; L leads into the room itself. The box b sits on the bottom edge right below L,
+  // the player right above L.
+  function world(): World {
+    return makeWorld(
+      [makeFloorBoard('root', 5)],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'L', kind: 'container', boardRef: 'root' },
+        { id: 'b', kind: 'normal' },
+      ],
+      { [PLAYER_ID]: { board: 'root', x: 1, y: 2 }, L: { board: 'root', x: 1, y: 3 }, b: { board: 'root', x: 1, y: 4 } },
+    )
+  }
+
+  it('pushing b down would take it out through L — the box doing the pushing — so L eats b instead', () => {
+    const next = applyMove(world(), 'down')
+    expect(next).not.toBeNull()
+    expect(next!.locations.L).toEqual({ board: 'root', x: 1, y: 4 })
+    expect(next!.locations[PLAYER_ID]).toEqual({ board: 'root', x: 1, y: 3 })
+    // b went into L through its bottom side: the middle of the room's bottom edge. Not the Void.
+    expect(next!.locations.b).toEqual({ board: 'root', x: 2, y: 4 })
+    expect(Object.values(next!.locations).some((l) => l.board === VOID_BOARD_ID)).toBe(false)
+  })
+})
+
+describe('a pushed box that would come back to its own cell is a wall (official, user-reported 2026-10-03)', () => {
+  // 5x5 room; L leads into the room itself, with box X right below it on the bottom edge.
+  // Two boxes stand in column 3 on the bottom edge, the player above them.
+  function world(): World {
+    return makeWorld(
+      [makeFloorBoard('root', 5)],
+      [
+        { id: PLAYER_ID, kind: 'player' },
+        { id: 'L', kind: 'container', boardRef: 'root' },
+        { id: 'X', kind: 'normal' },
+        { id: 'top', kind: 'normal' },
+        { id: 'bottom', kind: 'normal' },
+      ],
+      {
+        [PLAYER_ID]: { board: 'root', x: 3, y: 2 },
+        L: { board: 'root', x: 1, y: 3 },
+        X: { board: 'root', x: 1, y: 4 },
+        top: { board: 'root', x: 3, y: 3 },
+        bottom: { board: 'root', x: 3, y: 4 },
+      },
+    )
+  }
+
+  it('the bottom box would go out through L onto X, and X out through L back onto itself: nothing moves', () => {
+    const before = world()
+    const next = applyMove(before, 'down')
+    const after = next ?? before
+    for (const id of [PLAYER_ID, 'L', 'X', 'top', 'bottom']) expect(after.locations[id]).toEqual(before.locations[id])
+    expect(Object.values(after.locations).some((l) => l.board === VOID_BOARD_ID)).toBe(false)
   })
 })
